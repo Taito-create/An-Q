@@ -1,0 +1,383 @@
+import { StyleSheet, TouchableOpacity, Alert, Text, View } from 'react-native';
+import { useState, useEffect } from 'react';
+import { Link, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { translations, Language } from './i18n';
+
+const quizData = [
+  {
+    question: "JavaScriptはプログラミング言語である。",
+    answer: true
+  },
+  {
+    question: "HTMLはハイパーテキスト・マークランゲージを表している",
+    answer: true
+  },
+  {
+    question: "CSSはデータベース管理に使われている",
+    answer: false
+  }
+];
+
+export default function HomeScreen() {
+  const [allQuestions, setAllQuestions] = useState(quizData);
+  const [enabledQuestions, setEnabledQuestions] = useState(quizData);
+  const [timerMinutes, setTimerMinutes] = useState(3);
+  const [language, setLanguage] = useState<Language>('ja');
+  const router = useRouter();
+
+  // Load saved questions on component mount
+  useEffect(() => {
+    loadSavedQuestions();
+    loadTimerSetting();
+    loadLanguageSetting();
+  }, []);
+
+  const t = (key: keyof typeof translations.ja) => translations[language][key as keyof typeof translations.ja];
+
+  const loadSavedQuestions = async () => {
+    try {
+      const savedQuestions = await AsyncStorage.getItem('userQuestions');
+      if (savedQuestions) {
+        const userQuestions = JSON.parse(savedQuestions);
+        const combinedQuestions = [...quizData, ...userQuestions];
+        setAllQuestions(combinedQuestions);
+        setEnabledQuestions(combinedQuestions.filter(q => q.enabled !== false));
+      }
+    } catch (error) {
+      console.error('Error loading questions:', error);
+    }
+  };
+
+  const loadTimerSetting = async () => {
+    try {
+      const timerSetting = await AsyncStorage.getItem('timerSetting');
+      if (timerSetting) {
+        setTimerMinutes(parseInt(timerSetting));
+      }
+    } catch (error) {
+      console.error('Error loading timer setting:', error);
+    }
+  };
+
+  const loadLanguageSetting = async () => {
+    try {
+      const savedLanguage = await AsyncStorage.getItem('language');
+      if (savedLanguage && (savedLanguage === 'ja' || savedLanguage === 'en')) {
+        setLanguage(savedLanguage as Language);
+      }
+    } catch (error) {
+      console.error('Error loading language setting:', error);
+    }
+  };
+
+  const toggleLanguage = async () => {
+    const newLanguage = language === 'ja' ? 'en' : 'ja';
+    setLanguage(newLanguage);
+    try {
+      await AsyncStorage.setItem('language', newLanguage);
+    } catch (error) {
+      console.error('Error saving language setting:', error);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{t('appTitle')}</Text>
+        <TouchableOpacity style={styles.languageToggle} onPress={toggleLanguage}>
+          <Text style={styles.languageText}>{language === 'ja' ? 'JP' : 'EN'}</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{allQuestions.length}</Text>
+          <Text style={styles.statLabel}>{t('totalQuestions')}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{enabledQuestions.length}</Text>
+          <Text style={styles.statLabel}>{t('enabled')}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{timerMinutes}m</Text>
+          <Text style={styles.statLabel}>{t('timer')}</Text>
+        </View>
+      </View>
+      
+      {/* Icon Grid Navigation */}
+      <View style={styles.iconGrid}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/quiz')}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.iconText}>▶</Text>
+          </View>
+          <Text style={styles.iconText}>{t('startQuiz')}</Text>
+          <Text style={styles.subtitle}>{enabledQuestions.length} {t('questionsAvailable')}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/create')}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.iconText}>+</Text>
+          </View>
+          <Text style={styles.iconText}>{t('create')}</Text>
+          <Text style={styles.subtitle}>{t('manualOrAI')}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/manage')}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.iconText}>⚙</Text>
+          </View>
+          <Text style={styles.iconText}>{t('manage')}</Text>
+          <Text style={styles.subtitle}>{t('timerAndSettings')}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/browse')}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.iconText}>📖</Text>
+          </View>
+          <Text style={styles.iconText}>{t('browse')}</Text>
+          <Text style={styles.subtitle}>{t('viewAndEdit')}</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Quick Stats */}
+      <View style={styles.statsContainer}>
+        <Text style={styles.statsTitle}>{t('quickStats')}</Text>
+        <Text style={styles.statsText}>
+          {t('totalQuestions')}: {enabledQuestions.length}
+        </Text>
+        <Text style={styles.statsText}>
+          {t('timerSetting')}: {timerMinutes} {t('min')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    maxWidth: 800,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  title: {
+    marginBottom: 20,
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  languageToggle: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  languageText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  questionContainer: {
+    backgroundColor: '#e8e8e8',
+    padding: 20,
+    borderRadius: 10,
+    marginBottom: 30,
+    width: '100%',
+  },
+  question: {
+    textAlign: 'center',
+    fontSize: 18,
+    color: 'black',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 20,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  button: {
+    padding: 15,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  trueButton: {
+    backgroundColor: '#4CAF50',
+  },
+  falseButton: {
+    backgroundColor: '#f44336',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  feedback: {
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  scoreText: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  questionNumber: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  createNavButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '100%',
+  },
+  createNavButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  manageNavButton: {
+    backgroundColor: '#FF9500',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '100%',
+  },
+  manageNavButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  timerContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  timerText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  timerButton: {
+    backgroundColor: '#4CAF50',
+    padding: 8,
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    marginTop: 5,
+  },
+  timerButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+    gap: 15,
+  },
+  iconButton: {
+    width: '48%',
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 150,
+  },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  icon: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  iconText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  iconLabel: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+  },
+  statsContainer: {
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  statsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  statsText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+});

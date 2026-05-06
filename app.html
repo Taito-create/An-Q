@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App v3.0</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007AFF;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .icon-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .icon-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .icon-button:hover {
+            background: #0056CC;
+        }
+        .icon-text {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .icon-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .icon-subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .language-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #f5c6cb;
+            margin-bottom: 20px;
+        }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #c3e6cb;
+            margin-bottom: 20px;
+        }
+        
+        /* Quiz Screen Styles */
+        .quiz-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .question-card {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .question-number {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .question-text {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 30px;
+            line-height: 1.4;
+        }
+        .answer-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        .answer-btn {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .true-btn {
+            background: #28a745;
+            color: white;
+        }
+        .true-btn:hover {
+            background: #218838;
+        }
+        .false-btn {
+            background: #dc3545;
+            color: white;
+        }
+        .false-btn:hover {
+            background: #c82333;
+        }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        /* Results Screen Styles */
+        .results-container {
+            text-align: center;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .score-display {
+            margin-bottom: 30px;
+        }
+        .score-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #007AFF;
+            margin-bottom: 10px;
+        }
+        .score-percentage {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .performance-message {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .action-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .action-btn:hover {
+            background: #0056CC;
+        }
+        
+        /* Create Question Styles */
+        .create-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        .answer-options {
+            display: flex;
+            gap: 20px;
+        }
+        .answer-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: normal;
+        }
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .submit-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        
+        /* Manage Questions Styles */
+        .manage-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .questions-list {
+            margin-bottom: 20px;
+        }
+        .question-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .question-info {
+            flex: 1;
+        }
+        .question-text {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .question-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .question-actions {
+            margin-left: 15px;
+        }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        /* Browse Questions Styles */
+        .browse-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .browse-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .browse-list {
+            margin-bottom: 20px;
+        }
+        .browse-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .browse-number {
+            background: #007AFF;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .browse-content {
+            flex: 1;
+        }
+        .browse-question {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .browse-answer {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <button class="language-toggle" id="languageToggle">JP/EN</button>
+    
+    <div class="container" id="mainContainer">
+        <h1 class="title" id="appTitle">Quiz App</h1>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalQuestions">3</div>
+                <div class="stat-label" id="totalLabel">Total</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="enabledQuestions">3</div>
+                <div class="stat-label" id="enabledLabel">Enabled</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="timerMinutes">3m</div>
+                <div class="stat-label" id="timerLabel">Timer</div>
+            </div>
+        </div>
+        
+        <div class="icon-grid">
+            <button class="icon-button" id="startQuizBtn">
+                <div class="icon-text">?</div>
+                <div class="icon-title" id="startQuiz">Start Quiz</div>
+                <div class="icon-subtitle" id="questionsAvailable">3 questions available</div>
+            </button>
+            
+            <button class="icon-button" id="createQuestionBtn">
+                <div class="icon-text">+</div>
+                <div class="icon-title" id="create">Create</div>
+                <div class="icon-subtitle" id="manualOrAI">Manual or AI</div>
+            </button>
+            
+            <button class="icon-button" id="manageQuestionsBtn">
+                <div class="icon-text">?</div>
+                <div class="icon-title" id="manage">Manage</div>
+                <div class="icon-subtitle" id="timerAndSettings">Timer & Settings</div>
+            </button>
+            
+            <button class="icon-button" id="browseQuestionsBtn">
+                <div class="icon-text">?</div>
+                <div class="icon-title" id="browse">Browse</div>
+                <div class="icon-subtitle" id="viewAndEdit">View & Edit</div>
+            </button>
+        </div>
+        
+        <div id="message"></div>
+    </div>
+
+    <script>
+        let currentLanguage = 'en';
+        
+        const translations = {
+            en: {
+                appTitle: 'Quiz App',
+                totalQuestions: 'Total Questions',
+                enabled: 'Enabled',
+                timer: 'Timer',
+                startQuiz: 'Start Quiz',
+                questionsAvailable: 'questions available',
+                create: 'Create',
+                manualOrAI: 'Manual or AI',
+                manage: 'Manage',
+                timerAndSettings: 'Timer & Settings',
+                browse: 'Browse',
+                viewAndEdit: 'View & Edit',
+                quizStarted: 'Quiz started!',
+                questionCreated: 'Question created!',
+                settingsOpened: 'Settings opened!',
+                browseOpened: 'Browse opened!',
+                question: 'Question',
+                backToHome: 'Back to Home',
+                correct: 'Correct',
+                incorrect: 'Incorrect',
+                trueButton: 'True',
+                falseButton: 'False',
+                trueButtonJP: 'Maru',
+                falseButtonJP: 'Batsu',
+                quizResults: 'Quiz Results',
+                greatJob: 'Great job!',
+                keepPracticing: 'Keep practicing!',
+                tryAgain: 'Try Again',
+                enterQuestion: 'Enter Question',
+                questionPlaceholder: 'Type your question here...',
+                selectAnswer: 'Select Answer',
+                selectSource: 'Select Source',
+                saveQuestion: 'Save Question',
+                pleaseEnterQuestion: 'Please enter a question',
+                questionSaved: 'Question saved!',
+                manual: 'Manual',
+                ai: 'AI',
+                delete: 'Delete',
+                noQuestions: 'No questions available',
+                questionDeleted: 'Question deleted!',
+                answer: 'Answer',
+                source: 'Source'
+            },
+            ja: {
+                appTitle: 'クイズアプリ',
+                totalQuestions: '総問題数',
+                enabled: '有効',
+                timer: 'タイマー',
+                timerMinutes: '3分',
+                startQuiz: 'クイズ開始',
+                questionsAvailable: '問利用可能',
+                create: '作成',
+                manualOrAI: '手動またはAI',
+                manage: '管理',
+                timerAndSettings: 'タイマーと設定',
+                browse: '閲覧',
+                viewAndEdit: '表示と編集',
+                quizStarted: 'クイズが開始されました！',
+                questionCreated: '問題が作成されました！',
+                settingsOpened: '設定が開かれました！',
+                browseOpened: '閲覧が開かれました！',
+                question: '問題',
+                backToHome: 'ホームに戻る',
+                correct: '正解',
+                incorrect: '不正解',
+                quizResults: 'クイズ結果',
+                greatJob: '素晴らしい！',
+                keepPracticing: '練習を続けてください！',
+                tryAgain: 'もう一度',
+                enterQuestion: '問題を入力',
+                questionPlaceholder: 'ここに問題を入力してください...',
+                selectAnswer: '回答を選択',
+                selectSource: 'ソースを選択',
+                saveQuestion: '問題を保存',
+                pleaseEnterQuestion: '問題を入力してください',
+                questionSaved: '問題が保存されました！',
+                manual: '手動',
+                ai: 'AI',
+                delete: '削除',
+                noQuestions: '利用可能な問題がありません',
+                questionDeleted: '問題が削除されました！',
+                answer: '回答',
+                source: 'ソース'
+            },
+        };
+        
+        function t(key) {
+            try {
+                return translations[currentLanguage][key] || key;
+            } catch (error) {
+                console.error('Translation error:', error, 'Key:', key, 'Language:', currentLanguage);
+                return key;
+            }
+        }
+        
+        function updateLanguage() {
+            const elements = {
+                appTitle: document.getElementById('appTitle'),
+                totalLabel: document.getElementById('totalLabel'),
+                enabledLabel: document.getElementById('enabledLabel'),
+                timerLabel: document.getElementById('timerLabel'),
+                startQuiz: document.getElementById('startQuiz'),
+                questionsAvailable: document.getElementById('questionsAvailable'),
+                create: document.getElementById('create'),
+                manualOrAI: document.getElementById('manualOrAI'),
+                manage: document.getElementById('manage'),
+                timerAndSettings: document.getElementById('timerAndSettings'),
+                browse: document.getElementById('browse'),
+                viewAndEdit: document.getElementById('viewAndEdit')
+            };
+            
+            if (elements.appTitle) elements.appTitle.textContent = t('appTitle');
+            if (elements.totalLabel) elements.totalLabel.textContent = t('totalQuestions');
+            if (elements.enabledLabel) elements.enabledLabel.textContent = t('enabled');
+            if (elements.timerLabel) elements.timerLabel.textContent = t('timer');
+            if (elements.startQuiz) elements.startQuiz.textContent = t('startQuiz');
+            if (elements.questionsAvailable) elements.questionsAvailable.textContent = `${quizState.getQuestionsCount()} ${t('questionsAvailable')}`;
+            if (elements.create) elements.create.textContent = t('create');
+            if (elements.manualOrAI) elements.manualOrAI.textContent = t('manualOrAI');
+            if (elements.manage) elements.manage.textContent = t('manage');
+            if (elements.timerAndSettings) elements.timerAndSettings.textContent = t('timerAndSettings');
+            if (elements.browse) elements.browse.textContent = t('browse');
+            if (elements.viewAndEdit) elements.viewAndEdit.textContent = t('viewAndEdit');
+        }
+        
+        function showMessage(message, type = 'info') {
+            // Try to find existing message div, or create one
+            let messageDiv = document.getElementById('message');
+            
+            if (!messageDiv) {
+                // Create message div if it doesn't exist
+                messageDiv = document.createElement('div');
+                messageDiv.id = 'message';
+                messageDiv.style.display = 'none';
+                
+                // Add to container
+                const container = document.getElementById('mainContainer');
+                if (container) {
+                    container.appendChild(messageDiv);
+                } else {
+                    console.error('Main container not found');
+                    return;
+                }
+            }
+            
+            messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                if (messageDiv) {
+                    messageDiv.style.display = 'none';
+                }
+            }, 3000);
+        }
+        
+        // Quiz data - use object to encapsulate state
+        const quizData = [
+            { question: "JavaScript is a programming language.", answer: true },
+            { question: "HTML stands for HyperText Markup Language.", answer: true },
+            { question: "CSS is used for database management.", answer: false }
+        ];
+        
+        // Event listener management
+        const eventListeners = new Map();
+        
+        function addEventListenerWithCleanup(element, event, handler) {
+            // Remove existing listener if exists
+            if (eventListeners.has(element)) {
+                const existing = eventListeners.get(element);
+                if (existing && existing[event]) {
+                    element.removeEventListener(event, existing[event]);
+                }
+            }
+            
+            // Add new listener
+            element.addEventListener(event, handler);
+            
+            // Store reference
+            if (!eventListeners.has(element)) {
+                eventListeners.set(element, {});
+            }
+            const elementListeners = eventListeners.get(element);
+            elementListeners[event] = handler;
+        }
+        
+        function cleanupEventListeners(element) {
+            if (eventListeners.has(element)) {
+                const listeners = eventListeners.get(element);
+                Object.keys(listeners).forEach(event => {
+                    element.removeEventListener(event, listeners[event]);
+                });
+                eventListeners.delete(element);
+            }
+        }
+        
+        // Quiz state management
+        const quizState = {
+            currentQuiz: null,
+            currentQuestionIndex: 0,
+            score: 0,
+            questions: [...quizData],
+            
+            // Safe access methods
+            getCurrentQuestion() {
+                if (!this.currentQuiz || this.currentQuestionIndex >= this.currentQuiz.length) {
+                    return null;
+                }
+                return this.currentQuiz[this.currentQuestionIndex];
+            },
+            
+            resetQuiz() {
+                this.currentQuiz = [...this.questions];
+                this.currentQuestionIndex = 0;
+                this.score = 0;
+            },
+            
+            addQuestion(question) {
+                this.questions.push(question);
+            },
+            
+            removeQuestion(index) {
+                this.questions.splice(index, 1);
+            },
+            
+            getQuestionsCount() {
+                return this.questions.length;
+            }
+        };
+        
+        function startQuiz() {
+            console.log('startQuiz called');
+            quizState.resetQuiz();
+            showQuizScreen();
+        }
+        
+        function showQuizScreen() {
+            console.log('showQuizScreen called');
+            const currentQuestion = quizState.getCurrentQuestion();
+            if (!currentQuestion) {
+                console.error('No current question available');
+                return;
+            }
+            
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `
+                <button class="language-toggle" id="languageToggle">JP/EN</button>
+                <h1 class="title">${t('startQuiz')}</h1>
+                <div class="quiz-container">
+                    <div class="question-card">
+                        <div class="question-number">${t('question')} ${quizState.currentQuestionIndex + 1}/${quizState.currentQuiz.length}</div>
+                        <div class="question-text">${currentQuestion.question}</div>
+                        <div class="answer-buttons">
+                            <button class="answer-btn true-btn" id="trueBtn">${currentLanguage === 'ja' ? 'Maru' : 'True'}</button>
+                            <button class="answer-btn false-btn" id="falseBtn">${currentLanguage === 'ja' ? 'Batsu' : 'False'}</button>
+                        </div>
+                    </div>
+                    <button class="back-btn" id="backToHomeBtn">${t('backToHome')}</button>
+                </div>
+            `;
+            
+            // Add event listeners with cleanup
+            addEventListenerWithCleanup(document.getElementById('trueBtn'), 'click', () => answerQuestion(true));
+            addEventListenerWithCleanup(document.getElementById('falseBtn'), 'click', () => answerQuestion(false));
+            addEventListenerWithCleanup(document.getElementById('backToHomeBtn'), 'click', showHomeScreen);
+            addEventListenerWithCleanup(document.getElementById('languageToggle'), 'click', toggleLanguage);
+            
+            // Reset button colors to default
+            const trueBtn = document.getElementById('trueBtn');
+            const falseBtn = document.getElementById('falseBtn');
+            if (trueBtn) {
+                trueBtn.style.background = '#28a745'; // Green default
+                trueBtn.disabled = false;
+            }
+            if (falseBtn) {
+                falseBtn.style.background = '#dc3545'; // Red default
+                falseBtn.disabled = false;
+            }
+            
+            updateLanguage();
+        }
+        
+        function answerQuestion(userAnswer) {
+            console.log('answerQuestion called with:', userAnswer);
+            const currentQuestion = quizState.getCurrentQuestion();
+            console.log('Current question:', currentQuestion);
+            console.log('Current score:', quizState.score);
+            
+            if (!currentQuestion) {
+                console.error('Invalid quiz state');
+                return;
+            }
+            
+            const correct = currentQuestion.answer;
+            console.log('Correct answer:', correct);
+            
+            // Disable buttons to prevent multiple clicks
+            const buttons = document.querySelectorAll('.answer-btn');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            if (userAnswer === correct) {
+                quizState.score++;
+                showMessage(t('correct') + '!', 'success');
+                // Highlight correct answer
+                if (userAnswer) {
+                    const trueBtn = document.getElementById('trueBtn');
+                    if (trueBtn) trueBtn.style.background = '#28a745';
+                } else {
+                    const falseBtn = document.getElementById('falseBtn');
+                    if (falseBtn) falseBtn.style.background = '#28a745';
+                }
+            } else {
+                showMessage(t('incorrect') + '!', 'error');
+                // Highlight correct answer and wrong answer
+                const trueBtn = document.getElementById('trueBtn');
+                const falseBtn = document.getElementById('falseBtn');
+                if (userAnswer) {
+                    if (trueBtn) trueBtn.style.background = '#dc3545';
+                    if (falseBtn) falseBtn.style.background = '#28a745';
+                } else {
+                    if (trueBtn) trueBtn.style.background = '#28a745';
+                    if (falseBtn) falseBtn.style.background = '#dc3545';
+                }
+            }
+            
+            quizState.currentQuestionIndex++;
+            
+            // Move to next question after delay
+            setTimeout(() => {
+                if (quizState.currentQuestionIndex < quizState.currentQuiz.length) {
+                    showQuizScreen();
+                } else {
+                    showQuizResults();
+                }
+            }, 2000);
+        }
+        
+        function showQuizResults() {
+            console.log('showQuizResults called');
+            const percentage = Math.round((quizState.score / quizState.currentQuiz.length) * 100);
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `
+                <button class="language-toggle" id="languageToggle">JP/EN</button>
+                <h1 class="title">${t('quizResults')}</h1>
+                <div class="results-container">
+                    <div class="score-display">
+                        <div class="score-number">${quizState.score}/${quizState.currentQuiz.length}</div>
+                        <div class="score-percentage">${percentage}%</div>
+                    </div>
+                    <div class="performance-message">${percentage >= 70 ? t('greatJob') : t('keepPracticing')}</div>
+                    <div class="action-buttons">
+                        <button class="action-btn" id="tryAgainBtn">${t('tryAgain')}</button>
+                        <button class="action-btn" id="backToHomeBtn2">${t('backToHome')}</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners with cleanup
+            const tryAgainBtn = document.getElementById('tryAgainBtn');
+            const backToHomeBtn2 = document.getElementById('backToHomeBtn2');
+            const languageToggle = document.getElementById('languageToggle');
+            
+            if (tryAgainBtn) addEventListenerWithCleanup(tryAgainBtn, 'click', startQuiz);
+            if (backToHomeBtn2) addEventListenerWithCleanup(backToHomeBtn2, 'click', showHomeScreen);
+            if (languageToggle) addEventListenerWithCleanup(languageToggle, 'click', toggleLanguage);
+            
+            updateLanguage();
+        }
+        
+        function createQuestion() {
+            console.log('createQuestion called');
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `
+                <button class="language-toggle" id="languageToggle">JP/EN</button>
+                <h1 class="title">${t('create')}</h1>
+                <div class="create-container">
+                    <div class="form-group">
+                        <label>${t('enterQuestion')}:</label>
+                        <textarea id="questionInput" placeholder="${t('questionPlaceholder')}"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>${t('selectAnswer')}:</label>
+                        <div class="answer-options">
+                            <label><input type="radio" name="answer" value="true" checked> True</label>
+                            <label><input type="radio" name="answer" value="false"> False</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>${t('selectSource')}:</label>
+                        <select id="sourceSelect">
+                            <option value="manual">${t('manual')}</option>
+                            <option value="ai">${t('ai')}</option>
+                        </select>
+                    </div>
+                    <button class="submit-btn" id="saveQuestionBtn">${t('saveQuestion')}</button>
+                    <button class="back-btn" id="backToHomeBtn3">${t('backToHome')}</button>
+                </div>
+            `;
+            
+            // Add event listeners with cleanup
+            addEventListenerWithCleanup(document.getElementById('saveQuestionBtn'), 'click', saveQuestion);
+            addEventListenerWithCleanup(document.getElementById('backToHomeBtn3'), 'click', showHomeScreen);
+            addEventListenerWithCleanup(document.getElementById('languageToggle'), 'click', toggleLanguage);
+            
+            updateLanguage();
+        }
+        
+        function saveQuestion() {
+            console.log('saveQuestion called');
+            
+            const questionInput = document.getElementById('questionInput');
+            const questionText = questionInput ? questionInput.value : '';
+            const answerRadio = document.querySelector('input[name="answer"]:checked');
+            const answer = answerRadio ? answerRadio.value === 'true' : false;
+            const sourceSelect = document.getElementById('sourceSelect');
+            const source = sourceSelect ? sourceSelect.value : 'manual';
+            
+            console.log('Question text:', questionText);
+            console.log('Answer:', answer);
+            console.log('Source:', source);
+            
+            if (questionText.trim()) {
+                const newQuestion = {
+                    question: questionText.trim(),
+                    answer: answer,
+                    source: source
+                };
+                quizState.addQuestion(newQuestion);
+                console.log('New question added:', newQuestion);
+                console.log('Total questions now:', quizState.getQuestionsCount());
+                
+                updateStats();
+                showMessage(t('questionSaved'), 'success');
+                
+                // Clear form
+                if (questionInput) questionInput.value = '';
+                if (answerRadio) answerRadio.checked = true;
+                if (sourceSelect) sourceSelect.value = 'manual';
+                
+                setTimeout(() => showHomeScreen(), 1500);
+            } else {
+                console.log('Empty question submitted');
+                showMessage(t('pleaseEnterQuestion'), 'error');
+            }
+        }
+        
+        function manageQuestions() {
+            console.log('manageQuestions called');
+            const container = document.getElementById('mainContainer');
+            const questionsList = quizState.questions.map((q, index) => `
+                <div class="question-item">
+                    <div class="question-info">
+                        <span class="question-text">${q.question.substring(0, 50)}...</span>
+                        <span class="question-meta">${q.source} | ${q.answer ? 'True' : 'False'}</span>
+                    </div>
+                    <div class="question-actions">
+                        <button class="delete-btn" data-index="${index}">${t('delete')}</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `
+                <button class="language-toggle" id="languageToggle">JP/EN</button>
+                <h1 class="title">${t('manage')}</h1>
+                <div class="manage-container">
+                    <div class="questions-list">
+                        ${questionsList || '<p>' + t('noQuestions') + '</p>'}
+                    </div>
+                    <button class="back-btn" id="backToHomeBtn4">${t('backToHome')}</button>
+                </div>
+            `;
+            
+            // Add event listeners with cleanup
+            addEventListenerWithCleanup(document.getElementById('backToHomeBtn4'), 'click', showHomeScreen);
+            addEventListenerWithCleanup(document.getElementById('languageToggle'), 'click', toggleLanguage);
+            
+            // Add delete button listeners with cleanup
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                addEventListenerWithCleanup(btn, 'click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    deleteQuestion(index);
+                });
+            });
+            
+            updateLanguage();
+        }
+        
+        function deleteQuestion(index) {
+            console.log('deleteQuestion called with index:', index);
+            quizState.removeQuestion(index);
+            updateStats();
+            manageQuestions(); // Refresh the list
+            showMessage(t('questionDeleted'), 'success');
+        }
+        
+        function browseQuestions() {
+            console.log('browseQuestions called');
+            const container = document.getElementById('mainContainer');
+            const questionsList = quizState.questions.map((q, index) => `
+                <div class="browse-item">
+                    <div class="browse-number">Q${index + 1}</div>
+                    <div class="browse-content">
+                        <div class="browse-question">${q.question}</div>
+                        <div class="browse-answer">${t('answer')}: ${q.answer ? 'True' : 'False'} | ${t('source')}: ${q.source}</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `
+                <button class="language-toggle" id="languageToggle">JP/EN</button>
+                <h1 class="title">${t('browse')}</h1>
+                <div class="browse-container">
+                    <div class="browse-stats">
+                        <div class="stat-item">
+                            <div class="stat-number">${quizState.getQuestionsCount()}</div>
+                            <div class="stat-label">${t('totalQuestions')}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">${quizState.questions.filter(q => q.source === 'manual').length}</div>
+                            <div class="stat-label">${t('manual')}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">${quizState.questions.filter(q => q.source === 'ai').length}</div>
+                            <div class="stat-label">${t('ai')}</div>
+                        </div>
+                    </div>
+                    <div class="browse-list">
+                        ${questionsList || '<p>' + t('noQuestions') + '</p>'}
+                    </div>
+                    <button class="back-btn" id="backToHomeBtn5">${t('backToHome')}</button>
+                </div>
+            `;
+            
+            // Add event listeners with cleanup
+            addEventListenerWithCleanup(document.getElementById('backToHomeBtn5'), 'click', showHomeScreen);
+            addEventListenerWithCleanup(document.getElementById('languageToggle'), 'click', toggleLanguage);
+            
+            updateLanguage();
+        }
+        
+        function showHomeScreen() {
+            console.log('showHomeScreen called');
+            
+            // Preserve language state by not reloading the page
+            // Instead, rebuild the home screen with current language
+            const container = document.getElementById('mainContainer');
+            if (container) {
+                container.innerHTML = `
+                    <button class="language-toggle" id="languageToggle">JP/EN</button>
+                    <h1 class="title" id="appTitle">${t('appTitle')}</h1>
+                    
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalQuestions">${quizState.getQuestionsCount()}</div>
+                            <div class="stat-label" id="totalLabel">${t('totalQuestions')}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="enabledQuestions">${quizState.getQuestionsCount()}</div>
+                            <div class="stat-label" id="enabledLabel">${t('enabled')}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="timerMinutes">${currentLanguage === 'ja' ? t('timerMinutes') : '3m'}</div>
+                            <div class="stat-label" id="timerLabel">${t('timer')}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="icon-grid">
+                        <button class="icon-button" id="startQuizBtn">
+                            <div class="icon-text">?</div>
+                            <div class="icon-title" id="startQuiz">${t('startQuiz')}</div>
+                            <div class="icon-subtitle" id="questionsAvailable">${quizState.getQuestionsCount()} ${t('questionsAvailable')}</div>
+                        </button>
+                        
+                        <button class="icon-button" id="createQuestionBtn">
+                            <div class="icon-text">+</div>
+                            <div class="icon-title" id="create">${t('create')}</div>
+                            <div class="icon-subtitle" id="manualOrAI">${t('manualOrAI')}</div>
+                        </button>
+                        
+                        <button class="icon-button" id="manageQuestionsBtn">
+                            <div class="icon-text">?</div>
+                            <div class="icon-title" id="manage">${t('manage')}</div>
+                            <div class="icon-subtitle" id="timerAndSettings">${t('timerAndSettings')}</div>
+                        </button>
+                        
+                        <button class="icon-button" id="browseQuestionsBtn">
+                            <div class="icon-text">?</div>
+                            <div class="icon-title" id="browse">${t('browse')}</div>
+                            <div class="icon-subtitle" id="viewAndEdit">${t('viewAndEdit')}</div>
+                        </button>
+                    </div>
+                    
+                    <div id="message"></div>
+                `;
+                
+                // Re-add event listeners for home screen
+                const elements = {
+                    startQuizBtn: document.getElementById('startQuizBtn'),
+                    createQuestionBtn: document.getElementById('createQuestionBtn'),
+                    manageQuestionsBtn: document.getElementById('manageQuestionsBtn'),
+                    browseQuestionsBtn: document.getElementById('browseQuestionsBtn'),
+                    languageToggle: document.getElementById('languageToggle')
+                };
+                
+                if (elements.startQuizBtn) addEventListenerWithCleanup(elements.startQuizBtn, 'click', startQuiz);
+                if (elements.createQuestionBtn) addEventListenerWithCleanup(elements.createQuestionBtn, 'click', createQuestion);
+                if (elements.manageQuestionsBtn) addEventListenerWithCleanup(elements.manageQuestionsBtn, 'click', manageQuestions);
+                if (elements.browseQuestionsBtn) addEventListenerWithCleanup(elements.browseQuestionsBtn, 'click', browseQuestions);
+                if (elements.languageToggle) addEventListenerWithCleanup(elements.languageToggle, 'click', toggleLanguage);
+            }
+        }
+        
+        function updateStats() {
+            console.log('updateStats called, questions.length:', quizState.getQuestionsCount());
+            
+            const totalElement = document.getElementById('totalQuestions');
+            const enabledElement = document.getElementById('enabledQuestions');
+            const availableElement = document.getElementById('questionsAvailable');
+            
+            const questionsCount = quizState.getQuestionsCount();
+            
+            if (totalElement) {
+                totalElement.textContent = questionsCount;
+                console.log('Updated total questions:', questionsCount);
+            }
+            
+            if (enabledElement) {
+                enabledElement.textContent = questionsCount;
+                console.log('Updated enabled questions:', questionsCount);
+            }
+            
+            if (availableElement) {
+                availableElement.textContent = `${questionsCount} ${t('questionsAvailable')}`;
+                console.log('Updated questions available:', `${questionsCount} ${t('questionsAvailable')}`);
+            }
+        }
+        
+        function toggleLanguage() {
+            console.log('toggleLanguage called');
+            currentLanguage = currentLanguage === 'en' ? 'ja' : 'en';
+            showMessage('Language switched to ' + (currentLanguage === 'en' ? 'English' : 'Japanese'), 'success');
+            
+            // Force re-render of current screen to update all text
+            const container = document.getElementById('mainContainer');
+            if (container) {
+                // Check current screen and re-render
+                if (container.querySelector('.quiz-container')) {
+                    showQuizScreen();
+                } else if (container.querySelector('.results-container')) {
+                    showQuizResults();
+                } else if (container.querySelector('.create-container')) {
+                    createQuestion();
+                } else if (container.querySelector('.manage-container')) {
+                    manageQuestions();
+                } else if (container.querySelector('.browse-container')) {
+                    browseQuestions();
+                } else {
+                    // Home screen - just update language
+                    showHomeScreen();
+                }
+            }
+        }
+        
+        // Initialize event listeners for home screen
+        function initializeHomeScreen() {
+            console.log('initializeHomeScreen called');
+            
+            // Wait for DOM to be fully ready
+            setTimeout(() => {
+                const elements = {
+                    startQuizBtn: document.getElementById('startQuizBtn'),
+                    createQuestionBtn: document.getElementById('createQuestionBtn'),
+                    manageQuestionsBtn: document.getElementById('manageQuestionsBtn'),
+                    browseQuestionsBtn: document.getElementById('browseQuestionsBtn'),
+                    languageToggle: document.getElementById('languageToggle')
+                };
+                
+                // Check if all elements exist
+                if (!elements.startQuizBtn || !elements.createQuestionBtn || 
+                    !elements.manageQuestionsBtn || !elements.browseQuestionsBtn || 
+                    !elements.languageToggle) {
+                    console.error('Some DOM elements are missing:', elements);
+                    return;
+                }
+                
+                // Add event listeners with cleanup
+                addEventListenerWithCleanup(elements.startQuizBtn, 'click', startQuiz);
+                addEventListenerWithCleanup(elements.createQuestionBtn, 'click', createQuestion);
+                addEventListenerWithCleanup(elements.manageQuestionsBtn, 'click', manageQuestions);
+                addEventListenerWithCleanup(elements.browseQuestionsBtn, 'click', browseQuestions);
+                addEventListenerWithCleanup(elements.languageToggle, 'click', toggleLanguage);
+                
+                console.log('All event listeners added successfully');
+                
+                // Update language after ensuring elements exist
+                updateLanguage();
+            }, 100); // Small delay to ensure DOM is ready
+        }
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initializeHomeScreen);
+    </script>
+</body>
+</html>
