@@ -250,13 +250,6 @@ const styles = StyleSheet.create({
     padding: 25, 
     marginBottom: 20, 
     alignItems: 'center', 
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 5, 
   },
   bigScore: { flexDirection: 'row', alignItems: 'baseline' },

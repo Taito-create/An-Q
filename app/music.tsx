@@ -6,8 +6,10 @@ import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { loadStats } from './missions';
 import { useCustomBGM } from './customBGMContext';
+import { useBGM } from './bgmContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { useExternalAudioDetector, useAdaptiveSoundVolume } from './externalAudioDetector';
 
 export default function MusicScreen() {
   const { colors, onPrimary } = useTheme();
@@ -20,11 +22,20 @@ export default function MusicScreen() {
     createPlaylist, deletePlaylist, addTrackToPlaylist, removeTrackFromPlaylist, getActiveTracks,
     currentIndex, isPlaying, speed, play, pause, togglePlay, next, prev, setSpeed,
     currentTrack, duplicateWarning, clearDuplicateWarning,
+    unsupportedWarning, clearUnsupportedWarning,
   } = useCustomBGM();
+
+  const externalAudio = useExternalAudioDetector();
+  const { soundMultiplier, isTransitioning } = useAdaptiveSoundVolume(externalAudio.isPlaying, externalAudio.detectedApp);
+
+  // SoundManagerに外部音楽検出を設定
+  useEffect(() => {
+    SoundManager.setExternalAudioDetector(externalAudio);
+  }, [externalAudio]);
 
   const [bgmPreset, setBgmPreset] = useState<string>('default');
   const [seType, setSeType] = useState<string>('effect1');
-  const [bgmEnabled, setBgmEnabled] = useState(true);
+  const { bgmEnabled, toggleBGM } = useBGM();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showNewPlaylistInput, setShowNewPlaylistInput] = useState(false);
@@ -58,6 +69,23 @@ export default function MusicScreen() {
     loadStats().then(stats => {
       setIsUnlocked(!!(stats.unlockedFeatures?.includes('custom_bgm')));
     });
+
+    // BGM状態同期イベントをリッスン
+    const handleBGMStateChange = (event: any) => {
+      const { enabled } = event.detail;
+      // AsyncStorageに保存して状態を維持
+      AsyncStorage.setItem('bgm_enabled', enabled.toString());
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('bgmStateChanged', handleBGMStateChange);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('bgmStateChanged', handleBGMStateChange);
+      }
+    };
   }, []);
 
   const loadSettings = async () => {
@@ -69,9 +97,10 @@ export default function MusicScreen() {
         setSeType(st);
         await SoundManager.setSESet(st as any);
       }
-      const be = await AsyncStorage.getItem('bgm_enabled');
-      const enabled = be !== 'false'; // デフォルトtrue
-      setBgmEnabled(enabled);
+      // BGM状態はコンテキストから取得し、上書きしない
+      // const be = await AsyncStorage.getItem('bgm_enabled');
+      // const enabled = be !== 'false'; // デフォルトtrue
+      // toggleBGM(enabled);
     } catch {}
   };
 
@@ -80,7 +109,8 @@ export default function MusicScreen() {
     if (Platform.OS !== 'web') return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'audio/*';
+    // すべての音声ファイル形式に対応
+    input.accept = 'audio/*,.3gp,.aa,.aac,.aax,.act,.aiff,.alac,.amr,.ape,.au,.awb,.dss,.dvf,.flac,.gsm,.iklax,.ivs,.m4a,.m4b,.m4p,.mmf,.mp3,.mpc,.msv,.nmf,.ogg,.oga,.mogg,.opus,.ra,.rm,.raw,.rf64,.sln,.tta,.voc,.wma,.wv,.webm,.8svx,.cda';
     input.multiple = true;
     input.onchange = async (e: any) => {
       const files: File[] = Array.from(e.target.files || []);
@@ -114,6 +144,41 @@ export default function MusicScreen() {
           </TouchableOpacity>
         </View>
       )}
+      
+      {/* 未対応フォーマット警告バナー */}
+      {unsupportedWarning && unsupportedWarning.length > 0 && (
+        <View style={[styles.warningBanner, { backgroundColor: colors.error }]}>
+          <Text style={[styles.warningText, { color: colors.text }]}>
+            {t.unsupportedFormat}: 
+            {unsupportedWarning.join(', ')}
+          </Text>
+          <TouchableOpacity style={[styles.closeWarning, { backgroundColor: colors.border }]} onPress={clearUnsupportedWarning}>
+            <Text style={[styles.closeWarningText, { color: colors.text }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* 外部音楽再生状態表示 */}
+      {externalAudio.isPlaying && (
+        <View style={[styles.externalAudioBanner, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+          <View style={styles.externalAudioContent}>
+            <Text style={[styles.externalAudioIcon]}>🎵</Text>
+            <View style={styles.externalAudioInfo}>
+              <Text style={[styles.externalAudioApp, { color: colors.text }]}>
+                {externalAudio.detectedApp || 'External Music'}
+              </Text>
+              <Text style={[styles.externalAudioStatus, { color: colors.textSecondary }]}>
+                {t.externalAudioPlaying} {isTransitioning && '...'}
+              </Text>
+            </View>
+            <View style={styles.volumeIndicator}>
+              <Text style={[styles.volumeText, { color: colors.textSecondary }]}>
+                {Math.round(soundMultiplier * 100)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContainer}>
 
         {/* BGMプリセット */}
@@ -131,8 +196,11 @@ export default function MusicScreen() {
                   pause();
                 }
                 const fileKey = (preset as any).file || 'bgm';
+                // プリセットが変更された場合のみBGMを再読み込み
                 await SoundManager.updateBGMSetting(bgmEnabled, fileKey as any);
-                SoundManager.play('decide');
+                if (bgmEnabled) {
+                  SoundManager.play('decide');
+                }
               }}
             >
               <Text style={styles.presetIcon}>{preset.icon}</Text>
@@ -146,12 +214,12 @@ export default function MusicScreen() {
           <Switch
             value={bgmEnabled}
             onValueChange={async v => {
-              setBgmEnabled(v);
+              toggleBGM(v);
               await AsyncStorage.setItem('bgm_enabled', v.toString());
-              // SoundManagerに即時反映
-              const currentPreset = bgmPresets[bgmPreset as keyof typeof bgmPresets] as any;
-              const fileKey = currentPreset?.file || 'bgm';
-              await SoundManager.updateBGMSetting(v, fileKey as any);
+              // 設定画面と同期するためにグローバルイベントを発火
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('bgmStateChanged', { detail: { enabled: v } }));
+              }
             }}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFF"
@@ -325,18 +393,31 @@ export default function MusicScreen() {
                   );
                 })}
 
-                {/* 再生コントロール */}
-                <View style={styles.controls}>
+                {/* 再生コントロール - カスタムBGMのみ表示 */}
+                {activePlaylistId && activeTracks.length > 0 && (
+                  <View style={styles.controls}>
                   <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.border }]} onPress={prev}>
                     <Text style={styles.ctrlBtnText}>⏮</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.playBtn, { backgroundColor: isPlaying ? colors.error : colors.success }]} onPress={togglePlay}>
+                  <TouchableOpacity style={[styles.playBtn, { backgroundColor: isPlaying ? colors.error : colors.success }]} onPress={async () => {
+                    if (isPlaying) {
+                      // プリセットBGMを停止
+                      await SoundManager.pauseBGM();
+                    } else {
+                      // プリセットBGMを再生
+                      const currentPreset = bgmPresets[bgmPreset as keyof typeof bgmPresets] as any;
+                      const fileKey = currentPreset?.file || 'bgm';
+                      await SoundManager.updateBGMSetting(bgmEnabled, fileKey as any);
+                      await SoundManager.playBGM();
+                    }
+                  }}>
                     <Text style={styles.ctrlBtnText}>{isPlaying ? '⏸' : '▶'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.border }]} onPress={next}>
                     <Text style={styles.ctrlBtnText}>⏭</Text>
                   </TouchableOpacity>
                 </View>
+                )}
 
                 {/* 速度 */}
                 <View style={styles.speedRow}>
@@ -354,7 +435,7 @@ export default function MusicScreen() {
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}>
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>
+          <Text style={[styles.backButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -366,6 +447,45 @@ const styles = StyleSheet.create({
   scrollContent: { flex: 1 },
   scrollContainer: { padding: 16, paddingBottom: 90 },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
+  
+  // 外部音楽再生状態バナー
+  externalAudioBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  externalAudioContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  externalAudioIcon: {
+    fontSize: 20,
+  },
+  externalAudioInfo: {
+    flex: 1,
+  },
+  externalAudioApp: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  externalAudioStatus: {
+    fontSize: 12,
+  },
+  volumeIndicator: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  volumeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   hint: { fontSize: 11, marginBottom: 6 },
   presetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   presetCard: { width: '48%', padding: 10, borderRadius: 10, alignItems: 'center' },

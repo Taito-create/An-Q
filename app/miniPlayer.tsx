@@ -33,6 +33,9 @@ export default function MiniPlayer() {
 
   if (!hasCustom && !hasPreset) return null;
 
+  // プリセットBGM時はミニプレイヤーを非表示（音楽通知を非表示）
+  if (hasPreset && !hasCustom) return null;
+
   // ─── カスタムBGMプレイヤー ───
   if (hasCustom) {
     return (

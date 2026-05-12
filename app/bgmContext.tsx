@@ -62,14 +62,34 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Listen for BGM status changes
+  // Listen for BGM status changes and sync across screens
   useEffect(() => {
     const interval = setInterval(() => {
       const status = SoundManager.getBGMStatus();
       setIsPlaying(status.isPlaying);
+      // 同期するためにグローバルイベントを発火
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bgmStatusSync', { detail: status }));
+      }
     }, 1000);
 
-    return () => clearInterval(interval);
+    // 他の画面からのBGM状態変更をリッスン
+    const handleBGMStateChange = (event: any) => {
+      const { enabled } = event.detail;
+      setBgmEnabled(enabled);
+      setIsPlaying(enabled);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('bgmStateChanged', handleBGMStateChange);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('bgmStateChanged', handleBGMStateChange);
+      }
+    };
   }, []);
 
   const toggleBGM = async (enabled: boolean) => {

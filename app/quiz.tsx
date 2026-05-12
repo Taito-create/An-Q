@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, TouchableOpacity, Alert,
-  ScrollView, Text, View, Animated, TextInput
+  StyleSheet, Text, View, TouchableOpacity,
+  ScrollView, Alert, TextInput, Animated, Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
-import { incrementStat, recordQuizAnswers } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { incrementStat, recordQuizAnswers } from './missions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -256,7 +256,10 @@ export default function QuizScreen() {
     const elapsed = Math.round((Date.now() - questionStartTime.current) / 1000);
     const currentQuestion = shuffledQuestions[currentIndex];
     
+    // ✅ FIX: correct変数を先に宣言
+    let correct: boolean = false;
     let actualCorrectAnswer: boolean | number | string = currentQuestion.answer;
+    
     switch (currentQuestion.answerType) {
       case 'truefalse':
         correct = answer === currentQuestion.trueFalseAnswer;
@@ -422,7 +425,7 @@ export default function QuizScreen() {
         {/* 戻るボタン：フルワイド固定 */}
         <TouchableOpacity
           style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}
+          onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace('/'); }}
         >
           <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.back}</Text>
         </TouchableOpacity>
@@ -486,7 +489,7 @@ export default function QuizScreen() {
           SoundManager.play('decide');
           setIsTimerActive(a => !a);
         }}>
-          <Text style={styles.pauseBtnText}>{isTimerActive ? t.pause : t.resume}</Text>
+          <Text style={[styles.pauseBtnText, { pointerEvents: 'auto' }]}>{isTimerActive ? t.pause : t.resume}</Text>
         </TouchableOpacity>
         <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>{currentIndex + 1} / {shuffledQuestions.length}</Text>
       </View>
@@ -525,11 +528,15 @@ export default function QuizScreen() {
             {currentQuestion.multipleChoice?.options.map((option, i) => (
               <TouchableOpacity
                 key={i}
-                style={[styles.answerBtn, answered && styles.btnDisabled]}
+                style={[
+                  styles.answerBtn, 
+                  styles.multipleChoiceBtn,
+                  answered && styles.btnDisabled
+                ]}
                 onPress={() => handleAnswer(i)}
                 disabled={answered}
               >
-                <Text style={styles.answerBtnText}>{option}</Text>
+                <Text style={[styles.answerBtnText, styles.multipleChoiceText]}>{option}</Text>
               </TouchableOpacity>
             ))}
           </>
@@ -555,7 +562,10 @@ export default function QuizScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.quitBtn} onPress={() => Alert.alert(t.quitQuiz + '?', '', [{ text: t.cancel, style: 'cancel' },{ text: t.quitQuiz, style: 'destructive', onPress: () => router.push('/') }])}>
+      <TouchableOpacity 
+        style={styles.quitBtn} 
+        onPress={() => Alert.alert(t.quitQuiz + '?', '', [{ text: t.cancel, style: 'cancel' },{ text: t.quitQuiz, style: 'destructive', onPress: () => router.push('/') }])}
+      >
         <Text style={styles.quitBtnText}>{t.quitQuiz}</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -588,16 +598,53 @@ const styles = StyleSheet.create({
   progressFill: { height: 6, backgroundColor: '#007AFF', borderRadius: 3 },
   questionBox: { backgroundColor: '#F0F4FF', borderRadius: 16, padding: 24, marginBottom: 20, minHeight: 150, justifyContent: 'center' },
   topicBadge: { fontSize: 11, color: '#6366F1', backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 10, fontWeight: '600' },
-  questionText: { fontSize: 22, textAlign: 'center', color: '#1A1A1A', lineHeight: 32 },
+  questionText: { 
+    fontSize: Platform.OS === 'web' ? 22 : 18, 
+    textAlign: 'center', 
+    color: '#1A1A1A', 
+    lineHeight: Platform.OS === 'web' ? 32 : 26,
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 10,
+  },
   feedbackBox: { backgroundColor: '#F8F8F8', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#EFEFEF' },
   feedbackMain: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   feedbackSub: { fontSize: 14, color: '#F44336', marginBottom: 4 },
-  answerRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 20 },
-  answerBtn: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
+  answerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    marginVertical: 20,
+    flexWrap: 'wrap',
+    gap: Platform.OS === 'web' ? 20 : 15,
+  },
+  answerBtn: { 
+    width: Platform.OS === 'web' ? 100 : 80, 
+    height: Platform.OS === 'web' ? 100 : 80, 
+    borderRadius: 50, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    minWidth: Platform.OS === 'web' ? 100 : 70,
+    minHeight: Platform.OS === 'web' ? 100 : 70,
+  },
   trueBtn: { backgroundColor: '#4CAF50' },
   falseBtn: { backgroundColor: '#F44336' },
   btnDisabled: { opacity: 0.4 },
-  answerBtnText: { color: '#fff', fontSize: 40, fontWeight: 'bold' },
+  answerBtnText: { 
+    color: '#fff', 
+    fontSize: Platform.OS === 'web' ? 40 : 32, 
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  multipleChoiceBtn: {
+    width: Platform.OS === 'web' ? 120 : 100,
+    height: Platform.OS === 'web' ? 60 : 50,
+    borderRadius: 12,
+    minWidth: Platform.OS === 'web' ? 120 : 90,
+    minHeight: Platform.OS === 'web' ? 60 : 45,
+  },
+  multipleChoiceText: {
+    fontSize: Platform.OS === 'web' ? 16 : 14,
+    textAlign: 'center',
+    paddingHorizontal: Platform.OS === 'web' ? 8 : 6,
+  },
   quitBtn: { alignItems: 'center', paddingVertical: 20 },
   quitBtnText: { color: '#CCC', fontSize: 13 },
   // Review styles

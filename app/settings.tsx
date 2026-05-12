@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput } from 'react-native';
+import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput, Platform } from 'react-native';
+import { useTutorial } from './tutorial/tutorialContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize, PatternType } from './theme';
+import { translations } from './translations';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: string }[] = [
   { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue',   emoji: '🔵' },
@@ -20,8 +22,10 @@ const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: s
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
 export default function SettingsScreen() {
+  const { colors, onPrimary } = useTheme();
   const router = useRouter();
-  const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
+  const { startTutorial, isFirstTime } = useTutorial();
+  const { currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
   const [language, setLanguage] = useState<'ja' | 'en'>('ja');
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
@@ -33,6 +37,7 @@ export default function SettingsScreen() {
   }, []);
 
   const ja = language === 'ja';
+  const t = translations[ja ? 'ja' : 'en'];
 
   const handleThemeSelect = (theme: ThemeName) => {
     setTheme(theme);
@@ -52,13 +57,30 @@ export default function SettingsScreen() {
     SoundManager.play('decide');
   };
 
+  const handleStartTutorial = () => {
+    SoundManager.play('decide');
+    startTutorial('settings');
+  };
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale) }]}>
-          {ja ? 'テーマカラー設定' : 'Theme Settings'}
-        </Text>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale) }]}>
+            {ja ? 'テーマカラー設定' : 'Theme Settings'}
+          </Text>
+          
+          {/* チュートリアルボタン */}
+          <TouchableOpacity
+            style={[styles.tutorialButton, { backgroundColor: colors.primary }]}
+            onPress={handleStartTutorial}
+          >
+            <Text style={[styles.tutorialButtonText, { color: '#fff' }]}>
+              {ja ? '📚 チュートリアル' : '📚 Tutorial'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Preset Themes */}
@@ -267,11 +289,36 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 20, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },
+  headerContent: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  tutorialButton: { 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tutorialButtonText: { 
+    fontSize: 14, 
+    fontWeight: '600' 
+  },
   section: { padding: 20, marginBottom: 12 },
   sectionTitle: { fontWeight: 'bold', marginBottom: 6 },
   sectionDesc: { marginBottom: 16 },
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  themeCard: { width: '22%', aspectRatio: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', padding: 6 },
+  themeCard: { 
+    width: Platform.OS === 'web' ? '22%' : '30%', 
+    aspectRatio: 1, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    padding: Platform.OS === 'web' ? 6 : 4,
+    minHeight: Platform.OS === 'web' ? 80 : 70,
+  },
   themeEmoji: { fontSize: 22, marginBottom: 4 },
   themeLabel: { fontWeight: '600', textAlign: 'center' },
   checkmark: { fontSize: 12, fontWeight: 'bold', position: 'absolute', top: 4, right: 6 },

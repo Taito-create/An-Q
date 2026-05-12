@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "my-new-quiz",
-    "slug": "my-new-quiz",
+    "name": "An-Q",
+    "slug": "an-q",
     "version": "1.0.0",
     "scheme": "my-new-quiz",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "jsxRuntime": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -21,22 +22,84 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
+        "backgroundColor": "transparent"
+      },
+      "package": "com.kuro_pikumin.mynewquiz"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/edited-photo.png",
+      "name": "An-Q",
+      "short_name": "An-Q",
+      "description": "有明高専 専用クイズアプリ",
+      "start_url": "/An-Q/",
+      "display": "standalone",
+      "background_color": "#ffffff",
+      "theme_color": "#6366f1",
+      "scope": "/An-Q/",
+      "lang": "ja",
+      "orientation": "portrait",
+      "icons": [
+        {
+          "src": "./assets/icon-72x72.png",
+          "sizes": "72x72",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-128x128.png",
+          "sizes": "128x128",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-144x144.png",
+          "sizes": "144x144",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-152x152.png",
+          "sizes": "152x152",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-384x384.png",
+          "sizes": "384x384",
+          "type": "image/png"
+        },
+        {
+          "src": "./assets/icon-512x512.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
     },
     "plugins": [
-      "expo-router"
+      [
+        "expo-router",
+        {
+          "origin": false
+        }
+      ]
     ],
     "extra": {
-      "router": {
-        "origin": false
+      "firebase": {
+        "apiKey": "AIzaSyBr8S_zcf555B9LZWGLPayuFb8H6Og1MVI",
+        "authDomain": "an-q-77a3f.firebaseapp.com",
+        "projectId": "an-q-77a3f",
+        "storageBucket": "an-q-77a3f.firebasestorage.app",
+        "messagingSenderId": "211342470418",
+        "appId": "1:211342470418:web:7955a86694880684d0d7cb"
       },
-      "eas": {
-        "projectId": "43339eb1-1cfa-4a0a-bac5-cfee5e4c02fb"
-      }
+      "adminEmail": "your-admin@ga.ariake-nct.ac.jp"
     }
   }
 }

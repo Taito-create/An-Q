@@ -340,7 +340,6 @@ export default function CreateQuestionScreen() {
 
       {/* AI Section - Coming Soon */}
       <View style={[styles.section, styles.comingSoonSection]}>
-        <Text style={styles.comingSoonRocket}>Update v2.0</Text>
         <View style={styles.comingSoonHeader}>
           <Text style={styles.sectionTitle}>{t.aiConsultation}</Text>
           <View style={styles.comingSoonBadge}>
@@ -373,7 +372,7 @@ export default function CreateQuestionScreen() {
         style={[styles.backButton, { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
       >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.cancel}</Text>
+        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -398,13 +397,6 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 5,
   },
   sectionTitle: {
@@ -441,10 +433,12 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     marginBottom: 40,
+    borderRadius: 12,
   },
   backButtonText: {
     color: '#666',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   answerTypeContainer: {
     flexDirection: 'row',

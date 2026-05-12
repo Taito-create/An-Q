@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  ScrollView, StatusBar, Alert
+  ScrollView, StatusBar, Alert, Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,12 +13,33 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { responsive, getDeviceType } from './responsive';
 
 const HomeScreen = () => {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
   const { colors, fs, pattern, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+
+  const toggleLanguage = () => {
+    const newLocale = locale === 'ja' ? 'en' : 'ja';
+    AsyncStorage.setItem('user_language', newLocale);
+    // Force reload to apply new language
+    router.replace('/');
+  };
+
+  const handleIconPress = () => {
+    try {
+      // ホーム画面の最上部にスクロール
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      
+      // 効果音を再生
+      SoundManager.play('decide');
+    } catch (error) {
+      console.error('Icon press error:', error);
+    }
+  };
 
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [timerMinutes, setTimerMinutes] = useState(5);
@@ -41,6 +62,12 @@ const HomeScreen = () => {
     loadSettings();
     SoundManager.initialize();
     loadExamCountdown();
+    
+    // アプリ起動時にBGMを再生
+    setTimeout(async () => {
+      await SoundManager.initialize();
+      SoundManager.playBGM();
+    }, 1500); // 1.5秒後にBGM開始
   }, []);
 
   const loadExamCountdown = async () => {
@@ -167,14 +194,11 @@ const HomeScreen = () => {
 
       // Load timer setting - use APP_TIMER_SETTING
       const appTimerSetting = await AsyncStorage.getItem('APP_TIMER_SETTING');
-      console.log('--- TIMER LOAD ---', { appTimerSetting });
       
       if (appTimerSetting && appTimerSetting !== 'null' && appTimerSetting !== null) {
         setTimerMinutes(parseInt(appTimerSetting));
-        console.log('--- TIMER SET FROM APP_TIMER_SETTING ---', appTimerSetting);
       } else {
         setTimerMinutes(5);
-        console.log('--- TIMER DEFAULT ---', '5');
       }
 
       // Load layout settings
@@ -300,10 +324,14 @@ const HomeScreen = () => {
 
   return (
     <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+      >
+        <StatusBar barStyle="light-content" />
+        
+        {/* Header */}
       <View style={[styles.header, Platform.OS !== 'web' && styles.headerMobile]}>
         <View style={styles.headerContent}>
           {examCountdown && (
@@ -457,11 +485,11 @@ const HomeScreen = () => {
       {/* Main Actions */}
       <View style={styles.mainActions}>
         <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.push('/quiz'); }}>
-          <Ionicons name="play" size="24" color={onPrimary} />
+          <Ionicons name="play" size={24} color={onPrimary} />
           <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(18) }]}>{t.startQuizButton}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); router.push('/create'); }}>
-          <Ionicons name="add" size="24" color={colors.primary} />
+          <Ionicons name="add" size={24} color={colors.primary} />
           <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>{t.createQuestion}</Text>
         </TouchableOpacity>
       </View>
@@ -577,6 +605,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
+  
   content: {
     padding: 20,
   },
@@ -595,14 +624,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 32,
+    fontSize: Platform.OS === 'web' ? 32 : 28,
     fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 8,
+    textAlign: 'center',
+    flexWrap: 'wrap',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     color: '#666',
+    textAlign: 'center',
+    lineHeight: Platform.OS === 'web' ? 24 : 20,
   },
   topButtons: {
     flexDirection: 'row',
@@ -776,7 +809,7 @@ const styles = StyleSheet.create({
   },
   fixedCardRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 15,
   },
   fixedCard: {
     flex: 1,
@@ -785,11 +818,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navCard: {
-    width: '47%',
+    width: Platform.OS === 'web' ? '47%' : '48%',
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 20,
+    padding: Platform.OS === 'web' ? 20 : 16,
     alignItems: 'center',
+    minHeight: Platform.OS === 'web' ? 120 : 100,
   },
   iconCircle: {
     width: 48,
@@ -800,15 +834,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   navTitle: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 4,
+    textAlign: 'center',
   },
   navDesc: {
-    fontSize: 12,
+    fontSize: Platform.OS === 'web' ? 12 : 11,
     color: '#666',
     textAlign: 'center',
+    lineHeight: Platform.OS === 'web' ? 18 : 16,
   },
   listContainer: {
     gap: 10,

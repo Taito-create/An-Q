@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz App v3.0</title>
+    <title>An-Q</title>
+    <!-- アプリ名：変更しないでください - PWAインストール名が「An-Q」になるように設定済み -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#0175C2">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="An-Q">
+    <meta name="application-name" content="An-Q">
+    <meta name="msapplication-TileColor" content="#0175C2">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <style>
@@ -406,6 +414,17 @@
     </div>
 
     <script>
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+        
         let currentLanguage = 'en';
         
         const translations = {
@@ -495,6 +514,7 @@
                 source: 'ソース'
             },
         };
+        
         
         function t(key) {
             try {

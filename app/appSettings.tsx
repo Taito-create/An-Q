@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useBGM } from './bgmContext';
+import { useSE } from './seContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 
@@ -14,17 +15,16 @@ export default function AppSettingsScreen() {
   const router = useRouter();
   const { colors, onPrimary, scale } = useTheme();
   const { bgmEnabled, toggleBGM } = useBGM();
+  const { seEnabled, toggleSE } = useSE();
   const locale = useLocale();
   const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
 
   const [devModeEnabled, setDevModeEnabled] = useState(false);
-  const [seEnabled, setSeEnabled] = useState(true);
   const [homeNavMode, setHomeNavMode] = useState<'compact' | 'bigGrid'>('compact');
 
   useEffect(() => {
     AsyncStorage.getItem('dev_mode_enabled').then(v => setDevModeEnabled(v === 'true'));
-    AsyncStorage.getItem('se_enabled').then(v => setSeEnabled(v !== 'false'));
     AsyncStorage.getItem('home_nav_mode').then(v => { if (v === 'bigGrid') setHomeNavMode('bigGrid'); });
   }, []);
 
@@ -40,8 +40,7 @@ export default function AppSettingsScreen() {
   };
 
   const handleSE = async (val: boolean) => {
-    setSeEnabled(val);
-    await AsyncStorage.setItem('se_enabled', val ? 'true' : 'false');
+    toggleSE(val);
     SoundManager.play('decide');
   };
 

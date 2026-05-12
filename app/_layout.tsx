@@ -1,13 +1,18 @@
 import { Slot } from 'expo-router';
+import MiniPlayer from './miniPlayer';
 import { ThemeProvider } from './theme';
-import { SoundManager } from './sound';
+import { AuthProvider } from './auth/authProvider';
 import { BGMProvider } from './bgmContext';
+import { SEProvider } from './seContext';
 import { CustomBGMProvider } from './customBGMContext';
+import { TutorialProvider } from './tutorial/tutorialContext';
+import TutorialOverlay from './tutorial/TutorialOverlay';
+import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from './missions';
-import MiniPlayer from './miniPlayer';
+import { SoundManager } from './sound';
 
 export default function RootLayout() {
   const [bgmReady, setBgmReady] = useState(false);
@@ -58,14 +63,19 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <BGMProvider>
-        <CustomBGMProvider>
-          <View style={{ flex: 1 }}>
-            <MiniPlayer />
-            <Slot />
-          </View>
-        </CustomBGMProvider>
-      </BGMProvider>
+      <AuthProvider>
+        <BGMProvider>
+          <SEProvider>
+            <CustomBGMProvider>
+              <TutorialProvider>
+                <Slot />
+                <MiniPlayer />
+                <TutorialOverlay />
+              </TutorialProvider>
+            </CustomBGMProvider>
+          </SEProvider>
+        </BGMProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

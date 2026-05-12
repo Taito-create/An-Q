@@ -1,5 +1,6 @@
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useExternalAudioDetector } from './externalAudioDetector';
 
 // 音の種類を定義
 export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong';
@@ -322,11 +323,6 @@ export class SoundManager {
       case 'effect2': return effect2;
       case 'effect3': return effect3;
       case 'effect4': return effect4;
-      // 旧名称との互換性
-      case 'electronic':
-      case 'japanese':
-      case 'retro':
-      case 'standard':
       case 'effect1':
       default:
         return effect1;
@@ -361,14 +357,35 @@ export class SoundManager {
     }
   }
 
+  // 外部音楽検出のインスタンス
+  private static externalAudioDetector: any = null;
+
+  // 外部音楽検出を設定
+  static setExternalAudioDetector(detector: any) {
+    this.externalAudioDetector = detector;
+  }
+
   // 指定した種類の音を再生する
   static async play(type: SoundType) {
     try {
       if (!this.isInitialized) await this.initialize();
       
+      // 外部音楽再生中はBGMを停止
+      if (this.externalAudioDetector?.isPlaying && this.bgm) {
+        await this.pauseBGM();
+      }
+      
       const sound = this.sounds[type];
       if (sound) {
-        await sound.replayAsync(); // 最初から再生
+        // 再生前に停止してから再生（タイミングずれ防止）
+        await sound.stopAsync();
+        await sound.setPositionAsync(0);
+        
+        // 外部音楽再生中は効果音音量を調整
+        const volume = this.externalAudioDetector?.isPlaying ? 0.3 : 1.0;
+        await sound.setVolumeAsync(volume);
+        
+        await sound.playAsync();
       }
     } catch (error) {
       console.error(`Failed to play ${type} sound:`, error);

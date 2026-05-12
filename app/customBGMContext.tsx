@@ -48,6 +48,10 @@ interface CustomBGMContextType {
   // 重複警告
   duplicateWarning: string[];
   clearDuplicateWarning: () => void;
+  
+  // 未対応フォーマット警告
+  unsupportedWarning: string[];
+  clearUnsupportedWarning: () => void;
 }
 
 const CustomBGMContext = createContext<CustomBGMContextType | null>(null);
@@ -68,6 +72,7 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeedState] = useState(1.0);
   const [duplicateWarning, setDuplicateWarning] = useState<string[]>([]);
+  const [unsupportedWarning, setUnsupportedWarning] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const initialized = useRef(false);
 
@@ -109,17 +114,35 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ─── ライブラリ ───
-  const addFiles = useCallback(async (files: File[]): Promise<{ duplicates: string[] }> => {
+  const addFiles = useCallback(async (files: File[]): Promise<{ duplicates: string[]; unsupported: string[] }> => {
     const duplicates: string[] = [];
+    const unsupported: string[] = [];
     const newTracks: CustomTrack[] = [];
 
+    // 対応フォーマットリスト
+    const supportedFormats = [
+      'audio/mp3', 'audio/mpeg', // MP3
+      'audio/wav', 'audio/wave', // WAV
+      'audio/flac', // FLAC
+      'audio/aac', // AAC
+      'audio/mp4', 'audio/x-m4a', // M4A
+      'audio/x-caf', // CAF
+    ];
+
     for (const file of files) {
+      // フォーマットチェック
+      if (!supportedFormats.includes(file.type) && !file.name.match(/\.(mp3|wav|flac|aac|m4a|caf)$/i)) {
+        unsupported.push(file.name);
+        continue;
+      }
+
       // 重複チェック（ファイル名で判定）
       const alreadyExists = library.some(t => t.name === file.name);
       if (alreadyExists) {
         duplicates.push(file.name);
         continue;
       }
+      
       const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const url = URL.createObjectURL(file);
       newTracks.push({ id, name: file.name, url });
@@ -133,7 +156,10 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
     if (duplicates.length > 0) {
       setDuplicateWarning(duplicates);
     }
-    return { duplicates };
+    if (unsupported.length > 0) {
+      setUnsupportedWarning(unsupported);
+    }
+    return { duplicates, unsupported };
   }, [library]);
 
   const removeFromLibrary = useCallback((id: string) => {
@@ -338,6 +364,10 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
   const activeTracks = getActiveTracks();
   const currentTrack = activeTracks[currentIndex] ?? null;
 
+  const clearUnsupportedWarning = useCallback(() => {
+    setUnsupportedWarning([]);
+  }, []);
+
   return (
     <CustomBGMContext.Provider value={{
       library, addFiles, removeFromLibrary,
@@ -348,6 +378,7 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
       play, pause, togglePlay, next, prev, setSpeed,
       currentTrack,
       duplicateWarning, clearDuplicateWarning,
+      unsupportedWarning, clearUnsupportedWarning,
     }}>
       {children}
     </CustomBGMContext.Provider>
