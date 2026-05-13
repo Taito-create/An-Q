@@ -14,9 +14,26 @@ import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { responsive, getDeviceType } from './responsive';
+import { useAuth } from './auth/authProvider';
+import LoginScreen from './auth/loginScreen';
 
 const HomeScreen = () => {
+  const { currentUser, loading } = useAuth();
   const router = useRouter();
+
+  // ログイン画面が必要な場合は表示
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>読み込み中...</Text>
+      </View>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
   const scrollViewRef = useRef<ScrollView>(null);
   const { colors, fs, pattern, onPrimary } = useTheme();
   const locale = useLocale();
