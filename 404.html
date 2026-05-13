@@ -5,17 +5,20 @@
   <title>An-Q</title>
   <script>
     // GitHub Pages SPA ルーティング対応
-    // /An-Q/some/path → /An-Q/?p=/some/path にリダイレクトして index.html に渡す
+    // /An-Q/ へのアクセスはすべて index.html に渡す
     (function() {
       var base = '/An-Q';
-      var path = window.location.pathname;
-      // すでに /An-Q/ 配下でない場合はそのままリダイレクト
-      if (path === base || path === base + '/') {
+      var pathname = window.location.pathname;
+
+      // /An-Q または /An-Q/ へのアクセスはそのまま index.html にリダイレクト
+      if (pathname === base || pathname === base + '/') {
         window.location.replace(base + '/');
         return;
       }
+
       // /An-Q/xxx のサブパスをクエリパラメータに変換して index.html に渡す
-      var subPath = path.startsWith(base) ? path.slice(base.length) : path;
+      // これにより Expo Router が正しいルートを解決できる
+      var subPath = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
       var search = window.location.search;
       var hash = window.location.hash;
       var redirectUrl = base + '/?p=' + encodeURIComponent(subPath + search) + hash;
