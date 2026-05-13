@@ -28,6 +28,7 @@
     },
     "web": {
       "bundler": "metro",
+      "baseUrl": "/An-Q/",
       "favicon": "./assets/edited-photo.png",
       "name": "An-Q",
       "short_name": "An-Q",
