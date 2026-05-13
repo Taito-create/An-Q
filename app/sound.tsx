@@ -35,6 +35,7 @@ export class SoundManager {
         this.sounds[key] = sound;
       }
       this.isInitialized = true;
+      console.log('Sound effects loaded successfully');
     } catch (error) {
       console.error('Sound load failed:', error);
     }
