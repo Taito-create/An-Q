@@ -27,7 +27,7 @@ jobs:
           node-version: '20'
       
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --no-optional --no-audit --no-fund 2>&1
       
       - name: Debug Node and npm versions
         run: |
