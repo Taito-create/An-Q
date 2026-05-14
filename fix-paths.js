@@ -84,18 +84,64 @@ if (fs.existsSync(manifestPath)) {
   console.log('✅ manifest.json start_url/scope/icons fixed');
 }
 
-// sw.js の BASE_URL を修正
+// sw.js を正しい内容で上書き（キャッシュ名を上げて古いキャッシュを強制削除）
 const swPath = path.join(__dirname, 'dist', 'sw.js');
-if (fs.existsSync(swPath)) {
-  let sw = fs.readFileSync(swPath, 'utf8');
-  // start_url が '/' のままなら BASE に置換
-  sw = sw.replace(/const BASE_URL = '\/';/, `const BASE_URL = '${BASE}/';`);
-  // キャッシュリストの '/' を BASE に置換（sw.js が古い形式の場合）
-  sw = sw.replace(/'\/manifest\.json'/g, `'${BASE}/manifest.json'`);
-  sw = sw.replace(/'\/icon-192\.png'/g, `'${BASE}/icon-192.png'`);
-  fs.writeFileSync(swPath, sw, 'utf8');
-  console.log('✅ sw.js BASE_URL fixed');
-}
+const swContent =
+`const CACHE_NAME = 'an-q-v3';
+const BASE_URL = '${BASE}/';
+
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        return cache.addAll([
+          BASE_URL,
+          BASE_URL + 'manifest.json',
+          BASE_URL + 'icon-192.png',
+          BASE_URL + 'icon-512.png',
+        ]);
+      })
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames
+          .filter(name => name !== CACHE_NAME)
+          .map(name => {
+            console.log('Deleting old cache:', name);
+            return caches.delete(name);
+          })
+      );
+    }).then(() => {
+      return self.clients.claim();
+    })
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (!url.pathname.startsWith(BASE_URL)) {
+    return;
+  }
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).catch(() => {
+          return caches.match(BASE_URL);
+        });
+      })
+  );
+});
+`;
+fs.writeFileSync(swPath, swContent, 'utf8');
+console.log('✅ sw.js rewritten with correct BASE_URL and cache busting');
 
 // node_modules/@xxx フォルダを assets/npm/ にコピー（@を除去）
 const srcNodeModules = path.join(__dirname, 'dist', 'assets', 'node_modules');

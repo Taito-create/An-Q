@@ -14,12 +14,29 @@ import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { responsive, getDeviceType } from './responsive';
-import { useAuth } from './auth/authProvider';
+import { checkAccountExists } from './utils/authStorage';
 import LoginScreen from './auth/loginScreen';
 
 const HomeScreen = () => {
-  const { currentUser, loading } = useAuth();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const hasAccount = await checkAccountExists();
+        setIsAuthenticated(hasAccount);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   // ログイン画面が必要な場合は表示
   if (loading) {
@@ -30,7 +47,7 @@ const HomeScreen = () => {
     );
   }
 
-  if (!currentUser) {
+  if (!isAuthenticated) {
     return <LoginScreen />;
   }
 
