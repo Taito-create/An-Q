@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>An-Q</title>
+  <script>
+    // GitHub Pages SPA ルーティング対応
+    // /An-Q/ へのアクセスはすべて index.html に渡す
+    (function() {
+      var base = '/An-Q';
+      var pathname = window.location.pathname;
+
+      if (pathname === base || pathname === base + '/') {
+        window.location.replace(base + '/');
+        return;
+      }
+
+      // /An-Q/xxx のサブパスを取得
+      var subPath = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+      if (subPath.startsWith('/')) subPath = subPath.slice(1);
+
+      var search = window.location.search;
+      var hash = window.location.hash;
+      var redirectUrl = base + '/?p=' + encodeURIComponent('/' + subPath + search) + hash;
+      window.location.replace(redirectUrl);
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href="/An-Q/">An-Q</a>...</p>
+</body>
+</html>
+

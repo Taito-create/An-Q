@@ -1,8 +1,6 @@
 import { Slot } from 'expo-router';
 import MiniPlayer from './miniPlayer';
 import { ThemeProvider } from './theme';
-import { AuthProvider } from './auth/authProvider';
-import AuthGuard from './auth/authGuard';
 import { BGMProvider } from './bgmContext';
 import { SEProvider } from './seContext';
 import { CustomBGMProvider } from './customBGMContext';
@@ -109,21 +107,17 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AuthGuard>
-          <BGMProvider>
-            <SEProvider>
-              <CustomBGMProvider>
-                <TutorialProvider>
-                  <Slot />
-                  <MiniPlayer />
-                  <TutorialOverlay />
-                </TutorialProvider>
-              </CustomBGMProvider>
-            </SEProvider>
-          </BGMProvider>
-        </AuthGuard>
-      </AuthProvider>
+      <BGMProvider>
+        <SEProvider>
+          <CustomBGMProvider>
+            <TutorialProvider>
+              <Slot />
+              <MiniPlayer />
+              <TutorialOverlay />
+            </TutorialProvider>
+          </CustomBGMProvider>
+        </SEProvider>
+      </BGMProvider>
     </ThemeProvider>
   );
 }

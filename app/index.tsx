@@ -15,7 +15,6 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { responsive, getDeviceType } from './responsive';
 import { checkAccountExists } from './utils/authStorage';
-import LoginScreen from './auth/loginScreen';
 
 const HomeScreen = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -48,7 +47,11 @@ const HomeScreen = () => {
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen />;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>ログインが必要です</Text>
+      </View>
+    );
   }
 
   const scrollViewRef = useRef<ScrollView>(null);
