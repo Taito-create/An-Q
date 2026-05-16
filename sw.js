@@ -1,4 +1,4 @@
-const CACHE_NAME = 'an-q-v3';
+const CACHE_NAME = 'an-q-v4';
 const BASE_URL = '/An-Q/';
 
 self.addEventListener('install', event => {
