@@ -87,7 +87,8 @@
       [
         "expo-router",
         {
-          "origin": false
+          "origin": false,
+          "router": "hash"
         }
       ]
     ],
