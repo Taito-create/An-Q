@@ -2,25 +2,19 @@
   "name": "An-Q",
   "short_name": "An-Q",
   "start_url": "/An-Q/",
-  "scope": "/An-Q/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6366f1",
-  "description": "有明高専 専用クイズアプリ",
-  "lang": "ja",
-  "orientation": "portrait",
+  "theme_color": "#0175C2",
   "icons": [
     {
       "src": "/An-Q/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/An-Q/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
-  ]
+  ],
+  "scope": "/An-Q/",
+  "description": "有明高専 専用クイズアプリ",
+  "lang": "ja",
+  "orientation": "portrait"
 }

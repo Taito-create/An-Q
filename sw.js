@@ -1,7 +1,8 @@
-const CACHE_NAME = 'an-q-v2';
+const CACHE_NAME = 'an-q-v3';
 const BASE_URL = '/An-Q/';
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -13,7 +14,6 @@ self.addEventListener('install', event => {
         ]);
       })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -22,21 +22,22 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames
           .filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
+          .map(name => {
+            console.log('Deleting old cache:', name);
+            return caches.delete(name);
+          })
       );
+    }).then(() => {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // An-Q スコープ外のリクエストはスルー
   if (!url.pathname.startsWith(BASE_URL)) {
     return;
   }
-
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -44,7 +45,6 @@ self.addEventListener('fetch', event => {
           return response;
         }
         return fetch(event.request).catch(() => {
-          // オフライン時はindex.htmlにフォールバック
           return caches.match(BASE_URL);
         });
       })
