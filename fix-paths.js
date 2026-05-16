@@ -179,12 +179,17 @@ if (fs.existsSync(jsDir)) {
   const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js'));
   files.forEach(file => {
     const filePath = path.join(jsDir, file);
-    let content = fs.readFileSync(filePath, 'utf8');
-    // "/assets/ → "/An-Q/assets/ に置換（既に /An-Q/ が付いているものは除外）
-    content = content.replace(/(?<!\/(An-Q))"\/assets\//g, `"${BASE}/assets/`);
-    // /An-Q/assets/node_modules/@xxx → /An-Q/assets/npm/xxx
-    content = content.replace(/\/An-Q\/assets\/node_modules\/@/g, `${BASE}/assets/npm/`);
-    fs.writeFileSync(filePath, content, 'utf8');
-    console.log(`✅ Paths fixed in ${file}`);
+    try {
+      let content = fs.readFileSync(filePath, 'utf8');
+      // "/assets/ → "/An-Q/assets/ に置換（既に /An-Q/ が付いているものは除外）
+      content = content.replace(/(?<!\/(An-Q))"\/assets\//g, `"${BASE}/assets/`);
+      // /An-Q/assets/node_modules/@xxx → /An-Q/assets/npm/xxx
+      content = content.replace(/\/An-Q\/assets\/node_modules\/@/g, `${BASE}/assets/npm/`);
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`✅ Paths fixed in ${file}`);
+    } catch (e) {
+      console.log(`⚠️ Skip JS path fix for ${file}:`, e && e.message ? e.message : e);
+    }
   });
 }
+

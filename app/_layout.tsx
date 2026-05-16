@@ -23,14 +23,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Check login status on startup
+    // ※expo-router では最初のrender前のnavigateがエラーになることがあるため、isLoading解除後に遷移する
     const checkLogin = async () => {
       try {
         const hasAccount = await checkAccountExists();
         setIsLoggedIn(hasAccount);
-        
         if (!hasAccount) {
-          // アカウントがなければログイン画面に
-          router.replace('/auth/loginScreen');
+          // 遷移は render 完了後に行う（下の useEffect に任せる）
         }
       } catch (error) {
         console.error('Check login error:', error);
@@ -43,7 +42,10 @@ export default function RootLayout() {
     const initializeSounds = async () => {
       try {
         await SoundManager.initialize();
-        await SoundManager.initializeBGM();
+        // initializeBGM / playBGM は SoundManager 実装に依存するため、存在する場合のみ実行
+        if (typeof (SoundManager as any).initializeBGM === 'function') {
+          await (SoundManager as any).initializeBGM();
+        }
         setBgmReady(true);
         console.log('BGM initialization completed');
       } catch (error) {
@@ -55,7 +57,9 @@ export default function RootLayout() {
     // Play BGM on first user interaction
     const handleFirstInteraction = async () => {
       try {
-        await SoundManager.playBGM();
+        if (typeof (SoundManager as any).playBGM === 'function') {
+          await (SoundManager as any).playBGM();
+        }
       } catch (error) {
         console.error('BGM play on interaction failed:', error);
       }
@@ -94,7 +98,9 @@ export default function RootLayout() {
     checkLogin();
     initializeSounds();
     migrateTimerKeys();
-    recordLogin();
+    // 未ログイン時の不意なログイン記録は避ける（最小ログインフロー用）
+    // recordLogin() はログイン後に行われる想定のためここでは抑制
+    // recordLogin();
   }, []);
 
   if (isLoading) {
