@@ -17,42 +17,7 @@ import { responsive, getDeviceType } from './responsive';
 import { checkAccountExists } from './utils/authStorage';
 
 const HomeScreen = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const hasAccount = await checkAccountExists();
-        setIsAuthenticated(hasAccount);
-      } catch (error) {
-        console.error('Auth check error:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  // ログイン画面が必要な場合は表示
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>読み込み中...</Text>
-      </View>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>ログインが必要です</Text>
-      </View>
-    );
-  }
 
   const scrollViewRef = useRef<ScrollView>(null);
   const { colors, fs, pattern, onPrimary } = useTheme();

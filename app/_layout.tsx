@@ -12,7 +12,6 @@ import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from './missions';
 import { SoundManager } from './sound';
-import { checkAccountExists } from './utils/authStorage';
 import { useRouter } from 'expo-router';
 
 export default function RootLayout() {
@@ -22,21 +21,9 @@ export default function RootLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // Check login status on startup
-    // ※expo-router では最初のrender前のnavigateがエラーになることがあるため、isLoading解除後に遷移する
-    const checkLogin = async () => {
-      try {
-        const hasAccount = await checkAccountExists();
-        setIsLoggedIn(hasAccount);
-        if (!hasAccount) {
-          // 遷移は render 完了後に行う（下の useEffect に任せる）
-        }
-      } catch (error) {
-        console.error('Check login error:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // GitHub Pagesでは認証を無効化
+    setIsLoading(false);
+    setIsLoggedIn(true);
 
     // Initialize sounds (without playing BGM yet)
     const initializeSounds = async () => {
@@ -95,7 +82,6 @@ export default function RootLayout() {
       }
     };
     
-    checkLogin();
     initializeSounds();
     migrateTimerKeys();
     // 未ログイン時の不意なログイン記録は避ける（最小ログインフロー用）
