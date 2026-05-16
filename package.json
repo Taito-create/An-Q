@@ -1,5 +1,5 @@
 {
-  "name": "An-Q",
+  "name": "an-q",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "homepage": "https://taito-create.github.io/An-Q",
@@ -10,8 +10,8 @@
     "web": "expo start --web",
     "build": "npx expo export -p web --output-dir dist && node fix-paths.js && node -e \"require('fs').copyFileSync('404.html','dist/404.html')\"",
 
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "predeploy": "echo 'predeploy handled in deploy'",
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
