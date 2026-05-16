@@ -87,7 +87,7 @@ if (fs.existsSync(manifestPath)) {
 // sw.js を正しい内容で上書き（キャッシュ名を上げて古いキャッシュを強制削除）
 const swPath = path.join(__dirname, 'dist', 'sw.js');
 const swContent =
-`const CACHE_NAME = 'an-q-v3';
+`const CACHE_NAME = 'an-q-v4';
 const BASE_URL = '${BASE}/';
 
 self.addEventListener('install', event => {
