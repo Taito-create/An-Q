@@ -6,7 +6,7 @@ yarn-error.log*
 
 # Expo
 .expo/
-# dist/  # GitHub Pages デプロイのためコメントアウト
+dist/
 web-build/
 .expo-shared/
 
