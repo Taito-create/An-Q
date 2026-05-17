@@ -3,7 +3,7 @@ import {
   StyleSheet, Text, View, TouchableOpacity,
   ScrollView, Alert, TextInput, Animated, Platform
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -53,7 +53,7 @@ interface UserAnswer {
 // メイン
 // ──────────────────────────────────────────────
 export default function QuizScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -214,7 +214,7 @@ export default function QuizScreen() {
       `${t.currentScore}: ${score} / ${shuffledQuestions.length}`,
       [
         { text: t.viewDetails, onPress: () => setShowReview(true) },
-        { text: t.home, onPress: () => router.replace('/') },
+        { text: t.home, onPress: () => navigate('/') },
       ]
     );
   };
@@ -354,14 +354,14 @@ export default function QuizScreen() {
         `${t.score}: ${finalScore} / ${shuffledQuestions.length}（${pct}%）`,
         [
           { text: t.viewDetails, onPress: () => setShowReview(true) },
-          { text: t.shareFeedback, onPress: () => router.push('/feedback') },
-          { text: t.viewResults, onPress: () => router.push('/results') },
-          { text: t.home, onPress: () => router.replace('/') },
+          { text: t.shareFeedback, onPress: () => navigate('/feedback') },
+          { text: t.viewResults, onPress: () => navigate('/results') },
+          { text: t.home, onPress: () => navigate('/') },
         ]
       );
     } catch (e) {
       console.error('finishQuiz error:', e);
-      router.replace('/');
+      navigate('/');
     }
   };
 
@@ -425,7 +425,7 @@ export default function QuizScreen() {
         {/* 戻るボタン：フルワイド固定 */}
         <TouchableOpacity
           style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace('/'); }}
+          onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate('/'); }}
         >
           <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.back}</Text>
         </TouchableOpacity>
@@ -441,7 +441,7 @@ export default function QuizScreen() {
           <Text style={styles.reviewTitle}>{t.review}</Text>
           <TouchableOpacity 
             style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-            onPress={() => router.replace('/')}
+            onPress={() => navigate('/')}
           >
             <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.backToHome}</Text>
           </TouchableOpacity>
@@ -564,7 +564,7 @@ export default function QuizScreen() {
 
       <TouchableOpacity 
         style={styles.quitBtn} 
-        onPress={() => Alert.alert(t.quitQuiz + '?', '', [{ text: t.cancel, style: 'cancel' },{ text: t.quitQuiz, style: 'destructive', onPress: () => router.push('/') }])}
+        onPress={() => Alert.alert(t.quitQuiz + '?', '', [{ text: t.cancel, style: 'cancel' },{ text: t.quitQuiz, style: 'destructive', onPress: () => navigate('/') }])}
       >
         <Text style={styles.quitBtnText}>{t.quitQuiz}</Text>
       </TouchableOpacity>

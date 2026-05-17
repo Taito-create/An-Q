@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { translations } from './translations';
@@ -36,7 +36,7 @@ interface Question {
 }
 
 export default function CreateQuestionScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -139,7 +139,7 @@ export default function CreateQuestionScreen() {
       setTagInput('');
       // Navigate back after a short delay
       setTimeout(() => {
-        router.canGoBack() ? router.back() : router.replace("/");
+        router.canGoBack() ? navigate(-1) : navigate("/");
       }, 1000);
     }
   };
@@ -370,7 +370,7 @@ export default function CreateQuestionScreen() {
       {/* Back Button */}
       <TouchableOpacity 
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
       </TouchableOpacity>

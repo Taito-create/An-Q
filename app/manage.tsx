@@ -1,5 +1,5 @@
 import { StyleSheet, ScrollView, Text, View, TextInput, TouchableOpacity, Alert, Button, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
 import { SoundManager } from './sound';
@@ -21,7 +21,7 @@ export default function ManageScreen() {
   const [newTimerMinutes, setNewTimerMinutes] = useState('');
   const [locale, setLocale] = useState<'ja' | 'en'>('ja');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const router = useRouter();
+  const router = useNavigate();
 
   useEffect(() => {
     loadTimerSetting();
@@ -284,7 +284,7 @@ export default function ManageScreen() {
       {/* ホームへ移動ボタン */}
       <TouchableOpacity 
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.replace('/'); }}
+        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
       </TouchableOpacity>

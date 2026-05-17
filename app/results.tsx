@@ -3,7 +3,7 @@ import {
   StyleSheet, ScrollView, TouchableOpacity,
   Alert, Text, View
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -28,7 +28,7 @@ interface HistoryEntry {
 }
 
 export default function ResultsScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -105,10 +105,10 @@ export default function ResultsScreen() {
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emptyEmoji}>📊</Text>
         <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{t.noQuizResults}</Text>
-        <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/quiz')}>
+        <TouchableOpacity style={styles.startBtn} onPress={() => navigate('/quiz')}>
           <Text style={styles.startBtnText}>{t.takeQuizChallenge}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/')}>
+        <TouchableOpacity onPress={() => navigate('/')}>
           <Text style={styles.homeLinkText}>{t.backHome}</Text>
         </TouchableOpacity>
       </View>
@@ -220,10 +220,10 @@ export default function ResultsScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/quiz')}>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
           <Text style={styles.primaryBtnText}>{t.takeAgain}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/')}>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigate('/')}>
           <Text style={styles.secondaryBtnText}>{t.backHome}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>

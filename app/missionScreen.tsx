@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import {
@@ -18,7 +18,7 @@ const PERIOD_LABELS = {
 };
 
 export default function MissionScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary, scale } = useTheme();
   const fs = (n: number) => Math.round(n * scale);
 
@@ -152,7 +152,7 @@ export default function MissionScreen() {
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
           {ja ? '戻る' : 'Back'}

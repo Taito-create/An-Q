@@ -1,23 +1,25 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ReorderConfirmScreen() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { colors, onPrimary } = useTheme();
-  const params = useLocalSearchParams<{
-    before: string;
-    after: string;
-    mode: string;
-    locale: string;
-  }>();
+  const [searchParams] = useSearchParams();
+  
+  const params = {
+    before: searchParams.get('before') || '[]',
+    after: searchParams.get('after') || '[]',
+    mode: searchParams.get('mode') || 'swap',
+    locale: searchParams.get('locale') || 'ja',
+  };
 
   const ja = params.locale !== 'en';
-  const before: string[] = JSON.parse(params.before || '[]');
+  const before: string[] = JSON.parse(params.before);
   const after: string[] = JSON.parse(params.after || '[]');
   const mode = params.mode || 'compact';
 
@@ -40,12 +42,12 @@ export default function ReorderConfirmScreen() {
       await AsyncStorage.setItem('home_card_order', JSON.stringify(after));
     }
     SoundManager.play('complete');
-    router.replace('/');
+    navigate('/');
   };
 
   const cancel = () => {
     SoundManager.play('decide');
-    router.back();
+    navigate(-1);
   };
 
   const renderList = (order: string[], title: string) => (

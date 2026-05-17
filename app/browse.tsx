@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -22,7 +22,7 @@ interface Question {
 }
 
 export default function BrowseQuestionsScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -105,7 +105,7 @@ export default function BrowseQuestionsScreen() {
       </ScrollView>
       <TouchableOpacity 
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
       </TouchableOpacity>

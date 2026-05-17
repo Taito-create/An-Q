@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { TITLE_BADGES, loadStats, saveStats, UserStats } from './missions';
@@ -9,7 +9,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 
 export default function TitleScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary, scale } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -131,7 +131,7 @@ export default function TitleScreen() {
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
           {t.back}

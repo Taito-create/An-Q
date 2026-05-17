@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Switch, Platform, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
@@ -13,7 +13,7 @@ import { useExternalAudioDetector, useAdaptiveSoundVolume } from './externalAudi
 
 export default function MusicScreen() {
   const { colors, onPrimary } = useTheme();
-  const router = useRouter();
+  const router = useNavigate();
   const locale = useLocale();
   const t = translations[locale];
   const {
@@ -434,7 +434,7 @@ export default function MusicScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}>
           <Text style={[styles.backButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>

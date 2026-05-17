@@ -3,7 +3,7 @@ import {
   StyleSheet, Text, View, TouchableOpacity,
   ScrollView, StatusBar, Alert, Image
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import TooltipButton from './tooltipButton';
@@ -17,7 +17,7 @@ import { responsive, getDeviceType } from './responsive';
 import { checkAccountExists } from './utils/authStorage';
 
 const HomeScreen = () => {
-  const router = useRouter();
+  const router = useNavigate();
 
   const scrollViewRef = useRef<ScrollView>(null);
   const { colors, fs, pattern, onPrimary } = useTheme();
@@ -28,7 +28,7 @@ const HomeScreen = () => {
     const newLocale = locale === 'ja' ? 'en' : 'ja';
     AsyncStorage.setItem('user_language', newLocale);
     // Force reload to apply new language
-    router.replace('/');
+    navigate('/');
   };
 
   const handleIconPress = () => {
@@ -294,7 +294,7 @@ const HomeScreen = () => {
     if (newSel.length === allKeys.length) {
       // 全選択完了 → 確認画面へ
       const before = navMode === 'compact' ? buttonOrder : cardOrder.filter(k => k in { calendar: 1, mission: 1, title: 1, shop: 1, manage: 1, themeSettings: 1 });
-      router.push({
+      navigate({
         pathname: '/reorderConfirm',
         params: {
           before: JSON.stringify(before.length ? before : allKeys),
@@ -386,7 +386,7 @@ const HomeScreen = () => {
                 const def = btnDef[key];
                 if (!def) return null;
                 return (
-                  <TooltipButton key={key} style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.push(def.route as any); }} label={def.label}>
+                  <TooltipButton key={key} style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate(def.route as any); }} label={def.label}>
                     <Ionicons name={def.icon as any} size={16} color={colors.primary} />
                   </TooltipButton>
                 );
@@ -425,7 +425,7 @@ const HomeScreen = () => {
             <Ionicons name="language-outline" size={16} color={colors.primary} />
             <Text style={[styles.languageText, { color: colors.primary }]}>{locale === 'ja' ? 'JP' : 'EN'}</Text>
           </TooltipButton>
-          <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.push('/appSettings'); }} label={t.settings}>
+          <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
             <Ionicons name="settings-outline" size={16} color={colors.primary} />
           </TooltipButton>
         </View>
@@ -447,7 +447,7 @@ const HomeScreen = () => {
       {todayQuestion && (
         <TouchableOpacity
           style={[styles.todayCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); router.push('/quiz'); }}
+          onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
         >
           <View style={styles.todayHeader}>
             <Text style={styles.todayEmoji}>📅</Text>
@@ -468,7 +468,7 @@ const HomeScreen = () => {
           onPress={async () => {
             SoundManager.play('decide');
             await AsyncStorage.setItem('quiz_mode', 'weak');
-            router.push('/quiz');
+            navigate('/quiz');
           }}
         >
           <Text style={styles.weakEmoji}>⚠️</Text>
@@ -486,11 +486,11 @@ const HomeScreen = () => {
 
       {/* Main Actions */}
       <View style={styles.mainActions}>
-        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); router.push('/quiz'); }}>
+        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}>
           <Ionicons name="play" size={24} color={onPrimary} />
           <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(18) }]}>{t.startQuizButton}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); router.push('/create'); }}>
+        <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate('/create'); }}>
           <Ionicons name="add" size={24} color={colors.primary} />
           <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>{t.createQuestion}</Text>
         </TouchableOpacity>
@@ -526,7 +526,7 @@ const HomeScreen = () => {
               {/* 上部固定カード（グリッド） */}
               <View style={styles.grid}>
                 {fixedCards.map(card => (
-                  <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); router.push(card.route as any); }}>
+                  <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route as any); }}>
                     <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
                       <Ionicons name={card.icon as any} size={20} color={card.iconColor} />
                     </View>
@@ -559,7 +559,7 @@ const HomeScreen = () => {
                           handleReorderTap(btn.key);
                         } else {
                           SoundManager.play('decide');
-                          router.push(btn.route as any);
+                          navigate(btn.route as any);
                         }
                       }}
                     >
@@ -586,7 +586,7 @@ const HomeScreen = () => {
         return (
           <View style={styles.fixedCardRow}>
             {fixedCards.map(card => (
-              <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); router.push(card.route as any); }}>
+              <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route as any); }}>
                 <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
                   <Ionicons name={card.icon as any} size={20} color={card.iconColor} />
                 </View>

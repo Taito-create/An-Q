@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { useTutorial } from './tutorial/tutorialContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize, PatternType } from './theme';
 import { translations } from './translations';
@@ -23,7 +23,7 @@ const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
 export default function SettingsScreen() {
   const { colors, onPrimary } = useTheme();
-  const router = useRouter();
+  const router = useNavigate();
   const { startTutorial, isFirstTime } = useTutorial();
   const { currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
   const [language, setLanguage] = useState<'ja' | 'en'>('ja');
@@ -275,7 +275,7 @@ export default function SettingsScreen() {
       {/* Back Button */}
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { fontSize: Math.round(16 * scale) }]}>
           {ja ? '戻る' : 'Back'}

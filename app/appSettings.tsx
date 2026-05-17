@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useBGM } from './bgmContext';
@@ -12,7 +12,7 @@ import { useLocale } from './hooks/useLocale';
 const APP_VERSION = '1.0.0';
 
 export default function AppSettingsScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary, scale } = useTheme();
   const { bgmEnabled, toggleBGM } = useBGM();
   const { seEnabled, toggleSE } = useSE();
@@ -124,7 +124,7 @@ export default function AppSettingsScreen() {
           <Row
             label={t.musicSettings}
             right={
-              <TouchableOpacity onPress={() => { SoundManager.play('decide'); router.push('/music'); }}>
+              <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/music'); }}>
                 <Text style={[styles.linkText, { color: colors.primary, fontSize: fs(14) }]}>
                   {t.details}
                 </Text>
@@ -139,7 +139,7 @@ export default function AppSettingsScreen() {
           <Row
             label={t.themeSetting}
             right={
-              <TouchableOpacity onPress={() => { SoundManager.play('decide'); router.push('/settings'); }}>
+              <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/settings'); }}>
                 <Text style={[styles.linkText, { color: colors.primary, fontSize: fs(14) }]}>
                   {t.details}
                 </Text>
@@ -189,7 +189,7 @@ export default function AppSettingsScreen() {
             <Row
               label={t.openDevTools}
               right={
-                <TouchableOpacity onPress={() => { SoundManager.play('decide'); router.push('/devmode'); }}>
+                <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/devmode'); }}>
                   <Text style={[styles.linkText, { color: colors.warning, fontSize: fs(14) }]}>
                     {t.details}
                   </Text>
@@ -212,7 +212,7 @@ export default function AppSettingsScreen() {
           <Row
             label={t.musicCredits}
             right={
-              <TouchableOpacity onPress={() => { SoundManager.play('decide'); router.push('/credits'); }}>
+              <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/credits'); }}>
                 <Text style={[styles.linkText, { color: colors.primary, fontSize: fs(14) }]}>
                   {t.details}
                 </Text>
@@ -226,7 +226,7 @@ export default function AppSettingsScreen() {
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
           {t.back}

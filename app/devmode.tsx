@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { loadStats, saveStats, loadProgress, saveProgress, DEFAULT_STATS, MISSIONS } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DevModeScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary } = useTheme();
   const [log, setLog] = useState<string[]>([]);
 
@@ -152,7 +152,7 @@ export default function DevModeScreen() {
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>戻る / Back</Text>
       </TouchableOpacity>

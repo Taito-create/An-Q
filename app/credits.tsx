@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
@@ -59,7 +59,7 @@ const CREDITS = {
 };
 
 export default function CreditsScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors, onPrimary } = useTheme();
   const [locale, setLocale] = useState<'ja' | 'en'>('ja');
 
@@ -121,7 +121,7 @@ export default function CreditsScreen() {
       <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <TouchableOpacity
           style={[styles.backButton, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace('/'); }}
+          onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate('/'); }}
         >
           <Text style={[styles.backButtonText, { color: onPrimary }]}>
             {ja ? '戻る' : 'Back'}

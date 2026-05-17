@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, Alert, ScrollView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
@@ -38,7 +38,7 @@ export default function CalendarScreen() {
   const [endDate, setEndDate] = useState('');
   const [isRange, setIsRange] = useState(false);
   const [pendingDeleteDate, setPendingDeleteDate] = useState<string | null>(null);
-  const router = useRouter();
+  const router = useNavigate();
 
   useEffect(() => {
     loadExamDates();
@@ -311,7 +311,7 @@ export default function CalendarScreen() {
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? router.back() : router.replace("/"); }}
+        onPress={() => { SoundManager.play('decide'); router.canGoBack() ? navigate(-1) : navigate("/"); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
       </TouchableOpacity>

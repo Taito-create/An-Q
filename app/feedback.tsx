@@ -3,7 +3,7 @@ import {
   StyleSheet, ScrollView, TouchableOpacity,
   Alert, Text, View, TextInput
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -39,7 +39,7 @@ interface QuizFeedback {
 // メイン
 // ──────────────────────────────────────────────
 export default function FeedbackScreen() {
-  const router = useRouter();
+  const router = useNavigate();
   const { colors } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -141,8 +141,8 @@ export default function FeedbackScreen() {
       setFeedbackSubmitted(true);
       setShowFeedbackForm(false);
       Alert.alert(t.thankYou, t.feedbackSaved, [
-        { text: t.quizResults, onPress: () => router.push('/results') },
-        { text: t.home, onPress: () => router.push('/') }
+        { text: t.quizResults, onPress: () => navigate('/results') },
+        { text: t.home, onPress: () => navigate('/') }
       ]);
     } catch (error) {
       console.error('Failed to save feedback:', error);
@@ -192,10 +192,10 @@ export default function FeedbackScreen() {
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emptyEmoji}>📋</Text>
         <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{t.noResultsYet}</Text>
-        <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/quiz')}>
+        <TouchableOpacity style={styles.startBtn} onPress={() => navigate('/quiz')}>
           <Text style={styles.startBtnText}>{t.takeQuizChallenge}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/')}>
+        <TouchableOpacity onPress={() => navigate('/')}>
           <Text style={styles.homeLinkText}>{t.backHome}</Text>
         </TouchableOpacity>
       </View>
@@ -369,10 +369,10 @@ export default function FeedbackScreen() {
 
       {/* ボタン */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/quiz')}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigate('/quiz')}>
           <Text style={styles.primaryBtnText}>{t.takeAgain}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/')}>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigate('/')}>
           <Text style={styles.secondaryBtnText}>{t.backHome}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>
