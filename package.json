@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build": "npx expo export -p web --output-dir dist && node fix-paths.js && node -e \"require('fs').copyFileSync('404.html','dist/404.html')\"",
+    "build": "npx expo export -p web --output-dir dist && node fix-paths.js",
+    "build:clean": "node -e \"const fs=require('fs');const path=require('path');const distPath=path.join(__dirname,'dist');if(fs.existsSync(distPath)){fs.rmSync(distPath,{recursive:true,force:true});console.log('dist folder removed');}else{console.log('dist folder does not exist');}\"",
 
     "predeploy": "echo 'predeploy handled in deploy'",
     "deploy": "npm run build && gh-pages -d dist"

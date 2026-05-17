@@ -169,3 +169,12 @@ if (fs.existsSync(jsDir)) {
   });
 }
 
+// 404.html を dist フォルダにコピー
+const src404Path = path.join(__dirname, '404.html');
+const dst404Path = path.join(__dirname, 'dist', '404.html');
+if (fs.existsSync(src404Path)) {
+  fs.copyFileSync(src404Path, dst404Path);
+  console.log('✅ 404.html copied to dist/');
+} else {
+  console.log('⚠️ 404.html not found in root directory');
+}
