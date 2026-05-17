@@ -76,22 +76,9 @@
           "src": "./assets/icon-384x384.png",
           "sizes": "384x384",
           "type": "image/png"
-        },
-        {
-          "src": "./assets/icon-512x512.png",
-          "sizes": "512x512",
-          "type": "image/png"
         }
       ]
     },
-    "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": false
-        }
-      ]
-    ],
     "extra": {
       "firebase": {
         "apiKey": "AIzaSyBr8S_zcf555B9LZWGLPayuFb8H6Og1MVI",
