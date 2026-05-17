@@ -25,6 +25,22 @@ export default function RootLayout() {
     setIsLoading(false);
     setIsLoggedIn(true);
 
+    // GitHub Pages ハッシュルーティング対応（Webプラットフォームのみ）
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const base = '/An-Q';
+      const pathname = window.location.pathname;
+      const hash = window.location.hash;
+
+      // ハッシュがなく、ルートパスでない場合はハッシュルーティングに変換
+      if (!hash && pathname !== base && pathname !== base + '/') {
+        const subPath = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+        if (subPath.startsWith('/')) {
+          const newPath = base + '/#/' + subPath.slice(1);
+          window.history.replaceState(null, '', newPath);
+        }
+      }
+    }
+
     // Initialize sounds (without playing BGM yet)
     const initializeSounds = async () => {
       try {
