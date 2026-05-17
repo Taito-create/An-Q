@@ -28,6 +28,7 @@
     },
     "web": {
       "bundler": "metro",
+      "output": "static",
       "baseUrl": "/An-Q/",
       "router": "hash",
       "favicon": "./assets/edited-photo.png",
