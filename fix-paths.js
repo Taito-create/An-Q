@@ -8,30 +8,6 @@ const indexPath = path.join(__dirname, 'dist', 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 html = html.replace(/src="\/_expo\//g, `src="${BASE}/_expo/`);
 html = html.replace(/href="\/favicon\.ico"/g, `href="${BASE}/favicon.ico"`);
-// GitHub Pages SPA: 404.html から渡されたパスを history に復元するスクリプトを追加
-// Expo Router が初期化される前に URL を正しいパスに戻す必要があるため、
-// <meta charset> の直後（最初）に挿入する
-if (!html.includes('history.replaceState')) {
-  const spaScript =
-    `    <!-- GitHub Pages SPA: 404.html から渡されたパスを history に復元 -->\n` +
-    `    <!-- Expo Router が初期化される前に URL を正しいパスに戻す必要がある -->\n` +
-    `    <script>\n` +
-    `      (function() {\n` +
-    `        var p = new URLSearchParams(window.location.search).get('p');\n` +
-    `        if (p) {\n` +
-    `          var base = '${BASE}';\n` +
-    `          var decoded = decodeURIComponent(p);\n` +
-    `          var newUrl = base + decoded;\n` +
-    `          window.history.replaceState(null, '', newUrl);\n` +
-    `        }\n` +
-    `      })();\n` +
-    `    </script>\n`;
-  // <meta charset> タグの直後に挿入
-  html = html.replace(
-    /(<meta charset[^>]+\/>)/,
-    `$1\n${spaScript}`
-  );
-}
 // manifest リンクと PWA メタタグを追加（まだない場合）
 if (!html.includes('rel="manifest"')) {
   html = html.replace(
