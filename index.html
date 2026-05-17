@@ -2,20 +2,6 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <!-- GitHub Pages SPA: 404.html から渡されたパスを history に復元 -->
-    <!-- Expo Router が初期化される前に URL を正しいパスに戻す必要がある -->
-    <script>
-      (function() {
-        var p = new URLSearchParams(window.location.search).get('p');
-        if (p) {
-          var base = '/An-Q';
-          var decoded = decodeURIComponent(p);
-          var newUrl = base + decoded;
-          window.history.replaceState(null, '', newUrl);
-        }
-      })();
-    </script>
-
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>An-Q</title>
