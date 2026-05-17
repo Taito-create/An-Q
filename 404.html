@@ -5,30 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>An-Q</title>
   <script>
-    // GitHub Pages SPA ルーティング対応（ハッシュルーティング用）
+    // GitHub Pages SPA ルーティング対応（クエリパラメータ方式）
     (function() {
       var base = '/An-Q';
       var pathname = window.location.pathname;
 
-      // ルートパスの場合はハッシュルーティングのルートにリダイレクト
+      // ルートパスの場合はそのままリダイレクト
       if (pathname === base || pathname === base + '/') {
-        window.location.replace(base + '/#/');
+        window.location.replace(base + '/');
         return;
       }
 
-      // その他のパスの場合はハッシュルーティング用に変換
+      // その他のパスの場合はクエリパラメータでパスを渡す
       var subPath = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
       if (subPath.startsWith('/')) subPath = subPath.slice(1);
 
       var search = window.location.search;
       var hash = window.location.hash;
-      var redirectUrl = base + '/#/' + subPath + search + hash;
+      var redirectUrl = base + '/?p=' + encodeURIComponent('/' + subPath + search) + hash;
       window.location.replace(redirectUrl);
     })();
   </script>
 </head>
 <body>
-  <p>Redirecting to <a href="/An-Q/#/">An-Q</a>...</p>
+  <p>Redirecting to <a href="/An-Q/">An-Q</a>...</p>
 </body>
 </html>
 
