@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>An-Q</title>
+    <!-- アプリ名：変更しないでください - PWAインストール名が「An-Q」になるように設定済み -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#0175C2">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="An-Q">
+    <meta name="application-name" content="An-Q">
+    <meta name="msapplication-TileColor" content="#0175C2">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007AFF;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .quiz-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .question {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .option {
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .option:hover {
+            background-color: #f0f0f0;
+            border-color: #007AFF;
+        }
+        .option.selected {
+            background-color: #007AFF;
+            color: white;
+            border-color: #007AFF;
+        }
+        .option.correct {
+            background-color: #34C759;
+            color: white;
+            border-color: #34C759;
+        }
+        .option.incorrect {
+            background-color: #FF3B30;
+            color: white;
+            border-color: #FF3B30;
+        }
+        .submit-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+        }
+        .submit-btn:hover {
+            background: #0056CC;
+        }
+        .result {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .user-info {
+            text-align: right;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        .logout-btn {
+            background: #FF3B30;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .logout-btn:hover {
+            background: #CC2E24;
+        }
+    </style>
+</head>
+<body>
+    <!-- 認証チェック -->
+    <script>
+        // 認証システム
+        class AuthSystem {
+            constructor() {
+                this.users = this.loadUsers();
+                this.currentUser = this.getCurrentUser();
+            }
+
+            loadUsers() {
+                const saved = localStorage.getItem('anq_users');
+                return saved ? JSON.parse(saved) : {};
+            }
+
+            getCurrentUser() {
+                return localStorage.getItem('anq_current_user');
+            }
+
+            getUserData(username) {
+                return this.users[username]?.data || {
+                    quizProgress: {},
+                    settings: {},
+                    statistics: {
+                        totalQuizzes: 0,
+                        correctAnswers: 0,
+                        totalTime: 0
+                    }
+                };
+            }
+
+            saveUserData(username, data) {
+                if (this.users[username]) {
+                    this.users[username].data = { ...this.users[username].data, ...data };
+                    localStorage.setItem('anq_users', JSON.stringify(this.users));
+                }
+            }
+
+            logout() {
+                localStorage.removeItem('anq_current_user');
+                window.location.href = 'auth-system.html';
+            }
+        }
+
+        // 認証チェック
+        const auth = new AuthSystem();
+        if (!auth.currentUser) {
+            // 未ログインの場合は認証ページにリダイレクト
+            window.location.href = 'auth-system.html';
+        }
+    </script>
+
+    <div class="container">
+        <div class="user-info">
+            <span id="usernameDisplay"></span>
+            <button class="logout-btn" onclick="logout()">ログアウト</button>
+        </div>
+        <h1 class="title">An-Q - クイズ学習アプリ</h1>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalQuizzes">0</div>
+                <div class="stat-label">総クイズ数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="correctAnswers">0</div>
+                <div class="stat-label">正解数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="accuracy">0%</div>
+                <div class="stat-label">正解率</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="quiz-container">
+        <div class="question" id="question">クイズの質問がここに表示されます</div>
+        <div class="options" id="options">
+            <div class="option">選択肢1</div>
+            <div class="option">選択肢2</div>
+            <div class="option">選択肢3</div>
+            <div class="option">選択肢4</div>
+        </div>
+        <button class="submit-btn" id="submitBtn" onclick="submitAnswer()">回答を送信</button>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        // クイズシステム
+        class QuizSystem {
+            constructor() {
+                this.auth = new AuthSystem();
+                this.currentQuestion = 0;
+                this.selectedOption = null;
+                this.quizzes = [
+                    {
+                        question: "JavaScriptで変数を宣言する方法は？",
+                        options: ["var", "let", "const", "すべて正解"],
+                        correct: 3
+                    },
+                    {
+                        question: "HTMLの最新バージョンは？",
+                        options: ["HTML4", "HTML5", "HTML6", "XHTML"],
+                        correct: 1
+                    },
+                    {
+                        question: "CSSで色を指定するプロパティは？",
+                        options: ["color", "background", "font-color", "text-color"],
+                        correct: 0
+                    }
+                ];
+                this.loadUserData();
+                this.updateStats();
+                this.displayQuestion();
+            }
+
+            loadUserData() {
+                this.userData = this.auth.getUserData(this.auth.currentUser);
+            }
+
+            saveUserData() {
+                this.auth.saveUserData(this.auth.currentUser, this.userData);
+            }
+
+            updateStats() {
+                document.getElementById('usernameDisplay').textContent = `ユーザー: ${this.auth.currentUser}`;
+                document.getElementById('totalQuizzes').textContent = this.userData.statistics.totalQuizzes || 0;
+                document.getElementById('correctAnswers').textContent = this.userData.statistics.correctAnswers || 0;
+                
+                const total = this.userData.statistics.totalQuizzes || 0;
+                const correct = this.userData.statistics.correctAnswers || 0;
+                const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+                document.getElementById('accuracy').textContent = `${accuracy}%`;
+            }
+
+            displayQuestion() {
+                const quiz = this.quizzes[this.currentQuestion];
+                document.getElementById('question').textContent = quiz.question;
+                
+                const optionsContainer = document.getElementById('options');
+                optionsContainer.innerHTML = '';
+                
+                quiz.options.forEach((option, index) => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'option';
+                    optionDiv.textContent = option;
+                    optionDiv.onclick = () => this.selectOption(index);
+                    optionsContainer.appendChild(optionDiv);
+                });
+                
+                this.selectedOption = null;
+                document.getElementById('result').textContent = '';
+                document.getElementById('submitBtn').disabled = false;
+            }
+
+            selectOption(index) {
+                // 選択をリセット
+                document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+                
+                // 新しい選択をハイライト
+                document.querySelectorAll('.option')[index].classList.add('selected');
+                this.selectedOption = index;
+            }
+
+            submitAnswer() {
+                if (this.selectedOption === null) {
+                    document.getElementById('result').textContent = '選択肢を選択してください';
+                    return;
+                }
+
+                const quiz = this.quizzes[this.currentQuestion];
+                const isCorrect = this.selectedOption === quiz.correct;
+                
+                // 統計を更新
+                this.userData.statistics.totalQuizzes = (this.userData.statistics.totalQuizzes || 0) + 1;
+                if (isCorrect) {
+                    this.userData.statistics.correctAnswers = (this.userData.statistics.correctAnswers || 0) + 1;
+                }
+                
+                this.saveUserData();
+                this.updateStats();
+                
+                // 結果を表示
+                const options = document.querySelectorAll('.option');
+                options[this.selectedOption].classList.add(isCorrect ? 'correct' : 'incorrect');
+                options[quiz.correct].classList.add('correct');
+                
+                document.getElementById('result').textContent = isCorrect ? '正解！' : '不正解...';
+                document.getElementById('submitBtn').disabled = true;
+                
+                // 次の問題へ
+                setTimeout(() => {
+                    this.currentQuestion = (this.currentQuestion + 1) % this.quizzes.length;
+                    this.displayQuestion();
+                }, 2000);
+            }
+        }
+
+        // ログアウト関数
+        function logout() {
+            const auth = new AuthSystem();
+            auth.logout();
+        }
+
+        // アプリ起動
+        document.addEventListener('DOMContentLoaded', () => {
+            new QuizSystem();
+        });
+    </script>
+</body>
+</html>

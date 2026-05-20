@@ -13,6 +13,7 @@ export default function MusicScreen() {
   const { colors, onPrimary } = useTheme();
   const navigate = useNavigate();
   const locale = useLocale();
+  const ja = locale === 'ja';
   const t = translations[locale];
   const {
     library, addFiles, removeFromLibrary,
@@ -30,10 +31,10 @@ export default function MusicScreen() {
   const [showNewPlaylistInput, setShowNewPlaylistInput] = useState(false);
 
   const bgmPresets = {
-    default:   { name: t.standardBgm,        icon: '🎵', desc: t.standardBgm,           file: 'bgm' },
-    japanese:  { name: t.japaneseStyle,   icon: '🎋', desc: t.japaneseStyleDesc, file: 'bgm2' },
-    energetic: { name: t.hypeUp,   icon: '🔥', desc: t.hypeUpDesc, file: 'bgm3' },
-    stylish:   { name: t.stylishCafe,    icon: '☕', desc: t.stylishCafeDesc, file: 'bgm4' },
+    default:   { name: t.standardBgm,        icon: '🎵', desc: t.standardBgm,           file: 'BGM1' },
+    japanese:  { name: t.japaneseStyle,   icon: '🎋', desc: t.japaneseStyleDesc, file: 'BGM2' },
+    energetic: { name: t.hypeUp,   icon: '🔥', desc: t.hypeUpDesc, file: 'BGM3' },
+    stylish:   { name: t.stylishCafe,    icon: '☕', desc: t.stylishCafeDesc, file: 'BGM4' },
   };
 
   const seSets: Record<string, { name: string; icon: string; sound: string }> = {
@@ -80,7 +81,7 @@ export default function MusicScreen() {
     if (Platform.OS !== 'web') return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'audio/*';
+    input.accept = 'audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a,.opus,.webm,.wma';
     input.multiple = true;
     input.onchange = async (e: any) => {
       const files: File[] = Array.from(e.target.files || []);
@@ -130,7 +131,7 @@ export default function MusicScreen() {
                 if (isPlaying) {
                   pause();
                 }
-                const fileKey = (preset as any).file || 'bgm';
+                const fileKey = (preset as any).file || 'BGM1';
                 await SoundManager.updateBGMSetting(bgmEnabled, fileKey as any);
                 SoundManager.play('decide');
               }}
@@ -150,7 +151,7 @@ export default function MusicScreen() {
               await AsyncStorage.setItem('bgm_enabled', v.toString());
               // SoundManagerに即時反映
               const currentPreset = bgmPresets[bgmPreset as keyof typeof bgmPresets] as any;
-              const fileKey = currentPreset?.file || 'bgm';
+              const fileKey = currentPreset?.file || 'BGM1';
               await SoundManager.updateBGMSetting(v, fileKey as any);
             }}
             trackColor={{ false: colors.border, true: colors.primary }}
@@ -233,11 +234,11 @@ export default function MusicScreen() {
                     <View style={styles.trackActions}>
                       {activePlaylistId && (
                         <TouchableOpacity
-                          style={[styles.addToPlBtn, { backgroundColor: colors.success }]}
+                          style={[styles.addToPlBtn, { backgroundColor: colors.primary }]}
                           onPress={() => addTrackToPlaylist(activePlaylistId, file.id)}
                         >
-                          <Text style={styles.tinyBtnText}>
-                            {t.addToPlaylist}
+                          <Text style={[styles.tinyBtnText, { color: onPrimary }]}>
+                            {locale === 'ja' ? 'プレイリストに追加' : t.addToPlaylist}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -331,7 +332,7 @@ export default function MusicScreen() {
                     <Text style={styles.ctrlBtnText}>⏮</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.playBtn, { backgroundColor: isPlaying ? colors.error : colors.success }]} onPress={togglePlay}>
-                    <Text style={styles.ctrlBtnText}>{isPlaying ? '⏸' : '▶'}</Text>
+                    <Text style={styles.ctrlBtnText}>{isPlaying ? '❚❚' : '❯'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.border }]} onPress={next}>
                     <Text style={styles.ctrlBtnText}>⏭</Text>

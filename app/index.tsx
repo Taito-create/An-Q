@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 import TooltipButton from './tooltipButton';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
@@ -13,6 +12,7 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { Play, Plus, BarChart3, Music, Calendar, Settings, Globe, ScrollText, Award, ShoppingBag, Timer, Palette, Repeat2 } from 'lucide-react';
 
 const HomeScreen = () => {
   const navigate = useNavigate();
@@ -177,17 +177,8 @@ const HomeScreen = () => {
         setWeakQuestionCount(weak.length);
       }
 
-      // Load timer setting - use APP_TIMER_SETTING
-      const appTimerSetting = await AsyncStorage.getItem('APP_TIMER_SETTING');
-      console.log('--- TIMER LOAD ---', { appTimerSetting });
-      
-      if (appTimerSetting && appTimerSetting !== 'null' && appTimerSetting !== null) {
-        setTimerMinutes(parseInt(appTimerSetting));
-        console.log('--- TIMER SET FROM APP_TIMER_SETTING ---', appTimerSetting);
-      } else {
-        setTimerMinutes(5);
-        console.log('--- TIMER DEFAULT ---', '5');
-      }
+      // Load timer setting with migration from old keys
+      await loadTimerSetting();
 
       // Load layout settings
       const savedLayout = await AsyncStorage.getItem('home_layout_mode');
@@ -200,6 +191,34 @@ const HomeScreen = () => {
       if (savedButtonOrder) setButtonOrder(JSON.parse(savedButtonOrder));
     } catch (error) {
       console.error('Failed to load settings:', error);
+    }
+  };
+
+  const loadTimerSetting = async () => {
+    try {
+      // 1. 'APP_TIMER_SETTING' キーで保存された値を優先的に読み込む
+      let timerValue = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
+
+      // 2. 値が存在しない場合、古いキーをチェックして移行する
+      if (storedMinutes === null) {
+        const oldTimerValue = await AsyncStorage.getItem('timerSetting');
+        if (oldTimerValue !== null) {
+          storedMinutes = parseInt(oldTimerValue, 10);
+          // 古いキーの値を新しいキーにコピー
+          await AsyncStorage.setItem('APP_TIMER_SETTING', storedMinutes.toString());
+          // 古いキーは削除
+          await AsyncStorage.removeItem('timerSetting');
+          console.log(`Migrated timer setting from 'timerSetting' to 'APP_TIMER_SETTING': ${storedMinutes}`);
+        }
+      }
+
+      // 3. 最終的に有効な分数を設定する（デフォルトは5分）
+      const finalMinutes = (storedMinutes !== null && !isNaN(storedMinutes)) ? storedMinutes : 5;
+      setTimerMinutes(finalMinutes);
+    } catch (error) {
+      console.error('Failed to load timer setting:', error);
+      setTimerMinutes(5); // エラー時はデフォルト値に設定
     }
   };
 
@@ -330,12 +349,12 @@ const HomeScreen = () => {
           {/* タイトルと名言を横並び */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text, fontSize: fs(28) }]}>{t.appTitle}</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: fs(14) }]}>{t.subtitle}</Text>
+              <Text style={[styles.title, { color: colors.text, fontSize: fs(28) }]}>An-Q</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: fs(14) }]}>覚えるな、脳にインストールせよ</Text>
             </View>
             {motivationalMessage && (
               <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', flex: 1.2 }]}>
-                <Ionicons name="bulb" size={14} color={colors.primary} style={styles.bulbIcon} />
+                <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
                 <Text style={[styles.motivationalText, { color: colors.text, fontSize: fs(11) }]} numberOfLines={3}>
                   {motivationalMessage}
                 </Text>
@@ -349,19 +368,19 @@ const HomeScreen = () => {
           {navMode === 'compact' && !reorderMode && (
             <>
               {buttonOrder.map(key => {
-                const btnDef: Record<string, { icon: string; label: string; route: string }> = {
-                  calendar:      { icon: 'calendar-outline',      label: t.calendar,       route: '/calendar' },
-                  mission:       { icon: 'clipboard-outline',     label: t.mission,        route: '/mission' },
-                  title:         { icon: 'ribbon-outline',        label: t.titleLabel,     route: '/title' },
-                  shop:          { icon: 'storefront-outline',    label: t.shop,           route: '/shop' },
-                  manage:        { icon: 'timer-outline',         label: t.timerSettings,  route: '/manage' },
-                  themeSettings: { icon: 'color-palette-outline', label: t.themeSetting,    route: '/settings' },
+                const btnDef: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
+                  calendar:      { icon: <Calendar size={16} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
+                  mission:       { icon: <ScrollText size={16} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
+                  title:         { icon: <Award size={16} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
+                  shop:          { icon: <ShoppingBag size={16} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
+                  manage:        { icon: <Timer size={16} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
+                  themeSettings: { icon: <Palette size={16} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
                 };
                 const def = btnDef[key];
                 if (!def) return null;
                 return (
                   <TooltipButton key={key} style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate(def.route); }} label={def.label}>
-                    <Ionicons name={def.icon as any} size={16} color={colors.primary} />
+                    {def.icon}
                   </TooltipButton>
                 );
               })}
@@ -371,36 +390,36 @@ const HomeScreen = () => {
             <>
               {buttonOrder.map(key => {
                 const iconMap: Record<string, string> = {
-                  calendar: 'calendar-outline', mission: 'clipboard-outline',
-                  title: 'ribbon-outline', shop: 'storefront-outline',
-                  manage: 'timer-outline', themeSettings: 'color-palette-outline',
+                  calendar: '◧', mission: '◰',
+                  title: '◱', shop: '◲',
+                  manage: '◳', themeSettings: '◴',
                 };
                 const selIdx = reorderSelection.indexOf(key);
                 return (
                   <TouchableOpacity key={key} style={[styles.iconButton, { borderColor: selIdx >= 0 ? colors.primary : colors.border, backgroundColor: selIdx >= 0 ? colors.primary + '20' : 'transparent' }]} onPress={() => handleReorderTap(key)}>
                     {selIdx >= 0
                       ? <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>{selIdx + 1}</Text>
-                      : <Ionicons name={iconMap[key] as any} size={16} color={colors.textSecondary} />}
+                      : <Text style={{ fontSize: 16, color: colors.textSecondary }}>{iconMap[key]}</Text>}
                   </TouchableOpacity>
                 );
               })}
               <TouchableOpacity style={[styles.iconButton, { borderColor: colors.error }]} onPress={cancelReorderMode}>
-                <Ionicons name="close-outline" size={16} color={colors.error} />
+                <Text style={{ fontSize: 16, color: colors.error }}>✕</Text>
               </TouchableOpacity>
             </>
           )}
           <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={toggleNavMode} label={t.navModeToggle}>
-            <Ionicons name={navMode === 'compact' ? 'apps-outline' : 'menu-outline'} size={16} color={colors.primary} />
+            <Repeat2 size={16} color={colors.primary} />
           </TooltipButton>
           <TooltipButton style={[styles.iconButton, { borderColor: reorderMode ? colors.warning : colors.primary }]} onPress={reorderMode ? cancelReorderMode : startReorderMode} label={t.reorderButtons}>
-            <Ionicons name="swap-horizontal-outline" size={16} color={reorderMode ? colors.warning : colors.primary} />
+            <Text style={{ fontSize: 16, color: reorderMode ? colors.warning : colors.primary }}>⇄</Text>
           </TooltipButton>
           <TooltipButton style={[styles.languageButton, { borderColor: colors.primary }]} onPress={toggleLanguage} label={t.language}>
-            <Ionicons name="language-outline" size={16} color={colors.primary} />
-            <Text style={[styles.languageText, { color: colors.primary }]}>{locale === 'ja' ? 'JP' : 'EN'}</Text>
+            <Globe size={16} color={colors.primary} />
+            <Text style={[styles.languageText, { color: colors.primary }]}>{currentLocale === 'ja' ? 'JP' : 'EN'}</Text>
           </TooltipButton>
           <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
-            <Ionicons name="settings-outline" size={16} color={colors.primary} />
+            <Settings size={16} color={colors.primary} />
           </TooltipButton>
         </View>
       </View>
@@ -424,7 +443,7 @@ const HomeScreen = () => {
           onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
         >
           <View style={styles.todayHeader}>
-            <Text style={styles.todayEmoji}>📅</Text>
+            <Text style={styles.todayEmoji}>◧</Text>
             <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fs(13) }]}>
               {t.todayQuestion}
             </Text>
@@ -445,7 +464,7 @@ const HomeScreen = () => {
             navigate('/quiz');
           }}
         >
-          <Text style={styles.weakEmoji}>⚠️</Text>
+          <Text style={styles.weakEmoji}>⚠</Text>
           <View style={{ flex: 1 }}>
             <Text style={[styles.weakLabel, { color: colors.error, fontSize: fs(13) }]}>
               {t.weakQuestionsQuiz}
@@ -454,18 +473,18 @@ const HomeScreen = () => {
               {locale === 'ja' ? `${weakQuestionCount}${t.reviewWeakQuestions}` : `${t.reviewWeakQuestions} (${weakQuestionCount})`}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.error} />
+          <Text style={{ fontSize: 16, color: colors.error }}>›</Text>
         </TouchableOpacity>
       )}
 
       {/* Main Actions */}
       <View style={styles.mainActions}>
         <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}>
-          <Ionicons name="play" size="24" color={onPrimary} />
+          <Play size={20} color={onPrimary} style={{ marginRight: 8 }} />
           <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(18) }]}>{t.startQuizButton}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate('/create'); }}>
-          <Ionicons name="add" size="24" color={colors.primary} />
+          <Plus size={24} color={colors.primary} style={{ marginRight: 8 }} />
           <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>{t.createQuestion}</Text>
         </TouchableOpacity>
       </View>
@@ -474,19 +493,19 @@ const HomeScreen = () => {
       {(() => {
         // 上部固定カード（学習履歴・音楽設定のみ）
         const fixedCards = [
-          { key: 'browse', icon: 'stats-chart',   iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'learningHistory' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
-          { key: 'music',  icon: 'musical-notes', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
+          { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'learningHistory' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
+          { key: 'music',  icon: 'music', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
         ];
 
         // 「その他の機能」ボタン（並び替え可能）
         const defaultExtraOrder = ['calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings'];
-        const extraDefs: Record<string, { icon: string; label: string; route: string }> = {
-          calendar:      { icon: 'calendar-outline',      label: t.calendar,       route: '/calendar' },
-          mission:       { icon: 'clipboard-outline',     label: t.mission,        route: '/mission' },
-          title:         { icon: 'ribbon-outline',        label: t.titleLabel,     route: '/title' },
-          shop:          { icon: 'storefront-outline',    label: t.shop,           route: '/shop' },
-          manage:        { icon: 'timer-outline',         label: t.timerSettings,  route: '/manage' },
-          themeSettings: { icon: 'color-palette-outline', label: t.themeSetting,    route: '/settings' },
+        const extraDefs: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
+          calendar:      { icon: <Calendar size={26} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
+          mission:       { icon: <ScrollText size={26} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
+          title:         { icon: <Award size={26} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
+          shop:          { icon: <ShoppingBag size={26} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
+          manage:        { icon: <Timer size={26} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
+          themeSettings: { icon: <Palette size={26} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
         };
         const extraOrder: string[] = (cardOrder.filter(k => k in extraDefs).length === Object.keys(extraDefs).length)
           ? cardOrder.filter(k => k in extraDefs)
@@ -499,15 +518,18 @@ const HomeScreen = () => {
             <View>
               {/* 上部固定カード（グリッド） */}
               <View style={styles.grid}>
-                {fixedCards.map(card => (
-                  <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
-                    <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-                      <Ionicons name={card.icon as any} size={20} color={card.iconColor} />
-                    </View>
-                    <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
-                    <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
-                  </TouchableOpacity>
-                ))}
+                {fixedCards.map(card => {
+                  const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
+                  return (
+                    <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
+                      <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
+                        <IconComponent size={28} color={card.iconColor} />
+                      </View>
+                      <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
+                      <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* その他の機能 */}
@@ -543,7 +565,7 @@ const HomeScreen = () => {
                         </View>
                       )}
                       <View style={[styles.bigCardIcon, { backgroundColor: colors.primary + '20' }]}>
-                        <Ionicons name={btn.icon as any} size={26} color={colors.primary} />
+                        {btn.icon}
                       </View>
                       <Text style={[styles.bigCardTitle, { color: colors.text, fontSize: fs(14) }]}>
                         {btn.label}
@@ -559,15 +581,18 @@ const HomeScreen = () => {
         // compactモード（学習履歴・音楽設定のみ、左右対称）
         return (
           <View style={styles.fixedCardRow}>
-            {fixedCards.map(card => (
-              <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
-                <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-                  <Ionicons name={card.icon as any} size={20} color={card.iconColor} />
-                </View>
-                <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
-                <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
-              </TouchableOpacity>
-            ))}
+            {fixedCards.map(card => {
+              const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
+              return (
+                <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
+                  <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
+                    <IconComponent size={28} color={card.iconColor} />
+                  </View>
+                  <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
+                  <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         );
       })()}
@@ -691,10 +716,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  bulbIcon: {
-    marginRight: 6,
-    marginTop: 2,
-  },
   motivationalText: {
     fontSize: 11,
     fontStyle: 'italic',
@@ -802,6 +823,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+  },
+  iconSimple: {
+    fontSize: 22,
+    fontWeight: '300',
+    textAlign: 'center',
   },
   navTitle: {
     fontSize: 16,

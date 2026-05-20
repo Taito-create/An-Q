@@ -13,23 +13,27 @@ export default function RootLayout() {
   const [bgmReady, setBgmReady] = useState(false);
 
   useEffect(() => {
-    // Initialize BGM when app starts
+    // Initialize BGM when app starts (load only, no autoplay)
     const initializeBGM = async () => {
       try {
         await SoundManager.initialize();
         await SoundManager.initializeBGM();
-        
-        // Force BGM playback on app start
-        console.log('Force starting BGM playback...');
-        await SoundManager.playBGM();
-        
         setBgmReady(true);
-        console.log('BGM initialization completed');
+        console.log('SoundManager initialized');
       } catch (error) {
-        console.error('BGM initialization failed:', error);
-        setBgmReady(true); // Continue without BGM
+        console.error('SoundManager initialization failed:', error);
+        setBgmReady(true);
       }
     };
+    
+    // ユーザーが初めてクリックした時にBGMを開始する
+    const startBGMOnInteraction = () => {
+      SoundManager.playBGM();
+      document.removeEventListener('click', startBGMOnInteraction);
+      document.removeEventListener('touchstart', startBGMOnInteraction);
+    };
+    document.addEventListener('click', startBGMOnInteraction);
+    document.addEventListener('touchstart', startBGMOnInteraction);
     
     // Migrate old timer keys to new unified key
     const migrateTimerKeys = async () => {
@@ -54,6 +58,11 @@ export default function RootLayout() {
     initializeBGM();
     migrateTimerKeys();
     recordLogin();
+    
+    return () => {
+      document.removeEventListener('click', startBGMOnInteraction);
+      document.removeEventListener('touchstart', startBGMOnInteraction);
+    };
   }, []);
 
   return (

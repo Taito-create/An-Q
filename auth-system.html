@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>An-Q - 認証</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        .auth-title {
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 1rem;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .switch-mode {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .switch-mode:hover {
+            text-decoration: underline;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title" id="authTitle">An-Q ログイン</h1>
+        
+        <div id="loginForm">
+            <div class="form-group">
+                <label for="username">ユーザー名</label>
+                <input type="text" id="username" placeholder="ユーザー名を入力">
+            </div>
+            <div class="form-group">
+                <label for="password">パスワード</label>
+                <input type="password" id="password" placeholder="パスワードを入力">
+            </div>
+            <button class="btn" onclick="login()">ログイン</button>
+            <a href="#" class="switch-mode" onclick="switchToRegister()">新規アカウント作成</a>
+            <a href="#" class="switch-mode" onclick="showAdminPanel()">管理者パネル</a>
+            <div id="loginError" class="error"></div>
+        </div>
+
+        <div id="registerForm" style="display: none;">
+            <div class="form-group">
+                <label for="newUsername">ユーザー名</label>
+                <input type="text" id="newUsername" placeholder="新しいユーザー名を入力">
+            </div>
+            <div class="form-group">
+                <label for="email">メールアドレス（推奨：学校のドメイン）</label>
+                <input type="email" id="email" placeholder="user@school.jp または user@gmail.com">
+            </div>
+            <div class="form-group">
+                <label for="newPassword">パスワード</label>
+                <input type="password" id="newPassword" placeholder="パスワードを入力">
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">パスワード確認</label>
+                <input type="password" id="confirmPassword" placeholder="パスワードを再入力">
+            </div>
+            <button class="btn" onclick="register()">アカウント作成</button>
+            <a href="#" class="switch-mode" onclick="switchToLogin()">既存アカウントでログイン</a>
+            <div id="registerError" class="error"></div>
+        </div>
+
+        <div id="adminForm" style="display: none;">
+            <h2 class="auth-title">管理者パネル</h2>
+            <div class="form-group">
+                <label for="adminPassword">管理者パスワード</label>
+                <input type="password" id="adminPassword" placeholder="管理者パスワードを入力">
+            </div>
+            <button class="btn" onclick="adminLogin()">管理者ログイン</button>
+            <a href="#" class="switch-mode" onclick="switchToLogin()">戻る</a>
+            <div id="adminError" class="error"></div>
+        </div>
+
+        <div id="userListForm" style="display: none;">
+            <h2 class="auth-title">ユーザー管理</h2>
+            <div id="userList"></div>
+            <button class="btn" onclick="exportUserData()">ユーザーデータをエクスポート</button>
+            <button class="btn" onclick="switchToLogin()">戻る</button>
+        </div>
+    </div>
+
+    <script>
+        // 認証システム
+        class AuthSystem {
+            constructor() {
+                this.users = this.loadUsers();
+                this.currentUser = null;
+            }
+
+            loadUsers() {
+                const saved = localStorage.getItem('anq_users');
+                return saved ? JSON.parse(saved) : {};
+            }
+
+            saveUsers() {
+                localStorage.setItem('anq_users', JSON.stringify(this.users));
+            }
+
+            login(username, password) {
+                if (!this.users[username]) {
+                    return { success: false, error: 'ユーザー名が存在しません' };
+                }
+                if (this.users[username].password !== password) {
+                    return { success: false, error: 'パスワードが正しくありません' };
+                }
+                this.currentUser = username;
+                this.saveCurrentUser();
+                return { success: true };
+            }
+
+            register(username, password, email) {
+                if (this.users[username]) {
+                    return { success: false, error: 'このユーザー名は既に使用されています' };
+                }
+                this.users[username] = {
+                    password: password,
+                    email: email || '',
+                    createdAt: new Date().toISOString(),
+                    data: {
+                        quizProgress: {},
+                        settings: {},
+                        statistics: {
+                            totalQuizzes: 0,
+                            correctAnswers: 0,
+                            totalTime: 0
+                        }
+                    }
+                };
+                this.saveUsers();
+                return { success: true };
+            }
+
+            saveCurrentUser() {
+                localStorage.setItem('anq_current_user', this.currentUser);
+            }
+
+            logout() {
+                this.currentUser = null;
+                localStorage.removeItem('anq_current_user');
+            }
+
+            getUserData(username) {
+                return this.users[username]?.data || {};
+            }
+
+            saveUserData(username, data) {
+                if (this.users[username]) {
+                    this.users[username].data = { ...this.users[username].data, ...data };
+                    this.saveUsers();
+                }
+            }
+        }
+
+        const auth = new AuthSystem();
+
+        // UI関数
+        function switchToRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            document.getElementById('authTitle').textContent = 'An-Q アカウント作成';
+            clearErrors();
+        }
+
+        function switchToLogin() {
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('authTitle').textContent = 'An-Q ログイン';
+            clearErrors();
+        }
+
+        function clearErrors() {
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('registerError').textContent = '';
+        }
+
+        function login() {
+            clearErrors();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                document.getElementById('loginError').textContent = 'ユーザー名とパスワードを入力してください';
+                return;
+            }
+
+            const result = auth.login(username, password);
+            if (result.success) {
+                // メインアプリにリダイレクト
+                window.location.href = 'app.html';
+            } else {
+                document.getElementById('loginError').textContent = result.error;
+            }
+        }
+
+        function register() {
+            clearErrors();
+            const username = document.getElementById('newUsername').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!username || !password || !confirmPassword) {
+                document.getElementById('registerError').textContent = 'すべての項目を入力してください';
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                document.getElementById('registerError').textContent = 'パスワードが一致しません';
+                return;
+            }
+
+            if (password.length < 6) {
+                document.getElementById('registerError').textContent = 'パスワードは6文字以上にしてください';
+                return;
+            }
+
+            const result = auth.register(username, password, email);
+            if (result.success) {
+                // 自動ログインしてメインアプリにリダイレクト
+                auth.login(username, password);
+                window.location.href = 'app.html';
+            } else {
+                document.getElementById('registerError').textContent = result.error;
+            }
+        }
+
+        function showAdminPanel() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('adminForm').style.display = 'block';
+            document.getElementById('authTitle').textContent = 'An-Q 管理者パネル';
+            clearErrors();
+        }
+
+        function adminLogin() {
+            clearErrors();
+            const adminPassword = document.getElementById('adminPassword').value;
+            
+            if (adminPassword === 'Ariake_Tsutsumi') {
+                showUserList();
+            } else {
+                document.getElementById('adminError').textContent = '管理者パスワードが正しくありません';
+            }
+        }
+
+        function showUserList() {
+            document.getElementById('adminForm').style.display = 'none';
+            document.getElementById('userListForm').style.display = 'block';
+            document.getElementById('authTitle').textContent = 'An-Q ユーザー管理';
+            
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            
+            const users = auth.users;
+            Object.keys(users).forEach(username => {
+                const userDiv = document.createElement('div');
+                userDiv.style.cssText = 'background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 4px solid #007AFF;';
+                
+                const userInfo = users[username];
+                userDiv.innerHTML = `
+                    <strong>ユーザー名:</strong> ${username}<br>
+                    <strong>メール:</strong> ${userInfo.email || '未設定'}<br>
+                    <strong>登録日:</strong> ${new Date(userInfo.createdAt).toLocaleString('ja-JP')}<br>
+                    <strong>総クイズ数:</strong> ${userInfo.data.statistics.totalQuizzes || 0}<br>
+                    <strong>正解数:</strong> ${userInfo.data.statistics.correctAnswers || 0}<br>
+                    <strong>正解率:</strong> ${userInfo.data.statistics.totalQuizzes > 0 ? Math.round((userInfo.data.statistics.correctAnswers / userInfo.data.statistics.totalQuizzes) * 100) : 0}%
+                `;
+                
+                userList.appendChild(userDiv);
+            });
+        }
+
+        function exportUserData() {
+            const users = auth.users;
+            const dataStr = JSON.stringify(users, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `anq_users_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        // Enterキーで送信
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (document.getElementById('loginForm').style.display !== 'none') {
+                    login();
+                } else {
+                    register();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

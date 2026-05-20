@@ -29,9 +29,9 @@ export default function MiniPlayer() {
   const [locale] = useState<'ja' | 'en'>('ja');
 
   const hasCustom = tracks.length > 0;
-  const hasPreset = bgmEnabled;
 
-  if (!hasCustom && !hasPreset) return null;
+  // カスタムBGMがある場合のみ表示（プリセットBGM時は非表示）
+  if (!hasCustom) return null;
 
   // ─── カスタムBGMプレイヤー ───
   if (hasCustom) {

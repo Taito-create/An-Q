@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://[USERNAME].github.io/[REPOSITORY]/sitemap.xml
+
+# 重要なページのみクロールを許可
+Allow: /manifest.json
+Allow: /sw.js
+Allow: /assets/
+
+# 管理ページやAPIはブロック
+Disallow: /admin
+Disallow: /api
+Disallow: /auth
+
+# キャッシュされたファイルを最適化
+Crawl-delay: 1

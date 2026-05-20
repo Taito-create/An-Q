@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../src/icons';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';

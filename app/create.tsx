@@ -373,7 +373,7 @@ export default function CreateQuestionScreen() {
         style={[styles.backButton, { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); navigate('/'); }}
       >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.cancel}</Text>
+        <Text style={[styles.backButtonText, { color: onPrimary }]}>← {t.back}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -437,14 +437,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  backButton: {
+backButton: {
     padding: 15,
+    borderRadius: 12,
     alignItems: 'center',
+    marginTop: 20,
     marginBottom: 40,
+    backgroundColor: 'transparent',
   },
   backButtonText: {
     color: '#666',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   answerTypeContainer: {
     flexDirection: 'row',

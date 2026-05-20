@@ -1,14 +1,24 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+
+const basename = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element not found');
 
-const root = createRoot(container);
+const root = ReactDOM.createRoot(container);
 root.render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  <React.StrictMode>
+    <BrowserRouter
+      basename={basename}
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
 );

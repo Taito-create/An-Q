@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, TouchableOpacity, Alert,
-  ScrollView, Text, View, Animated, TextInput
+  ScrollView, Text, View, Animated, TextInput, Dimensions
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -57,6 +57,7 @@ export default function QuizScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  const isSmallScreen = Dimensions.get('window').width < 380;
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
@@ -180,15 +181,28 @@ export default function QuizScreen() {
 
   const loadTimerSetting = async () => {
     try {
-      const saved = await AsyncStorage.getItem('APP_TIMER_SETTING');
-      if (saved) {
-        const minutes = parseInt(saved);
-        const secs = minutes * 60;
-        setTimerLimit(secs);
-        setTimeLeft(secs);
+      // ホーム画面と同じロジックでタイマー値を読み込む
+      let timerValue = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
+
+      if (storedMinutes === null) {
+        const oldTimerValue = await AsyncStorage.getItem('timerSetting');
+        if (oldTimerValue !== null) {
+          storedMinutes = parseInt(oldTimerValue, 10);
+          await AsyncStorage.setItem('APP_TIMER_SETTING', storedMinutes.toString());
+          await AsyncStorage.removeItem('timerSetting');
+          console.log(`Migrated timer setting in Quiz screen: ${storedMinutes}`);
+        }
       }
-    } catch (e) {
-      console.error('Failed to load timer setting:', e);
+
+      const finalMinutes = (storedMinutes !== null && !isNaN(storedMinutes)) ? storedMinutes : 5;
+      const seconds = finalMinutes * 60;
+      setTimerLimit(seconds);
+      setTimeLeft(seconds);
+    } catch (error) {
+      console.error('Failed to load timer setting:', error);
+      setTimerLimit(300); // デフォルト5分(300秒)
+      setTimeLeft(300);
     }
   };
 
@@ -310,19 +324,22 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-    const isLast = currentIndex >= shuffledQuestions.length - 1;
     const delay = correct ? 1000 : 2500; // 不正解時は復習のために長く
 
     setTimeout(async () => {
-      if (isLast) {
+      if (currentIndex + 1 >= shuffledQuestions.length) {
+        // 最終問題の場合
         setIsTimerActive(false);
-        await finishQuiz(updatedResults, correct ? score + 1 : score);
+        setAnswered(false);
+        setShowFeedback(false);
+        await finishQuiz();
       } else {
-        setCurrentIndex(i => i + 1);
+        // 次の問題へ
+        setCurrentIndex(prev => prev + 1);
         setShowFeedback(false);
         setAnswered(false);
+        setUserDescriptiveAnswer('');
         questionStartTime.current = Date.now();
-        // Play question sound for next question
         SoundManager.play('question');
       }
     }, delay);
@@ -331,36 +348,35 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // クイズ終了
   // ──────────────────────────────────────────────
-  const finishQuiz = async (finalResults: QuizResult[], finalScore: number) => {
+  const finishQuiz = async () => {
+    setIsTimerActive(false);
+    setShowReview(true);
+    
+    // 現在の問題数を正しく取得
+    const totalQuestions = shuffledQuestions.length;
+    const finalScore = results.filter(r => r.isCorrect).length;
+    
+    // 結果を保存（問題数とスコアを含める）
+    await AsyncStorage.setItem('quizResults', JSON.stringify({
+      results,
+      total: totalQuestions,
+      score: finalScore,
+    }));
+    
     try {
-      await AsyncStorage.setItem('quizResults', JSON.stringify(finalResults));
       await updateStreak();
-
-      // 連続正解・タグ別成績を記録
-      const answers = finalResults.map(r => ({
+      
+      const answers = results.map(r => ({
         isCorrect: r.isCorrect,
         tags: shuffledQuestions.find(q => q.id === r.questionId)?.tags ?? [],
       }));
       await recordQuizAnswers(answers);
-
-      const pct = Math.round((finalScore / shuffledQuestions.length) * 100);
-      setShowReview(true);
-      setIsTimerActive(false);
-
-      Alert.alert(
-        t.finished,
-        `${t.score}: ${finalScore} / ${shuffledQuestions.length}（${pct}%）`,
-        [
-          { text: t.viewDetails, onPress: () => setShowReview(true) },
-          { text: t.shareFeedback, onPress: () => navigate('/feedback') },
-          { text: t.viewResults, onPress: () => navigate('/results') },
-          { text: t.home, onPress: () => navigate('/') },
-        ]
-      );
     } catch (e) {
       console.error('finishQuiz error:', e);
-      navigate('/');
     }
+    
+    // 結果画面へ遷移（問題数も渡す）
+    navigate('/results', { state: { total: totalQuestions, score: finalScore } });
   };
 
   const updateStreak = async () => {
@@ -513,13 +529,22 @@ export default function QuizScreen() {
       )}
       <View style={styles.answerRow}>
         {currentQuestion.answerType === 'truefalse' && (
-          <TouchableOpacity
-            style={[styles.answerBtn, { backgroundColor: colors.success }, answered && styles.btnDisabled]}
-            onPress={() => handleAnswer(true)}
-            disabled={answered}
-          >
-            <Text style={styles.answerBtnText}>○</Text>
-          </TouchableOpacity>
+          <View style={styles.trueFalseContainer}>
+            <TouchableOpacity
+              style={[styles.answerBtn, { minWidth: isSmallScreen ? 70 : 100, height: isSmallScreen ? 60 : 80, borderRadius: isSmallScreen ? 30 : 40 }, styles.trueBtn, { backgroundColor: colors.success }, answered && styles.btnDisabled]}
+              onPress={() => handleAnswer(true)}
+              disabled={answered}
+            >
+              <Text style={styles.answerBtnText}>○</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.answerBtn, { minWidth: isSmallScreen ? 70 : 100, height: isSmallScreen ? 60 : 80, borderRadius: isSmallScreen ? 30 : 40 }, styles.falseBtn, { backgroundColor: colors.error }, answered && styles.btnDisabled]}
+              onPress={() => handleAnswer(false)}
+              disabled={answered}
+            >
+              <Text style={styles.answerBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
         )}
         {currentQuestion.answerType === 'multiple' && (
           <>
@@ -536,23 +561,24 @@ export default function QuizScreen() {
           </>
         )}
         {currentQuestion.answerType === 'descriptive' && (
-          <>
+          <View style={styles.descriptiveContainer}>
             <TextInput
               style={styles.descriptiveInput}
               value={userDescriptiveAnswer}
               onChangeText={setUserDescriptiveAnswer}
               placeholder={t.enterQuestion}
+              placeholderTextColor="#999"
               multiline
               editable={!answered}
             />
             <TouchableOpacity
-              style={[styles.answerBtn, styles.descriptiveBtn, answered && styles.btnDisabled]}
+              style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
               onPress={() => handleAnswer(userDescriptiveAnswer)}
               disabled={answered}
             >
-              <Text style={styles.answerBtnText}>{t.checkAnswer}</Text>
+              <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
             </TouchableOpacity>
-          </>
+          </View>
         )}
       </View>
 
@@ -594,11 +620,23 @@ const styles = StyleSheet.create({
   feedbackMain: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   feedbackSub: { fontSize: 14, color: '#F44336', marginBottom: 4 },
   answerRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 20 },
-  answerBtn: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center' },
+  trueFalseContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  answerBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   trueBtn: { backgroundColor: '#4CAF50' },
   falseBtn: { backgroundColor: '#F44336' },
   btnDisabled: { opacity: 0.4 },
-  answerBtnText: { color: '#fff', fontSize: 40, fontWeight: 'bold' },
+  answerBtnText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
   quitBtn: { alignItems: 'center', paddingVertical: 20 },
   quitBtnText: { color: '#CCC', fontSize: 13 },
   // Review styles
@@ -614,8 +652,31 @@ const styles = StyleSheet.create({
   reviewAnswerItem: { flexDirection: 'row', justifyContent: 'space-between' },
   reviewAnswerLabel: { fontSize: 14, color: '#666', fontWeight: '600' },
   reviewAnswerValue: { fontSize: 14, color: '#1A1A1A', fontWeight: 'bold' },
-  descriptiveInput: { height: 100, borderColor: 'gray', borderWidth: 1, padding: 10 },
-  descriptiveBtn: { backgroundColor: '#4CAF50' },
+  descriptiveContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    width: '100%',
+    paddingHorizontal: 10,
+  },
+  descriptiveInput: {
+    flex: 1,
+    height: 100,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    textAlignVertical: 'top',
+    backgroundColor: '#fff',
+  },
+  descriptiveBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+  },
   descriptiveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  descriptiveInputContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }
 });

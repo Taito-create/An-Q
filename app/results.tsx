@@ -3,7 +3,7 @@ import {
   StyleSheet, ScrollView, TouchableOpacity,
   Alert, Text, View
 } from 'react-native';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -29,7 +29,8 @@ interface HistoryEntry {
 
 export default function ResultsScreen() {
   const navigate = useNavigate();
-  const { colors } = useTheme();
+  const location = useLocation();
+  const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
 
@@ -51,7 +52,9 @@ export default function ResultsScreen() {
       ]);
 
       if (resultsRaw) {
-        const loadedResults: QuizResult[] = JSON.parse(resultsRaw);
+        const parsed = JSON.parse(resultsRaw);
+        // Support both old format (array) and new format ({ results, total, score })
+        const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed.results || []);
         setResults(loadedResults);
       }
 
@@ -79,8 +82,8 @@ export default function ResultsScreen() {
     ]);
   };
 
-  // Statistics calculation
-  const total = results.length;
+  // Statistics calculation (use state from navigation if available)
+  const total = location.state?.total || results.length;
   const correctCount = results.filter(r => r.isCorrect).length;
   const incorrectCount = total - correctCount;
   const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
@@ -223,8 +226,8 @@ export default function ResultsScreen() {
         <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
           <Text style={styles.primaryBtnText}>{t.takeAgain}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigate('/')}>
-          <Text style={styles.secondaryBtnText}>{t.backHome}</Text>
+        <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/')}>
+          <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>
           <Text style={styles.dangerBtnText}>{t.deleteAllHistory}</Text>
