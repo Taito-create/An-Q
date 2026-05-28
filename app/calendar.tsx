@@ -1,31 +1,28 @@
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, Alert, ScrollView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, Dimensions } from 'react-native';
 import { useNavigate } from 'react-router-dom';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { SoundManager } from './sound';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
-import { translations } from './translations';
+import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
+import { translations } from './translations';
 
-LocaleConfig.locales['jp'] = {
-  monthNames: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
-  monthNamesShort: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
-  dayNames: ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'],
-  dayNamesShort: ['日','月','火','水','木','金','土'],
-};
-LocaleConfig.locales['en'] = {
-  monthNames: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-  monthNamesShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-  dayNames: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-  dayNamesShort: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
-};
-LocaleConfig.defaultLocale = 'jp';
+const { width, height } = Dimensions.get('window');
+const isMobile = width < 768;
+// 画面サイズに応じてセルサイズを調整
+const cellSize = isMobile ? Math.min(width / 7 - 8, 44) : Math.min(width / 7 - 4, 60);
 
-interface ExamDate {
-  date: string;      // start date (or single date)
-  endDate?: string;  // end date for multi-day exams
+interface SubjectExam {
+  subject: string;
+  date: string;
+}
+
+interface ScheduledEvent {
+  id: string;
+  date: string;
   name: string;
+  endDate?: string;
+  subjects?: SubjectExam[];
 }
 
 export default function CalendarScreen() {
@@ -33,303 +30,472 @@ export default function CalendarScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState('');
-  const [examDates, setExamDates] = useState<ExamDate[]>([]);
-  const [examName, setExamName] = useState('');
+  const [events, setEvents] = useState<ScheduledEvent[]>([]);
+  const [eventName, setEventName] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isRange, setIsRange] = useState(false);
-  const [pendingDeleteDate, setPendingDeleteDate] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [subjectInputs, setSubjectInputs] = useState<SubjectExam[]>([]);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
-    loadExamDates();
-    LocaleConfig.defaultLocale = locale === 'en' ? 'en' : 'jp';
-  }, [locale]);
+    loadEvents();
+  }, []);
 
-  const loadExamDates = async () => {
+  const loadEvents = async () => {
     try {
-      const saved = await AsyncStorage.getItem('EXAM_DATES');
-      if (saved) setExamDates(JSON.parse(saved));
-    } catch (e) {}
+      const saved = await AsyncStorage.getItem('calendar_events');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setEvents(parsed);
+      }
+    } catch (e) {
+      console.error('Load failed:', e);
+    }
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayString = (() => {
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  })();
-
-  // Build a set of all exam-covered dates for quick lookup
-  const examDateMap: Record<string, ExamDate> = {};
-  examDates.forEach(exam => {
-    if (exam.endDate && exam.endDate > exam.date) {
-      const cur = new Date(exam.date);
-      const end = new Date(exam.endDate);
-      while (cur <= end) {
-        const y = cur.getFullYear();
-        const m = String(cur.getMonth() + 1).padStart(2, '0');
-        const d = String(cur.getDate()).padStart(2, '0');
-        const ds = `${y}-${m}-${d}`;
-        examDateMap[ds] = exam;
-        cur.setDate(cur.getDate() + 1);
-      }
-    } else {
-      examDateMap[exam.date] = exam;
+  const saveEvents = async (newEvents: ScheduledEvent[]) => {
+    try {
+      await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
+      setEvents(newEvents);
+      return true;
+    } catch (e) {
+      console.error('Save failed:', e);
+      Alert.alert('エラー', '保存に失敗しました');
+      return false;
     }
-  });
+  };
 
-  const onDayPress = (day: any) => {
-    const dateStr = day.dateString;
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+const days: Array<number | null> = [];
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i);
+  }
+
+
+  const goPrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+    setShowForm(false);
+  };
+
+  const goNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+    setShowForm(false);
+  };
+
+  const onDayPress = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     setSelectedDate(dateStr);
-    SoundManager.play('select');
-    const existing = examDates.find(e => e.date === dateStr || examDateMap[dateStr] === e);
+    setShowForm(true);
+    
+    const existing = events.find((e) => e.date === dateStr);
     if (existing) {
-      setExamName(existing.name);
+      setEditingEventId(existing.id);
+      setEventName(existing.name);
       setEndDate(existing.endDate || '');
       setIsRange(!!existing.endDate);
+      setSubjectInputs(existing.subjects || []);
     } else {
-      setExamName('');
+      setEditingEventId(null);
+      setEventName('');
       setEndDate('');
       setIsRange(false);
+      setSubjectInputs([]);
     }
   };
 
-  const saveExamDate = async () => {
-    if (!selectedDate || !examName.trim()) return;
-    if (isRange && endDate && endDate <= selectedDate) {
-      Alert.alert(t.error, t.endDateAfterStart);
+  const addSubjectInput = () => {
+    if (!endDate && !selectedDate) {
+      Alert.alert('エラー', '日付を設定してください');
       return;
     }
-    try {
-      const updatedDates = examDates.filter(e => e.date !== selectedDate);
-      updatedDates.push({
-        date: selectedDate,
-        endDate: isRange && endDate ? endDate : undefined,
-        name: examName.trim(),
-      });
-      updatedDates.sort((a, b) => a.date.localeCompare(b.date));
-      setExamDates(updatedDates);
-      await AsyncStorage.setItem('EXAM_DATES', JSON.stringify(updatedDates));
-      SoundManager.play('complete');
-      setSelectedDate('');
-      setExamName('');
-      setEndDate('');
-      setIsRange(false);
-    } catch (e) {}
+    setSubjectInputs([...subjectInputs, { subject: '', date: selectedDate }]);
   };
 
-  const handleDeleteRequest = (date: string) => {
-    if (Platform.OS === 'web') {
-      setPendingDeleteDate(date);
+  const updateSubject = (index: number, field: 'subject' | 'date', value: string) => {
+    const newInputs = [...subjectInputs];
+    newInputs[index][field] = value;
+    setSubjectInputs(newInputs);
+  };
+
+  const removeSubject = (index: number) => {
+    const newInputs = subjectInputs.filter((_, i) => i !== index);
+    setSubjectInputs(newInputs);
+  };
+
+  const saveEvent = async () => {
+    if (!selectedDate || !eventName.trim()) {
+      Alert.alert('エラー', '予定名を入力してください');
+      return;
+    }
+
+    if (isRange && endDate && endDate <= selectedDate) {
+      Alert.alert('エラー', '終了日は開始日より後にしてください');
+      return;
+    }
+
+    const isExam = eventName.includes('試験');
+    if (isExam && subjectInputs.length === 0) {
+      Alert.alert('エラー', '教科を追加してください');
+      return;
+    }
+
+    let newEvents = events;
+    if (editingEventId) {
+      newEvents = newEvents.filter(e => e.id !== editingEventId);
     } else {
-      Alert.alert(t.deleteExam, t.confirmDeleteExam, [
-        { text: t.cancel, style: 'cancel' },
-        { text: t.deleteAction, style: 'destructive', onPress: () => confirmDeleteExam(date) },
-      ]);
+      newEvents = newEvents.filter(e => e.date !== selectedDate);
+    }
+    
+    const newEvent: ScheduledEvent = {
+      id: editingEventId || Date.now().toString(),
+      date: selectedDate,
+      name: eventName.trim(),
+      endDate: isRange && endDate ? endDate : undefined,
+      subjects: isExam ? subjectInputs : undefined,
+    };
+
+    newEvents.push(newEvent);
+    newEvents.sort((a, b) => a.date.localeCompare(b.date));
+
+    const success = await saveEvents(newEvents);
+    if (success) {
+      SoundManager.play('complete');
+      resetForm();
+      Alert.alert('成功', '予定を保存しました');
     }
   };
 
-  const confirmDeleteExam = async (date: string) => {
-    try {
-      const updatedDates = examDates.filter(e => e.date !== date);
-      setExamDates(updatedDates);
-      setPendingDeleteDate(null);
-      await AsyncStorage.setItem('EXAM_DATES', JSON.stringify(updatedDates));
-      SoundManager.play('complete');
-      if (selectedDate === date) { setSelectedDate(''); setExamName(''); setEndDate(''); }
-    } catch (e) {}
+  const resetForm = () => {
+    setShowForm(false);
+    setSelectedDate('');
+    setEventName('');
+    setEndDate('');
+    setIsRange(false);
+    setSubjectInputs([]);
+    setEditingEventId(null);
+  };
+
+  // 削除確認ダイアログ付きの削除関数
+  const deleteEvent = async (eventId: string, eventDate: string) => {
+    Alert.alert(
+      '確認', 
+      'この予定を削除しますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const saved = await AsyncStorage.getItem('calendar_events');
+              const currentEvents = saved ? JSON.parse(saved) : [];
+              const newEvents = currentEvents.filter(e => String(e.id) !== String(eventId));
+              
+              if (newEvents.length === currentEvents.length) {
+                Alert.alert('エラー', '削除対象が見つかりませんでした');
+                return;
+              }
+              
+              await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
+              setEvents(newEvents);
+              SoundManager.play('decide');
+              
+              if (selectedDate === eventDate) {
+                resetForm();
+              }
+              
+              Alert.alert('完了', '予定を削除しました');
+            } catch (error) {
+              console.error('削除エラー:', error);
+              Alert.alert('エラー', '削除に失敗しました');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getDayStyle = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const isPast = new Date(dateStr) < new Date(todayStr);
+    const isSelected = dateStr === selectedDate;
+const hasEvent = events.some((e) => e.date === dateStr);
+    const isInEventRange = events.some((e) => e.endDate && e.date <= dateStr && e.endDate >= dateStr);
+
+    let bgColor = 'transparent';
+    let textColor = colors.text;
+
+    if (isPast && !isToday) {
+      bgColor = '#cccccc';
+      textColor = '#888888';
+    }
+    if (isToday) {
+      bgColor = colors.primary + '30';
+      textColor = colors.primary;
+    }
+    if (isSelected) {
+      bgColor = colors.primary;
+      textColor = '#fff';
+    }
+    if ((hasEvent || isInEventRange) && !isSelected && !isToday) {
+      bgColor = colors.success + '20';
+    }
+
+    return { bgColor, textColor, hasEvent: hasEvent || isInEventRange };
+  };
+
+  const getEventDisplayText = (event: ScheduledEvent) => {
+    if (event.subjects && event.subjects.length > 0) {
+      const subjectsText = event.subjects.map(s => `${s.date}:${s.subject}`).join(', ');
+      return `${event.name}: ${subjectsText}`;
+    }
+    if (event.endDate) {
+      return `${event.name} (${event.date} 〜 ${event.endDate})`;
+    }
+    return `${event.name} (${event.date})`;
+  };
+
+  const getExamsOnDate = (date: string) => {
+    const exams: string[] = [];
+    events.forEach(event => {
+      if (event.name.includes('試験') && event.subjects) {
+        event.subjects.forEach(sub => {
+          if (sub.date === date) {
+            exams.push(sub.subject);
+          }
+        });
+      }
+    });
+    return exams;
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{t.calendar}</Text>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.scrollContent}
+    >
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>カレンダー</Text>
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            SoundManager.play('decide');
+            navigate('/');
+          }}
+        >
+          <Text style={[styles.backButtonText, { color: onPrimary }]}>戻る</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.calendarContainer}>
-        <Calendar
-          key={`${locale}-${selectedDate}-${examDates.length}`}
-          onDayPress={onDayPress}
-          markedDates={{}}
-          markingType={'custom'}
-          onMonthChange={() => SoundManager.play('decide')}
-          dayComponent={({ date, state }: any) => {
-            const dateStr = date.dateString;
-            const isToday = dateStr === todayString;
-            const isPast = dateStr < todayString;
-            const isSelected = dateStr === selectedDate;
-            const exam = examDateMap[dateStr];
-            const isDisabled = state === 'disabled';
+        {/* 月切り替えヘッダー */}
+        <View style={styles.monthHeader}>
+          <TouchableOpacity onPress={goPrevMonth}>
+            <Text style={[styles.monthArrow, { color: colors.primary }]}>＜</Text>
+          </TouchableOpacity>
+          <Text style={[styles.monthText, { color: colors.text }]}>
+            {year}年 {month + 1}月
+          </Text>
+          <TouchableOpacity onPress={goNextMonth}>
+            <Text style={[styles.monthArrow, { color: colors.primary }]}>＞</Text>
+          </TouchableOpacity>
+        </View>
 
-            // Determine if this date is start, end, or middle of a range
-            const examEntry = exam;
-            const isRangeStart = examEntry && examEntry.endDate && dateStr === examEntry.date;
-            const isRangeEnd = examEntry && examEntry.endDate && dateStr === examEntry.endDate;
-            const isRangeMid = examEntry && examEntry.endDate && !isRangeStart && !isRangeEnd;
+        {/* 曜日表示 */}
+        <View style={styles.weekDaysRow}>
+          {weekDays.map(day => (
+            <Text key={day} style={[styles.weekDayText, { color: colors.textSecondary, fontSize: isMobile ? 12 : 14 }]}>
+              {day}
+            </Text>
+          ))}
+        </View>
 
-            let bgColor = 'transparent';
-            let textColor = isDisabled ? colors.border : colors.text;
-            let fontWeight: 'normal' | 'bold' = 'normal';
-            let borderColor = 'transparent';
-            let borderWidth = 0;
-            let borderRadius = 4;
-
-            if (isPast && !isDisabled) {
-              bgColor = colors.border;
-              textColor = colors.textSecondary;
-            }
-            if (exam) {
-              bgColor = colors.primary + '30';
-              textColor = colors.primary;
-              fontWeight = 'bold';
-              if (isRangeMid) borderRadius = 0;
-              if (isRangeStart) borderRadius = 8;
-              if (isRangeEnd) borderRadius = 8;
-            }
-            if (isToday) {
-              bgColor = 'transparent';
-              textColor = colors.primary;
-              fontWeight = 'bold';
-              borderColor = colors.primary;
-              borderWidth = 2;
-              borderRadius = 18;
-            }
-            if (isSelected) {
-              bgColor = colors.primary;
-              textColor = '#ffffff';
-              fontWeight = 'bold';
-              borderColor = colors.primary;
-              borderWidth = 2;
-              borderRadius = 18;
-            }
-
-            const showName = examEntry && !examEntry.endDate
-              ? dateStr === examEntry.date
-              : isRangeStart;
-
+        {/* 日付表示 */}
+        <View style={styles.daysGrid}>
+          {days.map((day, index) => {
+            const dateStr = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+            const examsOnDate = dateStr ? getExamsOnDate(dateStr) : [];
+            const dayStyle = day ? getDayStyle(day) : null;
             return (
               <TouchableOpacity
-                onPress={() => onDayPress(date)}
-                style={{
-                  width: 36,
-                  minHeight: 36,
-                  height: showName ? 50 : 36,
-                  borderRadius,
-                  backgroundColor: bgColor,
-                  borderWidth,
-                  borderColor,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: 1,
-                }}
+                key={index}
+                style={[
+                  styles.dayCell,
+                  { width: cellSize, height: cellSize, borderRadius: cellSize / 2 },
+                  day && dayStyle && { backgroundColor: dayStyle.bgColor },
+                ]}
+                onPress={() => day && onDayPress(day)}
+                disabled={!day}
               >
-                <Text style={{ color: textColor, fontWeight, fontSize: 14 }}>
-                  {date.day}
-                </Text>
-                {showName && (
-                  <Text style={{ color: onPrimary, fontSize: 8, fontWeight: 'bold', textAlign: 'center', paddingHorizontal: 2 }} numberOfLines={1}>
-                    {examEntry!.name}
-                  </Text>
+                {day && (
+                  <>
+                    <Text style={[styles.dayText, { fontSize: isMobile ? 14 : 16 }, dayStyle && { color: dayStyle.textColor }]}>
+                      {day}
+                    </Text>
+                    {examsOnDate.length > 0 && (
+                      <View style={[styles.eventDot, { backgroundColor: colors.error, width: isMobile ? 4 : 6, height: isMobile ? 4 : 6 }]} />
+                    )}
+                    {dayStyle?.hasEvent && examsOnDate.length === 0 && (
+                      <View style={[styles.eventDot, { backgroundColor: colors.success, width: isMobile ? 4 : 6, height: isMobile ? 4 : 6 }]} />
+                    )}
+                  </>
                 )}
               </TouchableOpacity>
             );
-          }}
-          onArrowLeftPress={() => SoundManager.play('decide')}
-          onArrowRightPress={() => SoundManager.play('decide')}
-          theme={{
-            backgroundColor: colors.card,
-            calendarBackground: colors.card,
-            textSectionTitleColor: colors.textSecondary,
-            todayTextColor: colors.primary,
-            dayTextColor: colors.text,
-            textDisabledColor: colors.border,
-            arrowColor: colors.primary,
-            monthTextColor: colors.text,
-            textMonthFontWeight: 'bold',
-          }}
-        />
+          })}
+        </View>
       </View>
 
-      {/* Exam Registration Form */}
-      {selectedDate && (
-        <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-          <Text style={[styles.formTitle, { color: colors.text }]}>{t.registerExam}</Text>
-          <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>{t.selected}: {selectedDate}</Text>
+      {/* 予定登録フォーム */}
+      {showForm && selectedDate && (
+        <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.formTitle, { color: colors.text }]}>
+            {editingEventId ? '予定を編集' : '予定を登録'}
+          </Text>
+          <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>
+            開始日: {selectedDate}
+          </Text>
+
           <TouchableOpacity
-            style={[styles.toggleButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-            onPress={() => { setIsRange(!isRange); setEndDate(''); }}
+            style={[styles.toggleButton, { borderColor: colors.primary }]}
+            onPress={() => setIsRange(!isRange)}
           >
             <Text style={[styles.toggleButtonText, { color: colors.primary }]}>
-              {isRange ? `✓ ${t.rangeToggle}` : `○ ${t.rangeToggle}`}
+              {isRange ? '✓ 期間指定' : '○ 期間指定'}
             </Text>
           </TouchableOpacity>
+
           {isRange && (
-              <TextInput
-                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
-                value={endDate}
-                onChangeText={setEndDate}
-                placeholder={t.endDateLabel}
-                placeholderTextColor={colors.textSecondary}
-              />
-            )}
+            <TextInput
+              style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="終了日 (YYYY-MM-DD)"
+              placeholderTextColor={colors.textSecondary}
+            />
+          )}
+
           <TextInput
             style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
-            value={examName}
-            onChangeText={setExamName}
-            placeholder={t.examNamePlaceholder}
+            value={eventName}
+            onChangeText={setEventName}
+            placeholder="予定名 (例: 中間試験)"
             placeholderTextColor={colors.textSecondary}
           />
-          <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={saveExamDate}>
-            <Text style={[styles.saveButtonText, { color: onPrimary }]}>{t.saveExam}</Text>
-          </TouchableOpacity>
+
+          {eventName.includes('試験') && (
+            <View style={styles.subjectsContainer}>
+              <Text style={[styles.subjectsTitle, { color: colors.text }]}>教科ごとの試験日</Text>
+              {subjectInputs.map((input, idx) => (
+                <View key={idx} style={styles.subjectRow}>
+                  <TextInput
+                    style={[styles.subjectInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, flex: 1 }]}
+                    value={input.subject}
+                    onChangeText={(text) => updateSubject(idx, 'subject', text)}
+                    placeholder="教科名"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TextInput
+                    style={[styles.subjectDateInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, width: 110 }]}
+                    value={input.date}
+                    onChangeText={(text) => updateSubject(idx, 'date', text)}
+                    placeholder="日付"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TouchableOpacity onPress={() => removeSubject(idx)} style={styles.removeSubjectBtn}>
+                    <Text style={[styles.removeSubjectText, { color: colors.error }]}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.addSubjectBtn, { borderColor: colors.primary }]} onPress={addSubjectInput}>
+                <Text style={[styles.addSubjectText, { color: colors.primary }]}>+ 教科を追加</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.formButtons}>
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={saveEvent}>
+              <Text style={[styles.saveButtonText, { color: onPrimary }]}>保存</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={resetForm}>
+              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+
+          {events.some(e => (editingEventId ? e.id === editingEventId : e.date === selectedDate)) && (
+            <TouchableOpacity 
+              style={[styles.deleteEventButton, { backgroundColor: colors.error }]} 
+              onPress={() => {
+                const targetEvent = events.find(e => editingEventId ? e.id === editingEventId : e.date === selectedDate);
+                if (targetEvent) {
+                  deleteEvent(targetEvent.id, targetEvent.date);
+                }
+              }}
+            >
+              <Text style={styles.deleteEventButtonText}>この予定を削除</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
-      {/* Exam Dates List */}
-      {examDates.length > 0 && (
-        <View style={styles.examListContainer}>
-          <Text style={[styles.listTitle, { color: colors.text }]}>{t.registeredExams}</Text>
-          {examDates.map((exam) => (
-            <View key={exam.date} style={[styles.examItem, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-              <View style={styles.examInfo}>
-                <Text style={[styles.examDateText, { color: colors.textSecondary }]}>
-                  {exam.date}{exam.endDate ? ` ${t.to} ${exam.endDate}` : ''}
-                </Text>
-                <Text style={[styles.examNameText, { color: colors.text }]}>{exam.name}</Text>
-              </View>
+      {/* 予定一覧 */}
+      {events.length > 0 && (
+        <View style={styles.eventListContainer}>
+          <Text style={[styles.eventListTitle, { color: colors.text }]}>予定一覧</Text>
+          {events.map(event => (
+            <View
+              key={event.id}
+              style={[styles.eventItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <TouchableOpacity
-                onPress={() => handleDeleteRequest(exam.date)}
-                style={styles.deleteButton}
-                activeOpacity={0.7}
+                style={styles.eventContent}
+                onPress={() => {
+                  setSelectedDate(event.date);
+                  setEditingEventId(event.id);
+                  setEventName(event.name);
+                  setEndDate(event.endDate || '');
+                  setIsRange(!!event.endDate);
+                  setSubjectInputs(event.subjects || []);
+                  setShowForm(true);
+                }}
               >
-                <Text style={styles.deleteButtonText}>{t.deleteExam}</Text>
+                <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+                  {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
+                </Text>
+                <Text style={[styles.eventName, { color: colors.text }]}>{getEventDisplayText(event)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteIcon, { backgroundColor: colors.error }]}
+                onPress={() => deleteEvent(event.id, event.date)}
+              >
+                <Text style={styles.deleteIconText}>🗑️</Text>
               </TouchableOpacity>
             </View>
           ))}
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
-      </TouchableOpacity>
-
-      {/* Delete Confirmation UI */}
-      {pendingDeleteDate && (
-        <View style={[styles.confirmOverlay, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.confirmBox}>
-            <Text style={[styles.confirmText, { color: colors.text }]}>{t.confirmDelete}</Text>
-            <View style={styles.confirmButtons}>
-              <TouchableOpacity style={[styles.confirmCancelButton, { borderColor: colors.border }]} onPress={() => setPendingDeleteDate(null)}>
-                <Text style={[styles.confirmCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.confirmDeleteButton, { backgroundColor: colors.error }]} onPress={() => confirmDeleteExam(pendingDeleteDate)}>
-                <Text style={styles.confirmDeleteText}>{t.delete}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       )}
     </ScrollView>
@@ -337,33 +503,51 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  headerTitle: { textAlign: 'center', marginBottom: 20, fontSize: 24, fontWeight: 'bold' },
-  calendarContainer: { borderRadius: 10, overflow: 'hidden', marginBottom: 20 },
-  formContainer: { backgroundColor: '#f8f8f8', padding: 15, borderRadius: 8, marginBottom: 20 },
-  formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#333' },
-  selectedDateText: { fontSize: 14, color: '#555', marginBottom: 10 },
-  toggleButton: { backgroundColor: '#E8F4FF', padding: 10, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#87CEEB' },
-  toggleButtonText: { color: '#007AFF', fontWeight: 'bold', fontSize: 14 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: 'white', marginBottom: 10 },
-  saveButton: { backgroundColor: '#007AFF', padding: 12, borderRadius: 8, alignItems: 'center' },
-  saveButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  examListContainer: { marginBottom: 20 },
-  listTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#333' },
-  examItem: { backgroundColor: '#f8f8f8', padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  examInfo: { flex: 1 },
-  examDateText: { fontSize: 13, color: '#666', marginBottom: 4 },
-  examNameText: { fontSize: 16, color: '#333', fontWeight: 'bold' },
-  deleteButton: { backgroundColor: '#ff4444', padding: 8, borderRadius: 5, alignItems: 'center' },
-  deleteButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  backButton: { backgroundColor: '#888', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10, marginBottom: 40 },
-  backButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  confirmOverlay: { position: 'absolute', bottom: 80, left: 20, right: 20, backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#ddd', elevation: 8 },
-  confirmBox: { alignItems: 'center' },
-  confirmText: { fontSize: 14, color: '#333', marginBottom: 12, textAlign: 'center' },
-  confirmButtons: { flexDirection: 'row', gap: 10, width: '100%' },
-  confirmCancelButton: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', alignItems: 'center' },
-  confirmCancelText: { color: '#666', fontWeight: 'bold', fontSize: 14 },
-  confirmDeleteButton: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#ff4444', alignItems: 'center' },
-  confirmDeleteText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
+  header: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  backButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  backButtonText: { fontWeight: 'bold' },
+  calendarContainer: { padding: 16, alignItems: 'center' },
+  monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%', paddingHorizontal: 16 },
+  monthArrow: { fontSize: 24, fontWeight: 'bold', paddingHorizontal: 16 },
+  monthText: { fontSize: 18, fontWeight: 'bold' },
+  weekDaysRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8, width: '100%' },
+  weekDayText: { width: '14.28%', textAlign: 'center', fontWeight: 'bold' },
+  daysGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  dayCell: { justifyContent: 'center', alignItems: 'center', margin: 2, position: 'relative' },
+  dayText: { fontWeight: '500' },
+  eventDot: { position: 'absolute', bottom: 2, borderRadius: 3 },
+  formContainer: { margin: 16, padding: 16, borderRadius: 12, borderWidth: 1 },
+  formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
+  selectedDateText: { fontSize: 14, marginBottom: 12 },
+  toggleButton: { padding: 10, borderRadius: 8, marginBottom: 10, borderWidth: 1, alignItems: 'center' },
+  toggleButtonText: { fontWeight: 'bold' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 12 },
+  formButtons: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  saveButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  saveButtonText: { fontWeight: 'bold' },
+  cancelButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1 },
+  cancelButtonText: { fontWeight: 'bold' },
+  deleteEventButton: { padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  deleteEventButtonText: { color: '#fff', fontWeight: 'bold' },
+  eventListContainer: { margin: 16, marginTop: 0 },
+  eventListTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  eventItem: { padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eventContent: { flex: 1 },
+  eventDate: { fontSize: 12, marginBottom: 4 },
+  eventName: { fontSize: 14, fontWeight: '500' },
+  deleteIcon: { padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  deleteIconText: { fontSize: 14, color: '#fff' },
+  subjectsContainer: { marginBottom: 12 },
+  subjectsTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
+  subjectRow: { flexDirection: 'row', gap: 8, marginBottom: 8, alignItems: 'center' },
+  subjectInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14 },
+  subjectDateInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 14, width: 110 },
+  removeSubjectBtn: { padding: 8 },
+  removeSubjectText: { fontSize: 16, fontWeight: 'bold' },
+  addSubjectBtn: { padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, marginTop: 4 },
+  addSubjectText: { fontWeight: 'bold' },
 });
+

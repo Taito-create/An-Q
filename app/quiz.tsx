@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, TouchableOpacity, Alert,
-  ScrollView, Text, View, Animated, TextInput, Dimensions
+  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,6 +58,31 @@ export default function QuizScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const isSmallScreen = Dimensions.get('window').width < 380;
+  const isJapanese = locale === 'ja';
+
+  // 正解の文字数に応じてフォントサイズを調整
+  const getAnswerFontSize = (answer: string) => {
+    const length = answer.length;
+    if (isJapanese) {
+      if (length <= 10) return 28;
+      if (length <= 20) return 24;
+      if (length <= 30) return 20;
+      return 18;
+    } else {
+      if (length <= 15) return 28;
+      if (length <= 30) return 24;
+      if (length <= 50) return 20;
+      return 18;
+    }
+  };
+
+  // 文字数に応じてパディングも調整
+  const getAnswerPadding = (answer: string) => {
+    const length = answer.length;
+    if (length <= 10) return 24;
+    if (length <= 20) return 20;
+    return 16;
+  };
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
@@ -71,11 +96,12 @@ export default function QuizScreen() {
   const [results, setResults] = useState<QuizResult[]>([]);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showReview, setShowReview] = useState(false);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [mistakeCount, setMistakeCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAnswered, setIsAnswered] = useState(false);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isPaused, setIsPaused] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // タイマー
   const [timerLimit, setTimerLimit] = useState(180); // 秒
@@ -107,7 +133,6 @@ export default function QuizScreen() {
           .filter((q: any) => {
             // Filter out old format questions
             if (!q.answerType) {
-              console.log('Skipping old format question:', q);
               return false;
             }
             return true;
@@ -271,22 +296,44 @@ export default function QuizScreen() {
     const currentQuestion = shuffledQuestions[currentIndex];
     
     let actualCorrectAnswer: boolean | number | string = currentQuestion.answer;
-    let correct: boolean;
+    let correct: boolean = false;
     switch (currentQuestion.answerType) {
       case 'truefalse':
         correct = answer === currentQuestion.trueFalseAnswer;
         actualCorrectAnswer = currentQuestion.trueFalseAnswer ?? false;
+        // 誤答時に正解を設定
+        if (!correct) {
+          setFeedbackMessage(actualCorrectAnswer ? '○' : '✕');
+        } else {
+          setFeedbackMessage('');
+        }
         break;
       case 'multiple':
-        correct = answer === currentQuestion.multipleChoice?.correctAnswer;
-        actualCorrectAnswer = currentQuestion.multipleChoice?.correctAnswer ?? 0;
+        const selectedIndex = answer as number;
+        const correctIndex = currentQuestion.multipleChoice?.correctAnswer ?? 0;
+        correct = selectedIndex === correctIndex;
+        actualCorrectAnswer = currentQuestion.multipleChoice?.options[correctIndex] || '';
+        // 誤答時に正解を設定
+        if (!correct) {
+          setFeedbackMessage(actualCorrectAnswer);
+        } else {
+          setFeedbackMessage('');
+        }
         break;
       case 'descriptive':
-        correct = ((answer as string).trim().toLowerCase() === 
-                   currentQuestion.descriptiveAnswer?.toLowerCase());
-        actualCorrectAnswer = currentQuestion.descriptiveAnswer ?? '';
+        const userAnswerTrimmed = (answer as string).trim().toLowerCase();
+        const correctAnswerTrimmed = currentQuestion.descriptiveAnswer?.trim().toLowerCase() || '';
+        correct = userAnswerTrimmed === correctAnswerTrimmed;
+        actualCorrectAnswer = currentQuestion.descriptiveAnswer || '';
+        if (!correct) {
+          setFeedbackMessage(actualCorrectAnswer);
+          setShowFeedback(true);
+        }
         break;
     }
+
+    // フィードバック表示後に消去
+    setTimeout(() => setFeedbackMessage(''), 3000);
 
     // Play sound effect based on answer
     SoundManager.play(correct ? 'correct' : 'wrong');
@@ -327,12 +374,16 @@ export default function QuizScreen() {
     const delay = correct ? 1000 : 2500; // 不正解時は復習のために長く
 
     setTimeout(async () => {
+      // 最新の結果を確定（stateが非同期更新される前にローカルで生成）
+      const finalResults = [...results, newResult];
+      setResults(finalResults);
+
       if (currentIndex + 1 >= shuffledQuestions.length) {
         // 最終問題の場合
         setIsTimerActive(false);
         setAnswered(false);
         setShowFeedback(false);
-        await finishQuiz();
+        await finishQuizWithResults(finalResults);
       } else {
         // 次の問題へ
         setCurrentIndex(prev => prev + 1);
@@ -348,25 +399,24 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // クイズ終了
   // ──────────────────────────────────────────────
-  const finishQuiz = async () => {
+  const finishQuizWithResults = async (finalResults: QuizResult[]) => {
     setIsTimerActive(false);
     setShowReview(true);
-    
-    // 現在の問題数を正しく取得
+
     const totalQuestions = shuffledQuestions.length;
-    const finalScore = results.filter(r => r.isCorrect).length;
-    
-    // 結果を保存（問題数とスコアを含める）
+    const finalScore = finalResults.filter(r => r.isCorrect).length;
+
+    // 結果を保存
     await AsyncStorage.setItem('quizResults', JSON.stringify({
-      results,
+      results: finalResults,
       total: totalQuestions,
       score: finalScore,
+      timestamp: Date.now()
     }));
-    
+
     try {
       await updateStreak();
-      
-      const answers = results.map(r => ({
+      const answers = finalResults.map(r => ({
         isCorrect: r.isCorrect,
         tags: shuffledQuestions.find(q => q.id === r.questionId)?.tags ?? [],
       }));
@@ -374,9 +424,15 @@ export default function QuizScreen() {
     } catch (e) {
       console.error('finishQuiz error:', e);
     }
-    
-    // 結果画面へ遷移（問題数も渡す）
-    navigate('/results', { state: { total: totalQuestions, score: finalScore } });
+
+    // 結果画面へ遷移
+    navigate('/results', {
+      state: {
+        total: totalQuestions,
+        score: finalScore,
+        results: finalResults
+      }
+    });
   };
 
   const updateStreak = async () => {
@@ -431,7 +487,7 @@ export default function QuizScreen() {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.timeLimit}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{minutes} {t.minutes}</Text></View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.randomOrder}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{t.randomOrder}</Text></View>
+          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.randomOrder}</Text><Text style={[styles.infoValue, { color: colors.text }]}>ON</Text></View>
         </View>
         <TouchableOpacity style={[styles.startButton, { backgroundColor: colors.primary }]} onPress={startQuiz}>
           <Text style={[styles.startButtonText, { color: onPrimary }]}>{t.startQuizButton}</Text>
@@ -439,7 +495,10 @@ export default function QuizScreen() {
         {/* 戻るボタン：フルワイド固定 */}
         <TouchableOpacity
           style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-          onPress={() => navigate('/')}
+          onPress={() => {
+            SoundManager.play('decide');
+            navigate('/');
+          }}
         >
           <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.back}</Text>
         </TouchableOpacity>
@@ -450,12 +509,15 @@ export default function QuizScreen() {
   // Review Screen
   if (showReview) {
     return (
-      <ScrollView style={[styles.quizContainer, { backgroundColor: colors.background }]} contentContainerStyle={styles.quizContent}>
+      <ScrollView style={[styles.quizContainer, { backgroundColor: colors.background }]} contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
         <View style={styles.reviewHeader}>
           <Text style={styles.reviewTitle}>{t.review}</Text>
           <TouchableOpacity 
             style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-            onPress={() => navigate('/')}
+            onPress={() => {
+              SoundManager.play('decide');
+              navigate('/');
+            }}
           >
             <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.backToHome}</Text>
           </TouchableOpacity>
@@ -497,13 +559,28 @@ export default function QuizScreen() {
   }
 
   return (
-    <ScrollView style={[styles.quizContainer, { backgroundColor: colors.background }]} contentContainerStyle={styles.quizContent}>
+    <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
+      {/* スクロールしないヘッダー部分 */}
       <View style={styles.topBar}>
-        <Text style={[styles.timer, { color: timerColor }]}>{timeMin}:{String(timeSec).padStart(2, '0')}</Text>        <TouchableOpacity style={styles.pauseBtn} onPress={() => {
-          SoundManager.play('decide');
-          setIsTimerActive(a => !a);
-        }}>
-          <Text style={[styles.pauseBtnText, { pointerEvents: 'auto' }]}>{isTimerActive ? t.pause : t.resume}</Text>
+        <Text style={[styles.timer, { color: timerColor }]}>{timeMin}:{String(timeSec).padStart(2, '0')}</Text>
+        <TouchableOpacity 
+          style={[
+            styles.pauseBtn, 
+            { 
+              backgroundColor: isPaused ? colors.success : colors.border,
+              borderWidth: isPaused ? 2 : 0,
+              borderColor: isPaused ? '#fff' : 'transparent',
+            }
+          ]} 
+          onPress={() => {
+            SoundManager.play('decide');
+            setIsPaused(!isPaused);
+            setIsTimerActive(isPaused);
+          }}
+        >
+          <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
+            {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+          </Text>
         </TouchableOpacity>
         <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>{currentIndex + 1} / {shuffledQuestions.length}</Text>
       </View>
@@ -512,80 +589,196 @@ export default function QuizScreen() {
         <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
       </View>
 
-      <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
-        {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
-        <Text style={[styles.questionText, { color: colors.text }]}>{currentQuestion.question}</Text>
-      </View>
+      {/* スクロールが必要な部分 */}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+      >
+        <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
+          {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
+          <Text style={[styles.questionText, { color: colors.text }]}>{currentQuestion.question}</Text>
+        </View>
 
-      {showFeedback && (
-        <Animated.View style={[styles.feedbackBox, { opacity: fadeAnim }]}>
-          <Text style={[styles.feedbackMain, { color: isCorrect ? '#4CAF50' : '#F44336' }]}>
-            {isCorrect ? `○ ${t.correct}!` : `× ${t.incorrect}...`}
-          </Text>
-          {!isCorrect && (
-            <Text style={styles.feedbackSub}>{t.wasCorrectAnswer.replace('{answer}', currentQuestion.answer ? '○' : '×')}</Text>
-          )}
-        </Animated.View>
-      )}
-      <View style={styles.answerRow}>
-        {currentQuestion.answerType === 'truefalse' && (
-          <View style={styles.trueFalseContainer}>
-            <TouchableOpacity
-              style={[styles.answerBtn, { minWidth: isSmallScreen ? 70 : 100, height: isSmallScreen ? 60 : 80, borderRadius: isSmallScreen ? 30 : 40 }, styles.trueBtn, { backgroundColor: colors.success }, answered && styles.btnDisabled]}
-              onPress={() => handleAnswer(true)}
-              disabled={answered}
-            >
-              <Text style={styles.answerBtnText}>○</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.answerBtn, { minWidth: isSmallScreen ? 70 : 100, height: isSmallScreen ? 60 : 80, borderRadius: isSmallScreen ? 30 : 40 }, styles.falseBtn, { backgroundColor: colors.error }, answered && styles.btnDisabled]}
-              onPress={() => handleAnswer(false)}
-              disabled={answered}
-            >
-              <Text style={styles.answerBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
+        {/* 正解時の表示（小さく簡潔に） */}
+        {showFeedback && isCorrect && (
+          <Animated.View style={[styles.feedbackContainer, { opacity: fadeAnim, marginVertical: 16 }]}>
+            <View style={[styles.feedbackBox, { backgroundColor: colors.success + '20', padding: 16, borderRadius: 12 }]}>
+              <Text style={[styles.feedbackMain, { color: colors.success, fontSize: 20, fontWeight: 'bold', textAlign: 'center' }]}>
+                ✓ 正解！
+              </Text>
+            </View>
+          </Animated.View>
         )}
-        {currentQuestion.answerType === 'multiple' && (
-          <>
-            {currentQuestion.multipleChoice?.options.map((option, i) => (
+        <View style={styles.answerRow}>
+          {/* ○×問題 */}
+          {currentQuestion.answerType === 'truefalse' && (
+            <View style={styles.trueFalseContainer}>
               <TouchableOpacity
-                key={i}
-                style={[styles.answerBtn, answered && styles.btnDisabled]}
-                onPress={() => handleAnswer(i)}
-                disabled={answered}
+                style={[styles.answerBtn, styles.trueBtn, { backgroundColor: colors.success }]}
+                onPress={() => handleAnswer(true)}
+                disabled={answered || isPaused}
               >
-                <Text style={styles.answerBtnText}>{option}</Text>
+                <Text style={styles.answerBtnText}>○</Text>
               </TouchableOpacity>
-            ))}
-          </>
-        )}
-        {currentQuestion.answerType === 'descriptive' && (
-          <View style={styles.descriptiveContainer}>
-            <TextInput
-              style={styles.descriptiveInput}
-              value={userDescriptiveAnswer}
-              onChangeText={setUserDescriptiveAnswer}
-              placeholder={t.enterQuestion}
-              placeholderTextColor="#999"
-              multiline
-              editable={!answered}
-            />
+              <TouchableOpacity
+                style={[styles.answerBtn, styles.falseBtn, { backgroundColor: colors.error }]}
+                onPress={() => handleAnswer(false)}
+                disabled={answered || isPaused}
+              >
+                <Text style={styles.answerBtnText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 四択問題 */}
+          {currentQuestion.answerType === 'multiple' && (
+            <View style={styles.multipleContainer}>
+              {currentQuestion.multipleChoice?.options.map((option, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.multipleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => handleAnswer(i)}
+                  disabled={answered || isPaused}
+                >
+                  <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}️⃣</Text>
+                  <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* 記述式問題 */}
+          {currentQuestion.answerType === 'descriptive' && (
+            <View style={styles.descriptiveContainer}>
+              <TextInput
+                style={styles.descriptiveInput}
+                value={userDescriptiveAnswer}
+                onChangeText={setUserDescriptiveAnswer}
+                placeholder="回答を入力"
+                placeholderTextColor="#999"
+                multiline
+                editable={!answered && !isPaused}
+              />
+              <TouchableOpacity
+                style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
+                onPress={() => handleAnswer(userDescriptiveAnswer)}
+                disabled={answered || isPaused}
+              >
+                <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.bottomButtons}>
+          <TouchableOpacity 
+            style={[
+              styles.quitBtn, 
+              { 
+                backgroundColor: colors.primary,
+                paddingVertical: 12, 
+                paddingHorizontal: 24, 
+                borderRadius: 30,
+                alignSelf: 'center',
+                marginTop: 20,
+                minWidth: 180,
+                alignItems: 'center',
+              }
+            ]} 
+            onPress={() => {
+              SoundManager.play('decide');
+              setShowConfirmModal(true);
+            }}
+          >
+            <Text style={[styles.quitBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
+              {t.quitQuiz}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+      
+      {/* ポーズ時のフルスクリーンモーダル */}
+      <Modal visible={isPaused} transparent animationType="fade">
+        <View style={styles.pausedOverlay}>
+          <View style={styles.pausedContent}>
+            <Text style={styles.pausedText}>
+              {locale === 'ja' ? '⏸ 一時停止中' : '⏸ Paused'}
+            </Text>
+            <Text style={styles.pausedSubText}>
+              {locale === 'ja' ? '再開ボタンを押して続ける' : 'Press resume to continue'}
+            </Text>
             <TouchableOpacity
-              style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
-              onPress={() => handleAnswer(userDescriptiveAnswer)}
-              disabled={answered}
+              style={[styles.pauseBtn, { backgroundColor: colors.primary, marginTop: 24, paddingHorizontal: 32, paddingVertical: 14 }]}
+              onPress={() => {
+                SoundManager.play('decide');
+                setIsPaused(false);
+                setIsTimerActive(true);
+              }}
             >
-              <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
+              <Text style={[styles.pauseBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
+                {locale === 'ja' ? '▶ 再開' : '▶ Resume'}
+              </Text>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+        </View>
+      </Modal>
 
-      <TouchableOpacity style={styles.quitBtn} onPress={() => Alert.alert(t.quitQuiz + '?', '', [{ text: t.cancel, style: 'cancel' },{ text: t.quitQuiz, style: 'destructive', onPress: () => navigate('/') }])}>
-        <Text style={styles.quitBtnText}>{t.quitQuiz}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      {/* 中断確認モーダル */}
+      {showConfirmModal && (
+        <View style={styles.confirmModalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>確認</Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              ホーム画面に戻ります。本当にいいですか？
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>いいえ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={() => {
+                  setShowConfirmModal(false);
+                  setIsTimerActive(false);
+                  navigate('/');
+                }}
+              >
+                <Text style={styles.confirmModalConfirmText}>はい</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 誤答時のフルスクリーンモーダル */}
+      <Modal visible={showFeedback && !isCorrect && !!feedbackMessage} transparent animationType="fade">
+        <View style={styles.fullScreenFeedback}>
+          <View style={[styles.fullScreenCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.fullScreenIcon, { color: colors.error }]}>✗</Text>
+            <Text style={[styles.fullScreenTitle, { color: colors.error }]}>
+              {locale === 'ja' ? '不正解' : 'Incorrect'}
+            </Text>
+            
+            <View style={[styles.fullScreenAnswerBox, { backgroundColor: colors.primary + '15', borderRadius: 16, padding: 24, minWidth: 200, maxWidth: '90%' }]}>
+              <Text style={[styles.fullScreenAnswerLabel, { color: colors.textSecondary }]}>
+                {locale === 'ja' ? '正解はこちら' : 'Correct Answer'}
+              </Text>
+              <Text style={[styles.fullScreenAnswerText, { color: colors.primary, fontSize: 24, fontWeight: 'bold', textAlign: 'center' }]}>
+                {feedbackMessage}
+              </Text>
+            </View>
+            
+            <Text style={[styles.fullScreenTimer, { color: colors.textSecondary }]}>
+              {locale === 'ja' ? '次の問題へ...' : 'Next question...'}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -604,11 +797,75 @@ const styles = StyleSheet.create({
   backButtonText: { color: '#888', fontSize: 15 },
   backButtonFull: { width: '100%', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   backButtonFullText: { fontSize: 16, fontWeight: 'bold' },
-  quizContainer: { flex: 1, backgroundColor: '#fff' },
-  quizContent: { padding: 20, paddingTop: 60, paddingBottom: 40 },
+  pausedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  pausedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 20,
+    borderRadius: 20,
+  },
+  pausedText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  pausedSubText: {
+    fontSize: 14,
+    color: '#ccc',
+    textAlign: 'center',
+  },
+  pausedMessageContainer: {
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  pausedMessageText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  pausedMessageSub: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  quizContainer: { 
+    flex: 1, 
+    backgroundColor: '#fff' 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  quizContent: { 
+    padding: 20, 
+    paddingTop: 60, 
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   timer: { fontSize: 22, fontWeight: 'bold', minWidth: 60 },
-  pauseBtn: { backgroundColor: '#F0F0F0', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
+  pauseBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pauseBtnText: { fontSize: 12, color: '#555', fontWeight: '600' },
   questionCounter: { fontSize: 14, fontWeight: '600' },
   progressBar: { height: 6, borderRadius: 3, marginBottom: 20, overflow: 'hidden' },
@@ -616,9 +873,26 @@ const styles = StyleSheet.create({
   questionBox: { backgroundColor: '#F0F4FF', borderRadius: 16, padding: 24, marginBottom: 20, minHeight: 150, justifyContent: 'center' },
   topicBadge: { fontSize: 11, color: '#6366F1', backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 10, fontWeight: '600' },
   questionText: { fontSize: 22, textAlign: 'center', color: '#1A1A1A', lineHeight: 32 },
-  feedbackBox: { backgroundColor: '#F8F8F8', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#EFEFEF' },
-  feedbackMain: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  feedbackSub: { fontSize: 14, color: '#F44336', marginBottom: 4 },
+  feedbackContainer: {
+    marginVertical: 12,
+    width: '100%',
+  },
+  feedbackBox: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  feedbackMain: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  feedbackSub: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
   answerRow: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 20 },
   trueFalseContainer: {
     flexDirection: 'row',
@@ -637,7 +911,12 @@ const styles = StyleSheet.create({
   falseBtn: { backgroundColor: '#F44336' },
   btnDisabled: { opacity: 0.4 },
   answerBtnText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
-  quitBtn: { alignItems: 'center', paddingVertical: 20 },
+  quitBtn: { alignItems: 'center', justifyContent: 'center' },
+  bottomButtons: {
+    marginTop: 20,
+    marginBottom: 30,
+    alignItems: 'center',
+  },
   quitBtnText: { color: '#CCC', fontSize: 13 },
   // Review styles
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -648,6 +927,107 @@ const styles = StyleSheet.create({
   reviewQuestionNumber: { fontSize: 16, fontWeight: 'bold', color: '#666' },
   reviewResult: { fontSize: 14, fontWeight: 'bold' },
   reviewQuestionText: { fontSize: 16, color: '#1A1A1A', marginBottom: 12, lineHeight: 24 },
+  fullScreenFeedback: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    zIndex: 9999,
+  },
+  fullScreenCard: {
+    width: '85%',
+    maxWidth: 400,
+    padding: 32,
+    borderRadius: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  fullScreenIcon: {
+    marginBottom: 16,
+  },
+  fullScreenTitle: {
+    fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  fullScreenAnswerBox: {
+    alignItems: 'center',
+    marginBottom: 24,
+    width: 'auto',  // 自動調整
+  },
+  fullScreenAnswerLabel: {
+    marginBottom: 8,
+  },
+  fullScreenAnswerText: {
+    fontWeight: 'bold',
+    flexWrap: 'wrap',  // 長いテキストを折り返し
+  },
+  fullScreenTimer: {
+    marginTop: 8,
+  },
+  confirmModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  confirmModalContainer: {
+    width: '80%',
+    maxWidth: 300,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  confirmModalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmModalCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  confirmModalCancelText: {
+    fontWeight: 'bold',
+  },
+  confirmModalConfirm: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   reviewAnswers: { gap: 8 },
   reviewAnswerItem: { flexDirection: 'row', justifyContent: 'space-between' },
   reviewAnswerLabel: { fontSize: 14, color: '#666', fontWeight: '600' },
@@ -679,4 +1059,27 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   descriptiveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  // Multiple choice styles
+  multipleContainer: {
+    gap: 12,
+    width: '100%',
+  },
+  multipleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  multipleNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    minWidth: 40,
+  },
+  multipleText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
 });

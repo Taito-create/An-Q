@@ -8,6 +8,9 @@ import { loadStats } from './missions';
 import { useCustomBGM } from './customBGMContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { useSE } from './seContext';
+import { useBGM } from './bgmContext';
+
 
 export default function MusicScreen() {
   const { colors, onPrimary } = useTheme();
@@ -23,12 +26,14 @@ export default function MusicScreen() {
     currentTrack, duplicateWarning, clearDuplicateWarning,
   } = useCustomBGM();
 
+  const { seEnabled, toggleSE, refreshSE } = useSE();
+  const { bgmEnabled, toggleBGM, refreshBGM } = useBGM();
   const [bgmPreset, setBgmPreset] = useState<string>('default');
   const [seType, setSeType] = useState<string>('effect1');
-  const [bgmEnabled, setBgmEnabled] = useState(true);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showNewPlaylistInput, setShowNewPlaylistInput] = useState(false);
+  const [isBGMToggling, setIsBGMToggling] = useState(false);
 
   const bgmPresets = {
     default:   { name: t.standardBgm,        icon: '🎵', desc: t.standardBgm,           file: 'BGM1' },
@@ -54,6 +59,14 @@ export default function MusicScreen() {
     { key: 'question', label: t.questionNumber },
   ];
 
+  // BGMトグル処理（ちらつき防止）
+  const handleBGMToggle = async (value: boolean) => {
+    if (isBGMToggling) return;
+    setIsBGMToggling(true);
+    await toggleBGM(value);
+    setIsBGMToggling(false);
+  };
+
   useEffect(() => {
     loadSettings();
     loadStats().then(stats => {
@@ -65,15 +78,21 @@ export default function MusicScreen() {
     try {
       const bp = await AsyncStorage.getItem('bgm_preset');
       if (bp) setBgmPreset(bp);
+      
       const st = await AsyncStorage.getItem('se_type');
       if (st) {
         setSeType(st);
         await SoundManager.setSESet(st as any);
       }
-      const be = await AsyncStorage.getItem('bgm_enabled');
-      const enabled = be !== 'false'; // デフォルトtrue
-      setBgmEnabled(enabled);
-    } catch {}
+      
+      // BGM設定を読み込み
+      await refreshBGM();
+
+      // 効果音設定を読み込み
+      await refreshSE();
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+    }
   };
 
   // ファイル追加
@@ -146,14 +165,21 @@ export default function MusicScreen() {
           <Text style={[styles.toggleLabel, { color: colors.text }]}>BGM</Text>
           <Switch
             value={bgmEnabled}
-            onValueChange={async v => {
-              setBgmEnabled(v);
-              await AsyncStorage.setItem('bgm_enabled', v.toString());
-              // SoundManagerに即時反映
-              const currentPreset = bgmPresets[bgmPreset as keyof typeof bgmPresets] as any;
-              const fileKey = currentPreset?.file || 'BGM1';
-              await SoundManager.updateBGMSetting(v, fileKey as any);
-            }}
+            onValueChange={handleBGMToggle}
+            disabled={isBGMToggling}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFF"
+          />
+        </View>
+
+        {/* 効果音トグル */}
+        <View style={[styles.toggleRow, { backgroundColor: colors.card }]}>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>
+            {ja ? '効果音' : 'Sound Effects'}
+          </Text>
+          <Switch
+            value={seEnabled}
+            onValueChange={toggleSE}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFF"
           />
@@ -171,7 +197,9 @@ export default function MusicScreen() {
                 setSeType(key);
                 await AsyncStorage.setItem('se_type', key);
                 await SoundManager.setSESet(key as any);
-                SoundManager.play('decide');
+                if (seEnabled) {
+                  SoundManager.play('decide');
+                }
               }}
             >
               <Text style={styles.presetIcon}>{set.icon}</Text>

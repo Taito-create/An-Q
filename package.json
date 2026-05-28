@@ -1,5 +1,5 @@
 {
-  "name": "quiz-app",
+  "name": "an-q",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-native": "^0.74.5",
+    "react-native-calendars": "^1.1314.0",
     "react-native-web": "^0.21.2",
     "react-router-dom": "^6.30.3",
     "xdate": "^0.8.3"

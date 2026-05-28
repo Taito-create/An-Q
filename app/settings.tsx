@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput } from 'react-native';
+import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput, Switch } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize, PatternType } from './theme';
+import { useLocale } from './hooks/useLocale';
+import { useSE } from './seContext';
+import { useBGM } from './bgmContext';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: string }[] = [
   { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue',   emoji: '🔵' },
@@ -22,17 +25,13 @@ const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 export default function SettingsScreen() {
   const navigate = useNavigate();
   const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
-  const [language, setLanguage] = useState<'ja' | 'en'>('ja');
+  const locale = useLocale();
+  const ja = locale === 'ja';
+  const { bgmEnabled, toggleBGM } = useBGM();
+  const { seEnabled, toggleSE } = useSE();
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
-
-  useEffect(() => {
-    AsyncStorage.getItem('user_language').then(lang => {
-      if (lang === 'ja' || lang === 'en') setLanguage(lang);
-    });
-  }, []);
-
-  const ja = language === 'ja';
+  const [forceUpdate, setForceUpdate] = useState(Date.now());
 
   const handleThemeSelect = (theme: ThemeName) => {
     setTheme(theme);
@@ -90,6 +89,36 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             );
           })}
+        </View>
+      </View>
+
+      {/* BGM Toggle */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={styles.settingRow}>
+          <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+            BGM
+          </Text>
+          <Switch
+            value={bgmEnabled}
+            onValueChange={toggleBGM}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFF"
+          />
+        </View>
+      </View>
+
+      {/* SE Toggle */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={styles.settingRow}>
+          <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+            {ja ? '効果音' : 'Sound Effects'}
+          </Text>
+          <Switch
+            value={seEnabled}
+            onValueChange={toggleSE}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFF"
+          />
         </View>
       </View>
 
@@ -295,6 +324,18 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', gap: 8 },
   tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   tagText: { fontWeight: '500' },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   backButton: { margin: 20, padding: 16, borderRadius: 12, alignItems: 'center' },
   backButtonText: { color: 'white', fontWeight: 'bold' },
 });

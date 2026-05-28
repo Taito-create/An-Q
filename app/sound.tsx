@@ -4,6 +4,8 @@ export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct
 export type BGMType = 'BGM1' | 'BGM2' | 'BGM3' | 'BGM4';
 export type SEType = 'effect1' | 'effect2' | 'effect3' | 'effect4';
 
+const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
+
 class SoundManager {
   private static sounds: { [key: string]: HTMLAudioElement | null } = {};
   private static bgm: HTMLAudioElement | null = null;
@@ -12,6 +14,7 @@ class SoundManager {
   private static currentBGM: BGMType = 'BGM1';
   private static currentSESet: SEType = 'effect1';
   private static bgmRate = 1.0;
+  private static seEnabled = true;
 
   static async initialize() {
     if (this.initialized) return;
@@ -46,24 +49,48 @@ class SoundManager {
       }
     }
 
+    // 効果音のON/OFF設定を読み込み
+    const savedSE = localStorage.getItem('se_enabled');
+    this.seEnabled = savedSE !== 'false';
+    console.log('🔊 SE enabled:', this.seEnabled);
+
     this.initialized = true;
     console.log('SoundManager initialized with 4 effect sets');
   }
 
   static async play(type: SoundType) {
+    // ★ 毎回 localStorage から直接読み込む（最も確実な方法）
+    const seEnabled = localStorage.getItem('se_enabled') !== 'false';
+    
+    console.log(`🔊 Play called: ${type}, SE Enabled: ${seEnabled}`); // デバッグ用
+    
+    if (!seEnabled) {
+      console.log(`🔇 SE is OFF, skipping: ${type}`);
+      return;
+    }
+    
     const key = `${this.currentSESet}_${type}`;
     const sound = this.sounds[key];
     if (sound) {
       sound.currentTime = 0;
+      // スマホの場合は音量を小さく
+      const volume = isMobile ? 0.4 : 0.7;
+      sound.volume = volume;
       try {
         await sound.play();
-        console.log(`🔊 Playing: ${type} (${this.currentSESet})`);
+        console.log(`✅ Played: ${type}`);
       } catch (e) {
-        console.warn(`Failed to play ${type}:`, e);
+        console.warn(`❌ Failed: ${type}`, e);
       }
     } else {
-      console.warn(`Sound not found: ${key}`);
+      console.warn(`❌ Sound not found: ${key}`);
     }
+  }
+
+  static async setSEEnabled(enabled: boolean) {
+    this.seEnabled = enabled;
+    localStorage.setItem('se_enabled', enabled.toString());
+    console.log('🔊 SE enabled set to:', enabled);
   }
 
   static async setSESet(set: SEType) {

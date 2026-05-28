@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, View, StyleSheet, Platform } from 'react-native';
 import { useTheme } from './theme';
+import { SoundManager } from './sound';
 
 interface Props {
   onPress: () => void;
@@ -24,7 +25,10 @@ export default function TooltipButton({ onPress, label, children, style }: Props
         )}
         <TouchableOpacity
           style={style}
-          onPress={onPress}
+          onPress={() => {
+            SoundManager.play('select');
+            onPress();
+          }}
           {...({
             onMouseEnter: () => setVisible(true),
             onMouseLeave: () => setVisible(false),
@@ -46,7 +50,10 @@ export default function TooltipButton({ onPress, label, children, style }: Props
       )}
       <TouchableOpacity
         style={style}
-        onPress={onPress}
+        onPress={() => {
+          SoundManager.play('select');
+          onPress();
+        }}
         onLongPress={() => {
           setVisible(true);
           setTimeout(() => setVisible(false), 1500);

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { ThemeProvider } from '../app/theme';
 import { SoundManager } from '../app/sound';
 import { BGMProvider } from '../app/bgmContext';
+import { SEProvider } from '../app/seContext';
 import { CustomBGMProvider } from '../app/customBGMContext';
 import MiniPlayer from '../app/miniPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,20 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const location = useLocation();
 
   useEffect(() => {
+    const initializeSettings = async () => {
+      // BGMのデフォルト値を設定（まだ存在しない場合のみ）
+      const bgmSetting = await AsyncStorage.getItem('bgm_enabled');
+      if (bgmSetting === null) {
+        await AsyncStorage.setItem('bgm_enabled', 'false');
+      }
+      
+      // 効果音のデフォルト値を設定
+      const seSetting = await AsyncStorage.getItem('se_enabled');
+      if (seSetting === null) {
+        await AsyncStorage.setItem('se_enabled', 'false');
+      }
+    };
+
     const initializeBGM = async () => {
       try {
         await SoundManager.initialize();
@@ -50,6 +65,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       }
     };
     
+    initializeSettings();
     initializeBGM();
     migrateTimerKeys();
     recordLogin();
@@ -58,12 +74,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <ThemeProvider>
       <BGMProvider>
-        <CustomBGMProvider>
-          <View style={{ flex: 1 }}>
-            <MiniPlayer />
-            {children}
-          </View>
-        </CustomBGMProvider>
+        <SEProvider>
+          <CustomBGMProvider>
+            <View style={{ flex: 1 }}>
+              <MiniPlayer />
+              {children}
+            </View>
+          </CustomBGMProvider>
+        </SEProvider>
       </BGMProvider>
     </ThemeProvider>
   );

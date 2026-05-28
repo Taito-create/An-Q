@@ -1,14 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { SoundManager, BGMType } from './sound';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface BGMContextType {
   bgmEnabled: boolean;
-  currentBGM: BGMType;
   toggleBGM: (enabled: boolean) => Promise<void>;
-  updateBGM: (enabled: boolean, bgmType?: BGMType) => Promise<void>;
-  isPlaying: boolean;
-  bgmRate: number;
-  setBGMRate: (rate: number) => Promise<void>;
+  refreshBGM: () => Promise<void>;
+  currentBGM: string;
 }
 
 const BGMContext = createContext<BGMContextType | undefined>(undefined);
@@ -22,103 +20,79 @@ export const useBGM = () => {
 };
 
 export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [bgmEnabled, setBgmEnabled] = useState(true);
-  const [currentBGM, setCurrentBGM] = useState<BGMType>('bgm');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [bgmRate, setBgmRateState] = useState(1.0);
+  const [bgmEnabled, setBgmEnabled] = useState(false);
+  const [currentBGM, setCurrentBGM] = useState('BGM1');
 
-  // Initialize BGM settings
+  // BGM設定を読み込む関数
+  const refreshBGM = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('bgm_enabled');
+      const enabled = saved === 'true';
+      setBgmEnabled(enabled);
+      console.log('BGM refreshed:', enabled);
+    } catch (error) {
+      console.error('Failed to refresh BGM:', error);
+    }
+  };
+
+  // 初期読み込み
   useEffect(() => {
-    const initializeBGM = async () => {
-      try {
-        const bgmSettings = await SoundManager.getBGMSettings();
-        setBgmEnabled(bgmSettings.enabled);
-        setCurrentBGM(bgmSettings.currentBGM as BGMType);
-        setIsPlaying(bgmSettings.enabled);
-      } catch (error) {
-        console.error('Failed to initialize BGM context:', error);
+    refreshBGM();
+
+    // ストレージ変更を監視
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'bgm_enabled') {
+        const enabled = e.newValue === 'true';
+        setBgmEnabled(enabled);
+        console.log('BGM changed via storage:', enabled);
       }
     };
-    initializeBGM();
 
-    // カスタムBGMからBGM ON/OFFを制御できるようにコールバック登録
+    // 他の画面からの変更を監視
+    const handleCustomEvent = (e: CustomEvent) => {
+      const { enabled } = e.detail;
+      setBgmEnabled(enabled);
+      console.log('BGM changed via event:', enabled);
+    };
+
     if (typeof window !== 'undefined') {
-      (window as any).__setBGMEnabled = (enabled: boolean) => {
-        setBgmEnabled(enabled);
-        setIsPlaying(enabled);
-      };
-      // SoundManagerも含めて完全にOFFにするコールバック
-      (window as any).__bgmToggleOff = async () => {
-        setBgmEnabled(false);
-        setIsPlaying(false);
-        await SoundManager.updateBGMSetting(false, undefined);
-      };
+      window.addEventListener('storage', handleStorageChange);
+      window.addEventListener('bgmStateChanged', handleCustomEvent as EventListener);
     }
+
     return () => {
       if (typeof window !== 'undefined') {
-        delete (window as any).__setBGMEnabled;
-        delete (window as any).__bgmToggleOff;
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('bgmStateChanged', handleCustomEvent as EventListener);
       }
     };
-  }, []);
-
-  // Listen for BGM status changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const status = SoundManager.getBGMStatus();
-      setIsPlaying(status.isPlaying);
-    }, 1000);
-
-    return () => clearInterval(interval);
   }, []);
 
   const toggleBGM = async (enabled: boolean) => {
-    try {
-      setBgmEnabled(enabled);
-      if (enabled) {
-        // BGMをONにする際、カスタムBGMが再生中なら停止する
-        if (typeof window !== 'undefined' && (window as any).__customBGMPlaying) {
-          // カスタムBGM停止のイベントを発火
-          (window as any).__stopCustomBGM?.();
-          (window as any).__customBGMPlaying = false;
-        }
-        await SoundManager.updateBGMSetting(true, currentBGM);
-      } else {
-        await SoundManager.updateBGMSetting(false, currentBGM);
-      }
-      setIsPlaying(enabled);
-    } catch (error) {
-      console.error('Failed to toggle BGM:', error);
+    console.log('toggleBGM called:', enabled);
+    setBgmEnabled(enabled);
+    
+    // BGMのON/OFFを実際に切り替える
+    const currentPreset = currentBGM || 'BGM1';
+    if (enabled) {
+      await SoundManager.updateBGMSetting(true, currentPreset as any);
+      await SoundManager.playBGM();
+    } else {
+      await SoundManager.updateBGMSetting(false);
+      await SoundManager.pauseBGM();
+    }
+    
+    await AsyncStorage.setItem('bgm_enabled', enabled ? 'true' : 'false');
+    
+    // グローバルイベントを発火
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bgmStateChanged', { detail: { enabled } }));
     }
   };
 
-  const updateBGM = async (enabled: boolean, bgmType?: BGMType) => {
-    try {
-      setBgmEnabled(enabled);
-      if (bgmType) {
-        setCurrentBGM(bgmType);
-      }
-      await SoundManager.updateBGMSetting(enabled, bgmType || currentBGM);
-      setIsPlaying(enabled);
-    } catch (error) {
-      console.error('Failed to update BGM:', error);
-    }
-  };
-
-  const setBGMRate = async (rate: number) => {
-    setBgmRateState(rate);
-    await SoundManager.setBGMRate(rate);
-  };
-
-  const value: BGMContextType = {
-    bgmEnabled,
-    currentBGM,
-    toggleBGM,
-    updateBGM,
-    isPlaying,
-    bgmRate,
-    setBGMRate,
-  };
-
-  return <BGMContext.Provider value={value}>{children}</BGMContext.Provider>;
+  return (
+    <BGMContext.Provider value={{ bgmEnabled, toggleBGM, refreshBGM, currentBGM }}>
+      {children}
+    </BGMContext.Provider>
+  );
 };

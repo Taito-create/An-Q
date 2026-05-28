@@ -338,42 +338,13 @@ export default function CreateQuestionScreen() {
         )}
       </View>
 
-      {/* AI Section - Coming Soon */}
-      <View style={[styles.section, styles.comingSoonSection]}>
-        <Text style={styles.comingSoonRocket}>Update v2.0</Text>
-        <View style={styles.comingSoonHeader}>
-          <Text style={styles.sectionTitle}>{t.aiConsultation}</Text>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonBadgeText}>{t.comingSoon}</Text>
-          </View>
-        </View>
-        
-        <TextInput 
-          style={[styles.input, styles.comingSoonInput]} 
-          value="" 
-          onChangeText={() => {}} 
-          placeholder={t.aiFeatureUpdate}
-          editable={false}
-        />
-        
-        <TouchableOpacity 
-          style={[styles.createButton, styles.comingSoonButton]} 
-          onPress={() => {
-            SoundManager.play('select');
-            Alert.alert(t.comingSoonAlert, t.comingSoonMessage);
-          }}
-          disabled={true}
-        >
-          <Text style={styles.buttonText}>{t.comingSoon}...</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Back Button */}
       <TouchableOpacity 
         style={[styles.backButton, { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); navigate('/'); }}
       >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>← {t.back}</Text>
+        <Text style={[styles.backButtonText, { color: onPrimary }]}> {t.back}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -552,40 +523,5 @@ backButton: {
   removeTagText: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  comingSoonSection: {
-    opacity: 0.6,
-    backgroundColor: '#f8f9fa',
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    borderColor: '#ddd',
-  },
-  comingSoonHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  comingSoonBadge: {
-    backgroundColor: '#ff9500',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  comingSoonBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  comingSoonInput: {
-    backgroundColor: '#f0f0f0',
-  },
-  comingSoonButton: {
-    backgroundColor: '#ccc',
-  },
-  comingSoonRocket: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    fontSize: 20,
   },
 });

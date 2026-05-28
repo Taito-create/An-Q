@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  ScrollView, StatusBar, Alert
+  ScrollView, StatusBar, Alert, Dimensions
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,11 +14,28 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { Play, Plus, BarChart3, Music, Calendar, Settings, Globe, ScrollText, Award, ShoppingBag, Timer, Palette, Repeat2 } from 'lucide-react';
 
+const { width: screenWidth } = Dimensions.get('window');
+const isMobile = screenWidth < 768;
+
 const HomeScreen = () => {
   const navigate = useNavigate();
   const { colors, fs, pattern, onPrimary } = useTheme();
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
+
+  // 言語変更を監視
+  useEffect(() => {
+    const checkLanguage = async () => {
+      const saved = await AsyncStorage.getItem('user_language');
+      if (saved === 'ja' || saved === 'en') {
+        setCurrentLocale(saved);
+      }
+    };
+    checkLanguage();
+    
+    const interval = setInterval(checkLanguage, 100);
+    return () => clearInterval(interval);
+  }, []);
   const t = translations[currentLocale];
 
   const toggleLanguage = async () => {
@@ -350,7 +367,9 @@ const HomeScreen = () => {
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.text, fontSize: fs(28) }]}>An-Q</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: fs(14) }]}>覚えるな、脳にインストールせよ</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: fs(14) }]}>
+                {currentLocale === 'ja' ? '覚えるな、脳にインストールせよ' : 'Don\'t memorize, install into your brain'}
+              </Text>
             </View>
             {motivationalMessage && (
               <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', flex: 1.2 }]}>
@@ -624,13 +643,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 32,
+    fontSize: isMobile ? 24 : 28,
     fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: isMobile ? 12 : 14,
     color: '#666',
   },
   topButtons: {
@@ -661,9 +680,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: isMobile ? 44 : 32,
+    height: isMobile ? 44 : 32,
+    borderRadius: isMobile ? 22 : 16,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
@@ -696,9 +715,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    flexDirection: isMobile ? 'column' : 'row',
+    alignItems: isMobile ? 'flex-start' : 'center',
+    gap: isMobile ? 4 : 10,
   },
   todayCard: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 12 },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },

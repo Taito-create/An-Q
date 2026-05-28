@@ -4,6 +4,7 @@ import {
   Alert, Text, View
 } from 'react-native';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -39,10 +40,30 @@ export default function ResultsScreen() {
   const [showAll, setShowAll] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    loadData();
-    loadStats().then(setStats);
+    let isMounted = true;
+
+    const run = async () => {
+      try {
+        await loadData();
+        const loaded = await loadStats();
+        if (isMounted) setStats(loaded);
+      } finally {
+        // 一瞬表示防止
+        setTimeout(() => {
+          if (isMounted) setIsLoading(false);
+        }, 100);
+      }
+    };
+
+    run();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
 
   const loadData = async () => {
     try {
@@ -85,7 +106,7 @@ export default function ResultsScreen() {
   // Statistics calculation (use state from navigation if available)
   const total = location.state?.total || results.length;
   const correctCount = results.filter(r => r.isCorrect).length;
-  const incorrectCount = total - correctCount;
+  const incorrectCount = results.length - correctCount;
   const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
   const totalTime = results.reduce((s, r) => s + (r.timeSpent || 0), 0);
   const avgTime = total > 0 ? Math.round(totalTime / total) : 0;
@@ -103,7 +124,16 @@ export default function ResultsScreen() {
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
+  if (isLoading) {
+    return (
+      <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{'読み込み中...'}</Text>
+      </View>
+    );
+  }
+
   if (total === 0) {
+
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emptyEmoji}>📊</Text>
@@ -185,10 +215,10 @@ export default function ResultsScreen() {
       </View>
 
       {/* Tag Performance */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={styles.sectionTitle}>🏷️ {t.tagPerformance}</Text>
-        {stats && Object.keys(stats.tagStats || {}).length > 0 ? (
-          Object.entries(stats.tagStats).map(([tag, data]) => {
+      {stats && Object.keys(stats.tagStats || {}).length > 0 && (
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={styles.sectionTitle}>🏷️ {t.tagPerformance}</Text>
+          {Object.entries(stats.tagStats).map(([tag, data]) => {
             const tagPct = Math.round((data.correct / data.total) * 100);
             return (
               <View key={tag} style={styles.historyRow}>
@@ -199,11 +229,10 @@ export default function ResultsScreen() {
                 <Text style={[styles.historyPct, { color: colors.text }]}>{tagPct}% ({data.correct}/{data.total})</Text>
               </View>
             );
-          })
-        ) : (
-          <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t.noTagStats}</Text>
-        )}
-      </View>
+          })}
+        </View>
+      )}
+
 
       {/* History Graph */}
       {history.length > 0 && (
@@ -221,17 +250,31 @@ export default function ResultsScreen() {
         </View>
       )}
 
-      {/* Action Buttons */}
+      {/* アクションボタン */}
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
-          <Text style={styles.primaryBtnText}>{t.takeAgain}</Text>
+        <TouchableOpacity 
+          style={[styles.primaryBtn, { backgroundColor: colors.primary }]} 
+          onPress={() => {
+            SoundManager.play('decide');
+            navigate('/quiz');
+          }}
+        >
+          <Text style={styles.primaryBtnText}>
+            {locale === 'ja' ? 'もういちどプレイする' : 'Play Again'}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/')}>
+        
+        <TouchableOpacity 
+          style={[styles.secondaryBtn, { backgroundColor: colors.primary }]} 
+          onPress={() => {
+            SoundManager.play('decide');
+            navigate('/');
+          }}
+        >
           <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>
-          <Text style={styles.dangerBtnText}>{t.deleteAllHistory}</Text>
-        </TouchableOpacity>
+        
+        {/* 履歴をすべて削除ボタンは削除 */}
       </View>
     </ScrollView>
   );

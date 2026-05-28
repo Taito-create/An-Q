@@ -3,7 +3,7 @@ export type Language = 'ja' | 'en';
 export const translations = {
   ja: {
     // 共通
-    appTitle: 'クイズアプリ',
+    appTitle: 'An-Q',
     subtitle: '学習を楽しく効果的に',
     settings: '設定',
     cancel: 'キャンセル',
@@ -361,7 +361,7 @@ export const translations = {
   
   en: {
     // Common
-    appTitle: 'Quiz App',
+    appTitle: 'An-Q',
     subtitle: 'Learning made fun and effective',
     settings: 'Settings',
     cancel: 'Cancel',

@@ -203,7 +203,7 @@ export default function AppSettingsScreen() {
         {/* このアプリについて */}
         <SectionHeader title={t.aboutApp} />
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Row label={t.appName} right={<Text style={[styles.valueText, { color: colors.textSecondary, fontSize: fs(14) }]}>Quiz App</Text>} />
+          <Row label={t.appName} right={<Text style={[styles.valueText, { color: colors.textSecondary, fontSize: fs(14) }]}>An-Q</Text>} />
           <Row label={t.version} right={<Text style={[styles.valueText, { color: colors.textSecondary, fontSize: fs(14) }]}>{APP_VERSION}</Text>} />
           <Row label={t.developer} right={<Text style={[styles.valueText, { color: colors.textSecondary, fontSize: fs(14) }]}>{t.developerName}</Text>} />
           <Row

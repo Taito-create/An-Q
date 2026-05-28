@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Language } from '../translations';
 
-export function useLocale(): Language {
-  const [locale, setLocale] = useState<Language>('ja');
-  
+export function useLocale() {
+  const [locale, setLocale] = useState<'ja' | 'en'>('ja');
+
   useEffect(() => {
-    AsyncStorage.getItem('user_language').then(lang => {
-      if (lang === 'ja' || lang === 'en') {
-        setLocale(lang);
+    const loadLocale = async () => {
+      const saved = await AsyncStorage.getItem('user_language');
+      if (saved === 'ja' || saved === 'en') {
+        setLocale(saved);
       }
-    });
+    };
+    loadLocale();
   }, []);
-  
+
   return locale;
 }
