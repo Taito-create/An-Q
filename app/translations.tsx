@@ -370,6 +370,16 @@ export const translations = {
     saveTags: 'タグを保存',
     cancelEdit: '編集をキャンセル',
     answerDisplay: '正解',
+    folderCreate: '問題集を作成',
+    folderName: '問題集名',
+    batchAddTags: '一括タグ追加',
+    selectQuestions: '問題を選択',
+    createFolder: '作成',
+    folder: '問題集',
+    batchEdit: '一括編集',
+    cancelSelection: '選択解除',
+    addTagsToSelected: '選択した問題にタグ追加',
+    questionsSelected: '問選択中',
   },
   
   en: {
@@ -741,6 +751,15 @@ export const translations = {
     saveTags: 'Save Tags',
     cancelEdit: 'Cancel Edit',
     answerDisplay: 'Correct Answer',
+    folderCreate: 'Create Folder',
+    folderName: 'Folder Name',
+    batchAddTags: 'Batch Add Tags',
+    selectQuestions: 'Select Questions',
+    createFolder: 'Create',
+    folder: 'Folder',
+    batchEdit: 'Batch Edit',
+    cancelSelection: 'Cancel Selection',
+    addTagsToSelected: 'Add Tags to Selected',
+    questionsSelected: 'selected',
   }
 };
-]]>

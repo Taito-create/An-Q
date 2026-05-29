@@ -527,4 +527,3 @@ backButton: {
     fontWeight: 'bold',
   },
 });
-]]>

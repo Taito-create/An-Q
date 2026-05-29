@@ -512,7 +512,7 @@ const HomeScreen = () => {
       {(() => {
         // 上部固定カード（学習履歴・音楽設定のみ）
         const fixedCards = [
-          { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'learningHistory' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
+      { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'manageQuestions' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
           { key: 'music',  icon: 'music', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
         ];
 

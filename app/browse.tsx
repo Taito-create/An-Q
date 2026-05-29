@@ -38,8 +38,20 @@ export default function BrowseQuestionsScreen() {
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
 
+  // フォルダ関連 state
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folders, setFolders] = useState<{ id: string; name: string; questionIds: number[] }[]>([]);
+
+  // 一括タグ編集関連 state
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
+  const [showBatchTagModal, setShowBatchTagModal] = useState(false);
+  const [batchTagInput, setBatchTagInput] = useState('');
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
   useEffect(() => {
     loadQuestions();
+    loadFolders();
   }, []);
 
   const loadQuestions = async () => {
@@ -59,6 +71,71 @@ export default function BrowseQuestionsScreen() {
     } catch (e) {
       console.error('Failed to load questions.');
     }
+  };
+
+  // フォルダ読み込み
+  const loadFolders = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('question_folders');
+      if (saved) setFolders(JSON.parse(saved));
+    } catch (e) {}
+  };
+
+  // フォルダ保存
+  const saveFolders = async (newFolders: typeof folders) => {
+    setFolders(newFolders);
+    await AsyncStorage.setItem('question_folders', JSON.stringify(newFolders));
+  };
+
+  // フォルダ作成
+  const createFolder = async () => {
+    if (!newFolderName.trim()) {
+      Alert.alert('エラー', locale === 'ja' ? '問題集名を入力してください' : 'Please enter a folder name');
+      return;
+    }
+    const newFolder = {
+      id: Date.now().toString(),
+      name: newFolderName.trim(),
+      questionIds: [],
+    };
+    await saveFolders([...folders, newFolder]);
+    setNewFolderName('');
+    setShowFolderModal(false);
+    Alert.alert(
+      locale === 'ja' ? '成功' : 'Success',
+      locale === 'ja' ? '問題集を作成しました' : 'Folder created successfully'
+    );
+  };
+
+  // 一括タグ追加
+  const batchAddTags = async () => {
+    const newTags = batchTagInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    if (newTags.length === 0) {
+      Alert.alert('エラー', locale === 'ja' ? 'タグを入力してください' : 'Please enter tags');
+      return;
+    }
+
+    const updatedQuestions = questions.map(q => {
+      if (selectedQuestionIds.includes(q.id)) {
+        const currentTags = q.tags || [];
+        const mergedTags = [...new Set([...currentTags, ...newTags])];
+        return { ...q, tags: mergedTags };
+      }
+      return q;
+    });
+
+    await AsyncStorage.setItem('quiz_questions', JSON.stringify(updatedQuestions));
+    setQuestions(updatedQuestions);
+    setShowBatchTagModal(false);
+    setBatchTagInput('');
+    setSelectedQuestionIds([]);
+    setIsSelectionMode(false);
+    Alert.alert(
+      locale === 'ja' ? '成功' : 'Success',
+      locale === 'ja'
+        ? `選択した${selectedQuestionIds.length}問にタグを追加しました`
+        : `Added tags to ${selectedQuestionIds.length} selected questions`
+    );
   };
 
   const handleDeleteRequest = (id: number) => {
@@ -148,10 +225,61 @@ export default function BrowseQuestionsScreen() {
           ? `${t.manageQuestions} (All ${questions.length} ${t.questionsCountLabel})`
           : `${t.manageQuestions}（全 ${questions.length}${t.questionsCountLabel}）`}
       </Text>
+
+      {/* ヘッダーボタン */}
+      <View style={styles.headerButtons}>
+        <TouchableOpacity 
+          style={[styles.headerBtn, { borderColor: colors.primary }]} 
+          onPress={() => setShowFolderModal(true)}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.primary }]}>📁 {t.folderCreate}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.headerBtn, { borderColor: colors.primary }]} 
+          onPress={() => {
+            setIsSelectionMode(!isSelectionMode);
+            if (isSelectionMode) setSelectedQuestionIds([]);
+          }}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.primary }]}>
+            {isSelectionMode ? `✕ ${t.cancelSelection}` : `✓ ${t.batchEdit}`}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 一括タグ編集バー（選択モード時） */}
+      {isSelectionMode && selectedQuestionIds.length > 0 && (
+        <TouchableOpacity 
+          style={[styles.batchTagBar, { backgroundColor: colors.primary }]} 
+          onPress={() => setShowBatchTagModal(true)}
+        >
+          <Text style={styles.batchTagBarText}>
+            📋 {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <ScrollView>
         {questions.map((item) => (
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
+              {/* 選択モード時のチェックボックス */}
+              {isSelectionMode && (
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (selectedQuestionIds.includes(item.id)) {
+                      setSelectedQuestionIds(prev => prev.filter(id => id !== item.id));
+                    } else {
+                      setSelectedQuestionIds(prev => [...prev, item.id]);
+                    }
+                  }}
+                  style={styles.checkbox}
+                >
+                  <Text style={styles.checkboxText}>
+                    {selectedQuestionIds.includes(item.id) ? '☑' : '☐'}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
                 {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
               </Text>
@@ -266,17 +394,77 @@ export default function BrowseQuestionsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* フォルダ作成モーダル */}
+      <Modal visible={showFolderModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t.folderCreate}</Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+              value={newFolderName}
+              onChangeText={setNewFolderName}
+              placeholder={t.folderName}
+              placeholderTextColor={colors.textSecondary}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowFolderModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={createFolder}
+              >
+                <Text style={styles.modalSaveText}>{t.createFolder}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 一括タグ追加モーダル */}
+      <Modal visible={showBatchTagModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t.batchAddTags}</Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+              value={batchTagInput}
+              onChangeText={setBatchTagInput}
+              placeholder={t.enterTagsComma}
+              placeholderTextColor={colors.textSecondary}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowBatchTagModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={batchAddTags}
+              >
+                <Text style={styles.modalSaveText}>{t.saveTags}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#F5F7FA', paddingTop: 60 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
-  cardHeader: { marginBottom: 8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   typeBadge: { fontSize: 12, color: '#007AFF', fontWeight: 'bold', backgroundColor: '#E1EFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 6 },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 6, marginLeft: 'auto' },
   deleteText: { color: '#FF3B30', fontWeight: 'bold' },
   answerBtnText: { fontWeight: 'bold' },
   editTagBtnText: { fontWeight: 'bold' },
@@ -309,5 +497,39 @@ const styles = StyleSheet.create({
   modalCancelText: { fontWeight: 'bold' },
   modalSaveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   modalSaveText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  // 追加スタイル
+  headerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginBottom: 16,
+  },
+  headerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  headerBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkbox: {
+    marginRight: 12,
+    padding: 4,
+  },
+  checkboxText: {
+    fontSize: 20,
+  },
+  batchTagBar: {
+    marginVertical: 12,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  batchTagBarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });
 ]]>
