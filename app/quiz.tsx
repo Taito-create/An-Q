@@ -86,6 +86,7 @@ export default function QuizScreen() {
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
   const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -102,6 +103,10 @@ export default function QuizScreen() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isPaused, setIsPaused] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // タグフィルター用 state
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // タイマー
   const [timerLimit, setTimerLimit] = useState(180); // 秒
@@ -160,10 +165,21 @@ export default function QuizScreen() {
               multipleChoice: q.multipleChoice
             };
           });
-        setEnabledQuestions(processedQuestions.filter(q => q.enabled !== false));
+        const enabled = processedQuestions.filter(q => q.enabled !== false);
+        setAllQuestions(enabled);
+        setEnabledQuestions(enabled);
+
+        // 全タグを収集
+        const tagSet = new Set<string>();
+        enabled.forEach((q: Question) => {
+          (q.tags || []).forEach((tag: string) => tagSet.add(tag));
+        });
+        const sortedTags = Array.from(tagSet).sort();
+        setAllTags(sortedTags);
+        setSelectedTags(sortedTags); // デフォルトですべて選択
       } else {
         // Initial sample questions
-        setEnabledQuestions([
+        const samples: Question[] = [
           { 
             id: 1, 
             question: 'Earth orbits around the Sun.', 
@@ -197,7 +213,14 @@ export default function QuizScreen() {
             answerType: 'truefalse',
             trueFalseAnswer: true
           },
-        ]);
+        ];
+        setAllQuestions(samples);
+        setEnabledQuestions(samples);
+        const tagSet = new Set<string>();
+        samples.forEach(q => (q.tags || []).forEach(tag => tagSet.add(tag)));
+        const sortedTags = Array.from(tagSet).sort();
+        setAllTags(sortedTags);
+        setSelectedTags(sortedTags);
       }
     } catch (e) {
       console.error(e);
@@ -228,6 +251,37 @@ export default function QuizScreen() {
       console.error('Failed to load timer setting:', error);
       setTimerLimit(300); // デフォルト5分(300秒)
       setTimeLeft(300);
+    }
+  };
+
+  // 選択したタグでフィルタリングされた問題
+  const getFilteredQuestions = () => {
+    if (selectedTags.length === allTags.length) {
+      return allQuestions;
+    }
+    return allQuestions.filter(q => {
+      if (!q.tags || q.tags.length === 0) return selectedTags.length === allTags.length;
+      return q.tags.some(tag => selectedTags.includes(tag));
+    });
+  };
+
+  // タグの選択/解除をトグル
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    });
+  };
+
+  // すべて選択/解除
+  const toggleSelectAll = () => {
+    if (selectedTags.length === allTags.length) {
+      setSelectedTags([]);
+    } else {
+      setSelectedTags([...allTags]);
     }
   };
 
@@ -262,15 +316,16 @@ export default function QuizScreen() {
   // クイズ開始
   // ──────────────────────────────────────────────
   const startQuiz = () => {
-    if (enabledQuestions.length === 0) {
+    const filtered = getFilteredQuestions();
+    if (filtered.length === 0) {
       SoundManager.play('select');
-      Alert.alert('問題がありません', '「問題を作る」から問題を追加してください。', [
+      Alert.alert(t.error, locale === 'ja' ? '選択したタグに問題がありません。' : 'No questions with selected tags.', [
         { text: 'OK' },
       ]);
       return;
     }
     SoundManager.play('decide');
-    const shuffled = [...enabledQuestions].sort(() => Math.random() - 0.5);
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
     setShuffledQuestions(shuffled);
     setCurrentIndex(0);
     setScore(0);
@@ -464,7 +519,7 @@ export default function QuizScreen() {
   // UIパーツ
   // ──────────────────────────────────────────────// UI parts
   const timerColor = timeLeft > timerLimit * 0.4 ? '#4CAF50' : timeLeft > timerLimit * 0.2 ? '#FF9800' : '#F44336';
-  const progressPercent = Math.round(((currentIndex) / shuffledQuestions.length) * 100);
+  const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);
   const timeSec = timeLeft % 60;
   const currentQuestion = shuffledQuestions[currentIndex];
@@ -478,17 +533,65 @@ export default function QuizScreen() {
 
   if (!quizStarted) {
     const minutes = Math.floor(timerLimit / 60);
+    const filtered = getFilteredQuestions();
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.infoSubtitle, { color: colors.textSecondary }]}>{t.availableQuestions}: {enabledQuestions.length}</Text>
+        <Text style={[styles.infoSubtitle, { color: colors.textSecondary }]}>{t.availableQuestions}: {filtered.length}</Text>
         <Text style={[styles.infoSubtitle, { color: colors.textSecondary }]}>{t.timeLimit}: {minutes}{t.minutes}</Text>
         <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.questionCount}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{enabledQuestions.length} {locale === 'ja' ? '問' : ''}</Text></View>
+          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.questionCount}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{filtered.length} {locale === 'ja' ? '問' : ''}</Text></View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.timeLimit}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{minutes} {t.minutes}</Text></View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.randomOrder}</Text><Text style={[styles.infoValue, { color: colors.text }]}>ON</Text></View>
         </View>
+
+        {/* タグフィルターセクション */}
+        {allTags.length > 0 && (
+          <View style={[styles.tagFilterSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.tagFilterTitle, { color: colors.text }]}>{t.filterByTags}</Text>
+            <View style={styles.tagFilterRow}>
+              <TouchableOpacity
+                style={[
+                  styles.tagFilterChip,
+                  { borderColor: colors.primary },
+                  selectedTags.length === allTags.length && { backgroundColor: colors.primary }
+                ]}
+                onPress={toggleSelectAll}
+              >
+                <Text style={[
+                  styles.tagFilterChipText,
+                  { color: colors.primary },
+                  selectedTags.length === allTags.length && { color: '#fff' }
+                ]}>{t.selectAllTag} ({allTags.length})</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tagFilterList}>
+              {allTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[
+                      styles.tagFilterChip,
+                      { borderColor: colors.primary },
+                      isSelected && { backgroundColor: colors.primary }
+                    ]}
+                    onPress={() => toggleTag(tag)}
+                  >
+                    <Text style={[
+                      styles.tagFilterChipText,
+                      { color: colors.primary },
+                      isSelected && { color: '#fff' }
+                    ]}>{tag}: {count}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         <TouchableOpacity style={[styles.startButton, { backgroundColor: colors.primary }]} onPress={startQuiz}>
           <Text style={[styles.startButtonText, { color: onPrimary }]}>{t.startQuizButton}</Text>
         </TouchableOpacity>
@@ -786,7 +889,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 24 },
   title: { fontSize: 26, fontWeight: 'bold', marginBottom: 30, color: '#1A1A1A' },
   infoSubtitle: { fontSize: 16, color: '#666', marginBottom: 8 },
-  infoBox: { width: '100%', backgroundColor: '#F7F8FA', borderRadius: 14, padding: 16, marginBottom: 30, borderWidth: 1, borderColor: '#EFEFEF' },
+  infoBox: { width: '100%', backgroundColor: '#F7F8FA', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#EFEFEF' },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
   infoLabel: { fontSize: 14, color: '#666' },
   infoValue: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
@@ -1082,4 +1185,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A1A1A',
   },
+  // タグフィルタースタイル
+  tagFilterSection: {
+    width: '100%',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  tagFilterTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  tagFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  tagFilterList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 4,
+    marginRight: 4,
+  },
+  tagFilterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
+]]>

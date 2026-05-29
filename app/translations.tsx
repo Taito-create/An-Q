@@ -83,7 +83,7 @@ export const translations = {
     
     // 通知メッセージ
     success: '成功',
-    questionSaved: '問題が保存されました！',
+    questionSaved: '問題が正常に作成されました。',
     themeChanged: 'テーマが変更されました',
     languageChanged: '言語が変更されました',
     error: 'エラー',
@@ -256,7 +256,7 @@ export const translations = {
     unlockBgmMsg: 'ショップで本30冊を使って解放できます',
     
     // 管理画面
-    manageQuestions: '問題を管理',
+    manageQuestions: '問題管理',
     saveTimer: 'タイマーを保存',
     noQuestions: '利用可能な問題がありません',
     addQuestions: '問題を追加',
@@ -357,6 +357,19 @@ export const translations = {
     days: '日',
     JP: 'JP',
     EN: 'EN',
+    
+    // 機能1: タグフィルター
+    filterByTags: 'タグで絞り込み',
+    selectAllTag: 'すべて選択',
+    
+    // 機能3: 問題管理・タグ編集
+    showAnswer: '回答を表示',
+    editTags: 'タグを編集',
+    tagEditTitle: 'タグ編集',
+    enterTagsComma: 'カンマ区切りでタグを入力',
+    saveTags: 'タグを保存',
+    cancelEdit: '編集をキャンセル',
+    answerDisplay: '正解',
   },
   
   en: {
@@ -441,7 +454,7 @@ export const translations = {
     
     // Notification messages
     success: 'Success',
-    questionSaved: 'Question saved successfully!',
+    questionSaved: 'Question created successfully.',
     themeChanged: 'Theme has been changed',
     languageChanged: 'Language has been changed',
     error: 'Error',
@@ -614,7 +627,7 @@ export const translations = {
     unlockBgmMsg: 'Unlock with 30 books in the Shop',
     
     // Manage screen
-    manageQuestions: 'Manage Questions',
+    manageQuestions: 'Question Management',
     saveTimer: 'Save Timer',
     noQuestions: 'No questions available',
     addQuestions: 'Add Questions',
@@ -715,5 +728,19 @@ export const translations = {
     days: 'days',
     JP: 'JP',
     EN: 'EN',
+    
+    // 機能1: Tag filter
+    filterByTags: 'Filter by Tags',
+    selectAllTag: 'Select All',
+    
+    // 機能3: Question Management / Tag editing
+    showAnswer: 'Show Answer',
+    editTags: 'Edit Tags',
+    tagEditTitle: 'Edit Tags',
+    enterTagsComma: 'Enter tags (comma separated)',
+    saveTags: 'Save Tags',
+    cancelEdit: 'Cancel Edit',
+    answerDisplay: 'Correct Answer',
   }
 };
+]]>

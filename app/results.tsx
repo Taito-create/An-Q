@@ -214,26 +214,6 @@ export default function ResultsScreen() {
         ))}
       </View>
 
-      {/* Tag Performance */}
-      {stats && Object.keys(stats.tagStats || {}).length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={styles.sectionTitle}>🏷️ {t.tagPerformance}</Text>
-          {Object.entries(stats.tagStats).map(([tag, data]) => {
-            const tagPct = Math.round((data.correct / data.total) * 100);
-            return (
-              <View key={tag} style={styles.historyRow}>
-                <Text style={[styles.historyDate, { color: colors.text }]} numberOfLines={1}>{tag}</Text>
-                <View style={styles.historyBar}>
-                  <View style={[styles.historyFill, { width: `${tagPct}%`, backgroundColor: colors.primary }]} />
-                </View>
-                <Text style={[styles.historyPct, { color: colors.text }]}>{tagPct}% ({data.correct}/{data.total})</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-
       {/* History Graph */}
       {history.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>

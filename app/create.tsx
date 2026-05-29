@@ -132,15 +132,17 @@ export default function CreateQuestionScreen() {
     if (success) {
       SoundManager.play('complete');
       Alert.alert(t.success, t.questionSaved);
-      // Reset form
+      // Reset form - stay on same page, do NOT navigate back
       setQuestion('');
       setDescriptiveAnswer('');
       setTags([]);
       setTagInput('');
-      // Navigate back after a short delay
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
+      setAnswerType('descriptive');
+      setTrueFalseAnswer(true);
+      setMultipleChoice({
+        options: ['', '', '', ''],
+        correctAnswer: 0
+      });
     }
   };
 
@@ -525,3 +527,4 @@ backButton: {
     fontWeight: 'bold',
   },
 });
+]]>
