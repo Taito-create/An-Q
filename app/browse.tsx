@@ -49,6 +49,11 @@ export default function BrowseQuestionsScreen() {
   const [batchTagInput, setBatchTagInput] = useState('');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
+  // 問題集閲覧関連 state
+  const [showFoldersView, setShowFoldersView] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string; questionIds: number[] } | null>(null);
+  const [folderQuestions, setFolderQuestions] = useState<Question[]>([]);
+
   useEffect(() => {
     loadQuestions();
     loadFolders();
@@ -230,6 +235,12 @@ export default function BrowseQuestionsScreen() {
       <View style={styles.headerButtons}>
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
+          onPress={() => setShowFoldersView(true)}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.headerBtn, { borderColor: colors.primary }]} 
           onPress={() => setShowFolderModal(true)}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📁 {t.folderCreate}</Text>
@@ -242,7 +253,7 @@ export default function BrowseQuestionsScreen() {
           }}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>
-            {isSelectionMode ? `✕ ${t.cancelSelection}` : `✓ ${t.batchEdit}`}
+            {isSelectionMode ? t.cancelSelection : t.batchEdit}
           </Text>
         </TouchableOpacity>
       </View>
@@ -454,6 +465,132 @@ export default function BrowseQuestionsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 問題集一覧モーダル */}
+      <Modal visible={showFoldersView} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.foldersModalContainer, { backgroundColor: colors.card }]}>
+            <View style={styles.foldersModalHeader}>
+              <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders}</Text>
+              <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); }}>
+                <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView>
+              {folders.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
+              ) : (
+                folders.map(folder => {
+                  const folderQuestionCount = folder.questionIds.length;
+                  return (
+                    <TouchableOpacity 
+                      key={folder.id} 
+                      style={[styles.folderItem, { borderBottomColor: colors.border }]}
+                      onPress={() => {
+                        const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
+                        setFolderQuestions(questionsInFolder);
+                        setSelectedFolder(folder);
+                      }}
+                    >
+                      <View style={styles.folderInfo}>
+                        <Text style={[styles.folderIcon, { color: colors.primary }]}>📁</Text>
+                        <View>
+                          <Text style={[styles.folderName, { color: colors.text }]}>{folder.name}</Text>
+                          <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 問題集の中身を表示するモーダル */}
+      <Modal visible={!!selectedFolder} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
+            <View style={styles.folderDetailHeader}>
+              <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
+              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
+                <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView>
+              {folderQuestions.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestionsInFolder}</Text>
+              ) : (
+                folderQuestions.map(question => (
+                  <View key={question.id} style={[styles.folderQuestionItem, { borderBottomColor: colors.border }]}>
+                    <View style={styles.folderQuestionContent}>
+                      <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>
+                        {question.question}
+                      </Text>
+                      <View style={styles.folderQuestionActions}>
+                        <TouchableOpacity 
+                          style={[styles.folderActionBtn, { borderColor: colors.primary }]}
+                          onPress={() => {
+                            Alert.alert('回答', getAnswerText(question));
+                          }}
+                        >
+                          <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{t.showAnswer}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.folderActionBtn, { borderColor: colors.error }]}
+                          onPress={() => {
+                            const updatedFolders = folders.map(f => {
+                              if (f.id === selectedFolder?.id) {
+                                return { ...f, questionIds: f.questionIds.filter(id => id !== question.id) };
+                              }
+                              return f;
+                            });
+                            saveFolders(updatedFolders);
+                            setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
+                            Alert.alert('完了', '問題集から除外しました');
+                          }}
+                        >
+                          <Text style={[styles.folderActionBtnText, { color: colors.error }]}>{t.removeFromFolder}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            
+            {/* 問題集に問題を追加するバー */}
+            {isSelectionMode && selectedQuestionIds.length > 0 && selectedFolder && (
+              <TouchableOpacity 
+                style={[styles.addToFolderBar, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  const updatedFolders = folders.map(f => {
+                    if (f.id === selectedFolder?.id) {
+                      const newIds = [...new Set([...f.questionIds, ...selectedQuestionIds])];
+                      return { ...f, questionIds: newIds };
+                    }
+                    return f;
+                  });
+                  await saveFolders(updatedFolders);
+                  const updatedQuestions = questions.filter(q => updatedFolders.find(f => f.id === selectedFolder?.id)?.questionIds.includes(q.id));
+                  setFolderQuestions(updatedQuestions);
+                  setSelectedQuestionIds([]);
+                  setIsSelectionMode(false);
+                  Alert.alert('完了', '選択した問題を問題集に追加しました');
+                }}
+              >
+                <Text style={styles.addToFolderBarText}>
+                  ➕ 選択した{selectedQuestionIds.length}問を「{selectedFolder?.name}」に追加
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -531,5 +668,111 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  // 問題集一覧モーダル
+  foldersModalContainer: {
+    width: '90%',
+    maxWidth: 500,
+    padding: 24,
+    borderRadius: 16,
+    maxHeight: '80%',
+  },
+  foldersModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  foldersModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    padding: 4,
+  },
+  folderItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  folderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  folderIcon: {
+    fontSize: 24,
+  },
+  folderName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  folderCount: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  folderArrow: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  // 問題集詳細モーダル
+  folderDetailContainer: {
+    width: '90%',
+    maxWidth: 500,
+    padding: 24,
+    borderRadius: 16,
+    maxHeight: '80%',
+  },
+  folderDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  folderDetailTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  folderQuestionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  folderQuestionContent: {
+    gap: 8,
+  },
+  folderQuestionText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  folderQuestionActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  folderActionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  folderActionBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  addToFolderBar: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  addToFolderBarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });
-]]>

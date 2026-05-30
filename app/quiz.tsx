@@ -1044,9 +1044,9 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   fullScreenCard: {
-    width: '85%',
-    maxWidth: 400,
-    padding: 32,
+    width: '90%',
+    maxWidth: 500,
+    padding: 40,
     borderRadius: 24,
     alignItems: 'center',
     shadowColor: '#000',
@@ -1071,8 +1071,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   fullScreenAnswerText: {
+    fontSize: 28,
     fontWeight: 'bold',
-    flexWrap: 'wrap',  // 長いテキストを折り返し
+    flexWrap: 'wrap',
+    textAlign: 'center',
   },
   fullScreenTimer: {
     marginTop: 8,

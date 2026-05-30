@@ -380,6 +380,11 @@ export const translations = {
     cancelSelection: '選択解除',
     addTagsToSelected: '選択した問題にタグ追加',
     questionsSelected: '問選択中',
+    folders: '問題集',
+    noFolders: '問題集がありません',
+    noQuestionsInFolder: 'この問題集には問題がありません',
+    removeFromFolder: '除外',
+    addToFolder: '問題集に追加',
   },
   
   en: {
@@ -761,5 +766,10 @@ export const translations = {
     cancelSelection: 'Cancel Selection',
     addTagsToSelected: 'Add Tags to Selected',
     questionsSelected: 'selected',
+    folders: 'Folders',
+    noFolders: 'No folders',
+    noQuestionsInFolder: 'No questions in this folder',
+    removeFromFolder: 'Remove',
+    addToFolder: 'Add to folder',
   }
 };
