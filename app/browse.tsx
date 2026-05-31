@@ -57,6 +57,20 @@ export default function BrowseQuestionsScreen() {
   const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string; questionIds: number[] } | null>(null);
   const [folderQuestions, setFolderQuestions] = useState<Question[]>([]);
 
+  // タグ絞り込み用 state
+  const [selectedFilterTag, setSelectedFilterTag] = useState<string | null>(null);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [showTagFilterModal, setShowTagFilterModal] = useState(false);
+
+  // コンパクトモード用 state
+  const [isCompactMode, setIsCompactMode] = useState(false);
+
+  // 問題追加用モーダルの state
+  const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
+  const [selectedFolderForAdd, setSelectedFolderForAdd] = useState<{ id: string; name: string; questionIds: number[] } | null>(null);
+  const [availableQuestionsForAdd, setAvailableQuestionsForAdd] = useState<Question[]>([]);
+  const [selectedQuestionIdsForAdd, setSelectedQuestionIdsForAdd] = useState<number[]>([]);
+
   useEffect(() => {
     loadQuestions();
     loadFolders();
@@ -75,10 +89,42 @@ export default function BrowseQuestionsScreen() {
           return true;
         });
         setQuestions(filteredQuestions);
+        // 利用可能なタグ一覧を抽出
+        const tags = new Set<string>();
+        filteredQuestions.forEach(q => q.tags?.forEach(t => tags.add(t)));
+        setAvailableTags(Array.from(tags).sort());
       }
     } catch (e) {
       console.error('Failed to load questions.');
     }
+  };
+
+  // フィルタリングされた問題を取得
+  const getFilteredQuestions = (): Question[] => {
+    let filtered = questions;
+    if (selectedFilterTag) {
+      filtered = filtered.filter(q => q.tags && q.tags.includes(selectedFilterTag));
+    }
+    return filtered;
+  };
+
+  const deleteFolder = async (folderId: string) => {
+    Alert.alert(
+      '確認',
+      locale === 'ja' ? 'この問題集を削除しますか？（問題自体は削除されません）' : 'Delete this folder? (Questions will not be deleted)',
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.deleteAction,
+          style: 'destructive',
+          onPress: async () => {
+            const updatedFolders = folders.filter(f => f.id !== folderId);
+            await saveFolders(updatedFolders);
+            Alert.alert('完了', locale === 'ja' ? '問題集を削除しました' : 'Folder deleted');
+          }
+        }
+      ]
+    );
   };
 
   // フォルダ読み込み
@@ -259,6 +305,26 @@ export default function BrowseQuestionsScreen() {
             {isSelectionMode ? t.cancelSelection : t.batchEdit}
           </Text>
         </TouchableOpacity>
+        {/* コンパクトモード切替ボタン */}
+        <TouchableOpacity 
+          style={[styles.headerBtn, { borderColor: colors.primary }]} 
+          onPress={() => setIsCompactMode(!isCompactMode)}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.primary }]}>
+            {isCompactMode ? '📖 詳細表示' : '📄 コンパクト'}
+          </Text>
+        </TouchableOpacity>
+        {/* タグ絞り込みボタン（タグがある場合のみ表示） */}
+        {availableTags.length > 0 && (
+          <TouchableOpacity 
+            style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: selectedFilterTag ? colors.primary + '20' : 'transparent' }]} 
+            onPress={() => setShowTagFilterModal(true)}
+          >
+            <Text style={[styles.headerBtnText, { color: colors.primary }]}>
+              🏷️ {selectedFilterTag ? selectedFilterTag : '全問'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 一括タグ編集バー（選択モード時） */}
@@ -274,7 +340,7 @@ export default function BrowseQuestionsScreen() {
       )}
 
       <ScrollView>
-        {[...questions].reverse().map((item) => (
+        {[...getFilteredQuestions()].reverse().map((item) => (
           /* 問題カード - アコーディオン形式 */
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }]}>
             {/* 選択モード時のチェックボックス */}
@@ -536,6 +602,98 @@ export default function BrowseQuestionsScreen() {
                 })
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* タグ絞り込みモーダル */}
+      <Modal visible={showTagFilterModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>🏷️ {t.filterByTags || 'タグで絞り込み'}</Text>
+            <ScrollView style={styles.tagFilterList}>
+              <TouchableOpacity 
+                style={[styles.tagFilterChip, selectedFilterTag === null && { backgroundColor: colors.primary }]}
+                onPress={() => { setSelectedFilterTag(null); setShowTagFilterModal(false); }}
+              >
+                <Text style={[styles.tagFilterChipText, selectedFilterTag === null && { color: '#fff' }]}>📋 全問</Text>
+              </TouchableOpacity>
+              {availableTags.map(tag => (
+                <TouchableOpacity 
+                  key={tag} 
+                  style={[styles.tagFilterChip, selectedFilterTag === tag && { backgroundColor: colors.primary }]}
+                  onPress={() => { setSelectedFilterTag(tag); setShowTagFilterModal(false); }}
+                >
+                  <Text style={[styles.tagFilterChipText, selectedFilterTag === tag && { color: '#fff' }]}>🏷️ {tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 問題追加モーダル */}
+      <Modal visible={showAddToFolderModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
+            <View style={styles.folderDetailHeader}>
+              <Text style={[styles.folderDetailTitle, { color: colors.text }]}>
+                ➕ {selectedFolderForAdd?.name} に問題を追加
+              </Text>
+              <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}>
+                <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView>
+              {availableQuestionsForAdd.length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>追加できる問題がありません</Text>
+              ) : (
+                availableQuestionsForAdd.map(question => (
+                  <TouchableOpacity 
+                    key={question.id} 
+                    style={[styles.questionSelectItem, { borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      setSelectedQuestionIdsForAdd(prev =>
+                        prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]
+                      );
+                    }}
+                  >
+                    <Text style={[styles.checkboxText, { color: colors.primary }]}>
+                      {selectedQuestionIdsForAdd.includes(question.id) ? '☑' : '☐'}
+                    </Text>
+                    <Text style={[styles.questionSelectText, { color: colors.text }]} numberOfLines={2}>
+                      {question.question}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+            
+            {selectedQuestionIdsForAdd.length > 0 && (
+              <TouchableOpacity 
+                style={[styles.addToFolderBar, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  if (selectedFolderForAdd) {
+                    const updatedFolders = folders.map(f => {
+                      if (f.id === selectedFolderForAdd.id) {
+                        const newIds = [...new Set([...f.questionIds, ...selectedQuestionIdsForAdd])];
+                        return { ...f, questionIds: newIds };
+                      }
+                      return f;
+                    });
+                    await saveFolders(updatedFolders);
+                    setSelectedQuestionIdsForAdd([]);
+                    setShowAddToFolderModal(false);
+                    Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
+                  }
+                }}
+              >
+                <Text style={styles.addToFolderBarText}>
+                  ➕ 選択した{selectedQuestionIdsForAdd.length}問を追加
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -837,6 +995,36 @@ const styles = StyleSheet.create({
   folderActionBtnText: {
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  // タグ絞り込み用スタイル
+  tagFilterList: {
+    maxHeight: 400,
+  },
+  tagFilterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  tagFilterChipText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  // 問題選択用スタイル
+  questionSelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  questionSelectText: {
+    fontSize: 15,
+    flex: 1,
+    lineHeight: 22,
   },
   addToFolderBar: {
     marginTop: 16,
