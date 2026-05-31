@@ -62,7 +62,9 @@ export default function BrowseQuestionsScreen() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [showTagFilterModal, setShowTagFilterModal] = useState(false);
 
-  // (コンパクトモードは削除)
+  // 問題集削除モード用 state
+  const [isFolderDeleteMode, setIsFolderDeleteMode] = useState(false);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
 
   // 問題追加用モーダルの state
   const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
@@ -111,6 +113,35 @@ export default function BrowseQuestionsScreen() {
       filtered = filtered.filter(q => q.tags && q.tags.includes(selectedFilterTag));
     }
     return filtered;
+  };
+
+  // 選択した問題集を一括削除する関数
+  const deleteSelectedFolders = async () => {
+    if (selectedFolderIds.length === 0) return;
+
+    Alert.alert(
+      '確認',
+      `選択した${selectedFolderIds.length}個の問題集を削除しますか？`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedFolders = folders.filter(f => !selectedFolderIds.includes(f.id));
+              await saveFolders(updatedFolders);
+              setFolders(updatedFolders);
+              setSelectedFolderIds([]);
+              setIsFolderDeleteMode(false);
+              Alert.alert('完了', `${selectedFolderIds.length}個の問題集を削除しました`);
+            } catch (error) {
+              Alert.alert('エラー', '削除に失敗しました');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const deleteFolder = async (folderId: string) => {
@@ -315,6 +346,19 @@ export default function BrowseQuestionsScreen() {
           onPress={() => setShowFoldersView(true)}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
+        </TouchableOpacity>
+        
+        {/* 問題集削除モードボタン */}
+        <TouchableOpacity 
+          style={[styles.headerBtn, { borderColor: colors.error, backgroundColor: isFolderDeleteMode ? colors.error + '20' : 'transparent' }]} 
+          onPress={() => {
+            setIsFolderDeleteMode(!isFolderDeleteMode);
+            if (isFolderDeleteMode) setSelectedFolderIds([]);
+          }}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.error }]}>
+            {isFolderDeleteMode ? '✓ 削除キャンセル' : '🗑 問題集削除'}
+          </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -570,23 +614,53 @@ export default function BrowseQuestionsScreen() {
           <View style={[styles.foldersModalContainer, { backgroundColor: colors.card }]}>
             <View style={styles.foldersModalHeader}>
               <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders}</Text>
-              <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); }}>
-                <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
-              </TouchableOpacity>
+              <View style={styles.foldersModalActions}>
+                {isFolderDeleteMode && selectedFolderIds.length > 0 && (
+                  <TouchableOpacity 
+                    style={[styles.confirmDeleteBtn, { backgroundColor: colors.error }]}
+                    onPress={deleteSelectedFolders}
+                  >
+                    <Text style={styles.confirmDeleteBtnText}>削除({selectedFolderIds.length})</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}>
+                  <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             
-            {/* 問題集一覧 */}
             <ScrollView>
               {folders.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
               ) : (
                 folders.map(folder => {
                   const folderQuestionCount = folder.questionIds.length;
+                  const isSelected = selectedFolderIds.includes(folder.id);
                   return (
                     <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }]}>
+                      {/* 削除モード時はチェックボックスを表示 */}
+                      {isFolderDeleteMode && (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setSelectedFolderIds(prev =>
+                              prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]
+                            );
+                          }}
+                          style={styles.checkbox}
+                        >
+                          <Text style={[styles.checkboxText, { color: colors.primary }]}>
+                            {isSelected ? '☑' : '☐'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      
                       <TouchableOpacity 
                         style={styles.folderInfo}
-                        onPress={() => openFolderDetail(folder)}
+                        onPress={() => {
+                          if (!isFolderDeleteMode) {
+                            openFolderDetail(folder);
+                          }
+                        }}
                       >
                         <Text style={[styles.folderIcon, { color: colors.primary }]}>📁</Text>
                         <View>
@@ -594,15 +668,14 @@ export default function BrowseQuestionsScreen() {
                           <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
                         </View>
                       </TouchableOpacity>
-                      <View style={styles.folderRightActions}>
-                        <TouchableOpacity 
-                          style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
-                          onPress={() => deleteFolder(folder.id)}
-                        >
-                          <Text style={styles.deleteFolderBtnText}>削除</Text>
-                        </TouchableOpacity>
+                      
+                      {/* 大きくした矢印ボタン */}
+                      <TouchableOpacity 
+                        style={styles.folderArrowBtn}
+                        onPress={() => openFolderDetail(folder)}
+                      >
                         <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
                   );
                 })
@@ -917,6 +990,25 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     maxHeight: '80%',
+  },
+  foldersModalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  confirmDeleteBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  confirmDeleteBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  folderArrowBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   foldersModalHeader: {
     flexDirection: 'row',
