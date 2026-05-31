@@ -62,8 +62,7 @@ export default function BrowseQuestionsScreen() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [showTagFilterModal, setShowTagFilterModal] = useState(false);
 
-  // コンパクトモード用 state
-  const [isCompactMode, setIsCompactMode] = useState(false);
+  // (コンパクトモードは削除)
 
   // 問題追加用モーダルの state
   const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
@@ -232,7 +231,7 @@ export default function BrowseQuestionsScreen() {
     setShowTagModal(true);
   };
 
-  // タグを保存
+  // タグを保存（タグ一覧もリアルタイム更新）
   const saveEditedTags = async () => {
     if (!editingQuestion) return;
 
@@ -251,10 +250,23 @@ export default function BrowseQuestionsScreen() {
     try {
       await AsyncStorage.setItem('quiz_questions', JSON.stringify(updatedQuestions));
       setQuestions(updatedQuestions);
+
+      // タグ一覧を更新
+      const tagSet = new Set<string>();
+      updatedQuestions.forEach(q => {
+        (q.tags || []).forEach(tag => tagSet.add(tag));
+      });
+      setAvailableTags(Array.from(tagSet).sort());
+
+      // 現在のフィルタータグが削除された場合は解除
+      if (selectedFilterTag && !tagSet.has(selectedFilterTag)) {
+        setSelectedFilterTag(null);
+      }
+
       setShowTagModal(false);
       setEditingQuestion(null);
       SoundManager.play('complete');
-      Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました。' : 'Tags updated.');
+      Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました' : 'Tags updated');
     } catch (e) {
       console.error('Failed to save tags:', e);
       Alert.alert(t.error, t.failedToSave);
@@ -315,15 +327,6 @@ export default function BrowseQuestionsScreen() {
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>
             {isSelectionMode ? t.cancelSelection : t.batchEdit}
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.headerBtn, { borderColor: colors.primary }]} 
-          onPress={() => setIsCompactMode(!isCompactMode)}
-        >
-          <Text style={[styles.headerBtnText, { color: colors.primary }]}>
-            {isCompactMode ? '📖 詳細' : '📄 コンパクト'}
           </Text>
         </TouchableOpacity>
         
@@ -573,43 +576,29 @@ export default function BrowseQuestionsScreen() {
                 folders.map(folder => {
                   const folderQuestionCount = folder.questionIds.length;
                   return (
-                    <TouchableOpacity 
-                      key={folder.id} 
-                      style={[styles.folderItem, { borderBottomColor: colors.border }]}
-                      onPress={() => {
-                        const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
-                        setFolderQuestions(questionsInFolder);
-                        setSelectedFolder(folder);
-                      }}
-                    >
-                      <View style={styles.folderInfo}>
+                    <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }]}>
+                      <TouchableOpacity 
+                        style={styles.folderInfo}
+                        onPress={() => {
+                          const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
+                          setFolderQuestions(questionsInFolder);
+                          setSelectedFolder(folder);
+                        }}
+                      >
                         <Text style={[styles.folderIcon, { color: colors.primary }]}>📁</Text>
                         <View>
                           <Text style={[styles.folderName, { color: colors.text }]}>{folder.name}</Text>
                           <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
                         </View>
-                      </View>
-                      <View style={styles.folderRightActions}>
-                        {/* 問題集を削除するボタン */}
-                        <TouchableOpacity 
-                          onPress={(e) => { e.stopPropagation(); Alert.alert(
-                            locale === 'ja' ? '削除確認' : 'Delete Confirmation',
-                            locale === 'ja' ? `「${folder.name}」を削除しますか？` : `Delete "${folder.name}"?`,
-                            [
-                              { text: t.cancel, style: 'cancel' },
-                              { text: t.deleteAction, style: 'destructive', onPress: () => {
-                                const updatedFolders = folders.filter(f => f.id !== folder.id);
-                                saveFolders(updatedFolders);
-                              }}
-                            ]
-                          ); }}
-                          style={styles.folderActionIcon}
-                        >
-                          <Text style={[styles.folderActionIconText, { color: colors.error }]}>🗑</Text>
-                        </TouchableOpacity>
-                        <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      {/* 削除ボタン */}
+                      <TouchableOpacity 
+                        style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
+                        onPress={() => deleteFolder(folder.id)}
+                      >
+                        <Text style={styles.deleteFolderBtnText}>削除</Text>
+                      </TouchableOpacity>
+                    </View>
                   );
                 })
               )}
@@ -1101,6 +1090,17 @@ const styles = StyleSheet.create({
   },
   addQuestionBtnText: {
     color: '#fff',
+    fontWeight: 'bold',
+  },
+  deleteFolderBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  deleteFolderBtnText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   addToFolderBar: {
