@@ -164,9 +164,9 @@ const days: Array<number | null> = [];
 
     let newEvents = events;
     if (editingEventId) {
-      newEvents = newEvents.filter(e => e.id !== editingEventId);
+      newEvents = newEvents.filter((e: ScheduledEvent) => e.id !== editingEventId);
     } else {
-      newEvents = newEvents.filter(e => e.date !== selectedDate);
+      newEvents = newEvents.filter((e: ScheduledEvent) => e.date !== selectedDate);
     }
     
     const newEvent: ScheduledEvent = {
@@ -212,7 +212,7 @@ const days: Array<number | null> = [];
             try {
               const saved = await AsyncStorage.getItem('calendar_events');
               const currentEvents = saved ? JSON.parse(saved) : [];
-              const newEvents = currentEvents.filter(e => String(e.id) !== String(eventId));
+              const newEvents = currentEvents.filter((e: ScheduledEvent) => String(e.id) !== String(eventId));
               
               if (newEvents.length === currentEvents.length) {
                 Alert.alert('エラー', '削除対象が見つかりませんでした');
@@ -346,7 +346,7 @@ const hasEvent = events.some((e) => e.date === dateStr);
                 style={[
                   styles.dayCell,
                   { width: cellSize, height: cellSize, borderRadius: cellSize / 2 },
-                  day && dayStyle && { backgroundColor: dayStyle.bgColor },
+                  day && dayStyle ? { backgroundColor: dayStyle.bgColor } : null,
                 ]}
                 onPress={() => day && onDayPress(day)}
                 disabled={!day}

@@ -38,6 +38,9 @@ export default function BrowseQuestionsScreen() {
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
 
+  // アコーディオン用 state
+  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
+
   // フォルダ関連 state
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -271,76 +274,84 @@ export default function BrowseQuestionsScreen() {
       )}
 
       <ScrollView>
-        {questions.map((item) => (
+        {[...questions].reverse().map((item) => (
+          /* 問題カード - アコーディオン形式 */
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }]}>
-            <View style={styles.cardHeader}>
-              {/* 選択モード時のチェックボックス */}
-              {isSelectionMode && (
-                <TouchableOpacity 
-                  onPress={() => {
-                    if (selectedQuestionIds.includes(item.id)) {
-                      setSelectedQuestionIds(prev => prev.filter(id => id !== item.id));
-                    } else {
-                      setSelectedQuestionIds(prev => [...prev, item.id]);
-                    }
-                  }}
-                  style={styles.checkbox}
-                >
-                  <Text style={styles.checkboxText}>
-                    {selectedQuestionIds.includes(item.id) ? '☑' : '☐'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
-                {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
-              </Text>
-              <View style={styles.cardActions}>
-                {/* 回答を表示ボタン */}
-                <TouchableOpacity
-                  onPress={() => {
-                    SoundManager.play('select');
-                    setShowAnswerId(showAnswerId === item.id ? null : item.id);
-                  }}
-                >
-                  <Text style={[styles.answerBtnText, { color: colors.primary }]}>
-                    {showAnswerId === item.id ? t.hide : t.showAnswer}
-                  </Text>
-                </TouchableOpacity>
-                {/* タグ編集ボタン */}
-                <TouchableOpacity
-                  onPress={() => {
-                    SoundManager.play('select');
-                    startEditTags(item);
-                  }}
-                >
-                  <Text style={[styles.editTagBtnText, { color: colors.primary }]}>
-                    {t.editTags}
-                  </Text>
-                </TouchableOpacity>
-                {/* 削除ボタン */}
-                <TouchableOpacity onPress={() => handleDeleteRequest(item.id)}>
-                  <Text style={[styles.deleteText, { color: colors.error }]}>{t.deleteAction}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            <Text style={[styles.questionText, { color: colors.text }]}>{item.question}</Text>
-
-            {/* タグ表示 */}
-            {item.tags && item.tags.length > 0 && (
-              <View style={styles.tagRow}>
-                {item.tags.map((tag, i) => (
-                  <View key={i} style={[styles.miniTag, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.miniTagText, { color: colors.primary }]}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
+            {/* 選択モード時のチェックボックス */}
+            {isSelectionMode && (
+              <TouchableOpacity 
+                onPress={() => {
+                  if (selectedQuestionIds.includes(item.id)) {
+                    setSelectedQuestionIds(prev => prev.filter(id => id !== item.id));
+                  } else {
+                    setSelectedQuestionIds(prev => [...prev, item.id]);
+                  }
+                }}
+                style={styles.checkbox}
+              >
+                <Text style={styles.checkboxText}>
+                  {selectedQuestionIds.includes(item.id) ? '☑' : '☐'}
+                </Text>
+              </TouchableOpacity>
             )}
+            {/* ヘッダー部分（常に表示） */}
+            <TouchableOpacity 
+              style={styles.cardHeader}
+              onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}
+            >
+              <View style={styles.cardHeaderLeft}>
+                <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
+                  {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
+                </Text>
+                <Text style={[styles.questionPreview, { color: colors.text }]} numberOfLines={1}>
+                  {item.question}
+                </Text>
+              </View>
+              <Text style={[styles.expandIcon, { color: colors.primary }]}>
+                {expandedQuestionId === item.id ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
 
-            {/* 回答表示 */}
-            {showAnswerId === item.id && (
-              <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
-                <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
-                <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(item)}</Text>
+            {/* 展開時のみ表示（詳細） */}
+            {expandedQuestionId === item.id && (
+              <View style={styles.expandedContent}>
+                <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
+                
+                {/* タグ表示 */}
+                {item.tags && item.tags.length > 0 && (
+                  <View style={styles.tagRow}>
+                    {item.tags.map((tag, i) => (
+                      <View key={i} style={[styles.miniTag, { backgroundColor: colors.primary + '20' }]}>
+                        <Text style={[styles.miniTagText, { color: colors.primary }]}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                {/* アクションボタン */}
+                <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => {
+                    setShowAnswerId(showAnswerId === item.id ? null : item.id);
+                  }}>
+                    <Text style={[styles.answerBtnText, { color: colors.primary }]}>
+                      {showAnswerId === item.id ? t.hide : t.showAnswer}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => startEditTags(item)}>
+                    <Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteRequest(item.id)}>
+                    <Text style={[styles.deleteText, { color: colors.error }]}>{t.deleteAction}</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* 回答表示 */}
+                {showAnswerId === item.id && (
+                  <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                    <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
+                    <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(item)}</Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -500,7 +511,26 @@ export default function BrowseQuestionsScreen() {
                           <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
                         </View>
                       </View>
-                      <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
+                      <View style={styles.folderRightActions}>
+                        {/* 問題集を削除するボタン */}
+                        <TouchableOpacity 
+                          onPress={(e) => { e.stopPropagation(); Alert.alert(
+                            locale === 'ja' ? '削除確認' : 'Delete Confirmation',
+                            locale === 'ja' ? `「${folder.name}」を削除しますか？` : `Delete "${folder.name}"?`,
+                            [
+                              { text: t.cancel, style: 'cancel' },
+                              { text: t.deleteAction, style: 'destructive', onPress: () => {
+                                const updatedFolders = folders.filter(f => f.id !== folder.id);
+                                saveFolders(updatedFolders);
+                              }}
+                            ]
+                          ); }}
+                          style={styles.folderActionIcon}
+                        >
+                          <Text style={[styles.folderActionIconText, { color: colors.error }]}>🗑</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })
@@ -599,7 +629,39 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#F5F7FA', paddingTop: 60 },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  cardHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  questionPreview: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  expandIcon: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+  },
+  expandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    gap: 10,
+  },
+  fullQuestion: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   typeBadge: { fontSize: 12, color: '#007AFF', fontWeight: 'bold', backgroundColor: '#E1EFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
   cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 6, marginLeft: 'auto' },
   deleteText: { color: '#FF3B30', fontWeight: 'bold' },
@@ -718,6 +780,18 @@ const styles = StyleSheet.create({
   folderArrow: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  folderRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  folderActionIcon: {
+    padding: 6,
+    borderRadius: 6,
+  },
+  folderActionIconText: {
+    fontSize: 18,
   },
   // 問題集詳細モーダル
   folderDetailContainer: {
