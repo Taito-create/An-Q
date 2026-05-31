@@ -98,6 +98,12 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
+  const openFolderDetail = (folder: { id: string; name: string; questionIds: number[] }) => {
+    const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
+    setFolderQuestions(questionsInFolder);
+    setSelectedFolder(folder);
+  };
+
   // フィルタリングされた問題を取得
   const getFilteredQuestions = (): Question[] => {
     let filtered = questions;
@@ -569,6 +575,7 @@ export default function BrowseQuestionsScreen() {
               </TouchableOpacity>
             </View>
             
+            {/* 問題集一覧 */}
             <ScrollView>
               {folders.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
@@ -579,11 +586,7 @@ export default function BrowseQuestionsScreen() {
                     <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }]}>
                       <TouchableOpacity 
                         style={styles.folderInfo}
-                        onPress={() => {
-                          const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
-                          setFolderQuestions(questionsInFolder);
-                          setSelectedFolder(folder);
-                        }}
+                        onPress={() => openFolderDetail(folder)}
                       >
                         <Text style={[styles.folderIcon, { color: colors.primary }]}>📁</Text>
                         <View>
@@ -591,13 +594,15 @@ export default function BrowseQuestionsScreen() {
                           <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
                         </View>
                       </TouchableOpacity>
-                      {/* 削除ボタン */}
-                      <TouchableOpacity 
-                        style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
-                        onPress={() => deleteFolder(folder.id)}
-                      >
-                        <Text style={styles.deleteFolderBtnText}>削除</Text>
-                      </TouchableOpacity>
+                      <View style={styles.folderRightActions}>
+                        <TouchableOpacity 
+                          style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
+                          onPress={() => deleteFolder(folder.id)}
+                        >
+                          <Text style={styles.deleteFolderBtnText}>削除</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text>
+                      </View>
                     </View>
                   );
                 })
@@ -953,8 +958,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   folderArrow: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
+    paddingHorizontal: 4,
   },
   folderRightActions: {
     flexDirection: 'row',
