@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Platform, TextInput, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate } from 'react-router-dom';
@@ -261,8 +261,8 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
-  // 回答テキストを取得
-  const getAnswerText = (item: Question): string => {
+  // 回答テキストを取得（useCallback でメモ化）
+  const getAnswerText = useCallback((item: Question): string => {
     switch (item.answerType) {
       case 'truefalse':
         return item.trueFalseAnswer ? '○' : '✕';
@@ -275,7 +275,7 @@ export default function BrowseQuestionsScreen() {
       default:
         return '';
     }
-  };
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -721,23 +721,50 @@ export default function BrowseQuestionsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 問題追加ボタン */}
-            <TouchableOpacity 
-              style={[styles.addQuestionBtn, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setSelectedFolderForAdd(selectedFolder);
-                const notInFolder = questions.filter(q => !selectedFolder?.questionIds.includes(q.id));
-                setAvailableQuestionsForAdd(notInFolder);
-                setSelectedQuestionIdsForAdd([]);
-                setShowAddToFolderModal(true);
-              }}
-            >
-              <Text style={styles.addQuestionBtnText}>+ 問題を追加</Text>
-            </TouchableOpacity>
+            {/* 問題集に含まれていない問題を表示して追加できるセクション */}
+            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+              📋 追加可能な問題
+            </Text>
+            <ScrollView style={styles.addableQuestionsList}>
+              {questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).length === 0 ? (
+                <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>追加できる問題がありません</Text>
+              ) : (
+                questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).map(question => (
+                  <TouchableOpacity 
+                    key={question.id} 
+                    style={[styles.addableQuestionItem, { borderBottomColor: colors.border }]}
+                    onPress={async () => {
+                      const updatedFolders = folders.map(f => {
+                        if (f.id === selectedFolder?.id) {
+                          return { ...f, questionIds: [...f.questionIds, question.id] };
+                        }
+                        return f;
+                      });
+                      await saveFolders(updatedFolders);
+                      setFolders(updatedFolders);
+                      const updatedQuestions = questions.filter(q => updatedFolders.find(f => f.id === selectedFolder?.id)?.questionIds.includes(q.id));
+                      setFolderQuestions(updatedQuestions);
+                      Alert.alert('完了', '問題を追加しました');
+                    }}
+                  >
+                    <Text style={[styles.addableQuestionText, { color: colors.text }]} numberOfLines={2}>
+                      {question.question}
+                    </Text>
+                    <Text style={[styles.addButton, { color: colors.primary }]}>+ 追加</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
 
-            <ScrollView>
+            <View style={styles.divider} />
+
+            {/* 問題集に含まれている問題一覧 */}
+            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+              📖 この問題集の問題
+            </Text>
+            <ScrollView style={styles.folderQuestionsList}>
               {folderQuestions.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestionsInFolder}</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
               ) : (
                 folderQuestions.map(question => (
                   <View key={question.id} style={[styles.folderQuestionItem, { borderBottomColor: colors.border }]}>
@@ -1026,6 +1053,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
     lineHeight: 22,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
+  addableQuestionsList: {
+    maxHeight: 200,
+    marginHorizontal: 16,
+  },
+  addableQuestionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  addableQuestionText: {
+    flex: 1,
+    fontSize: 13,
+    marginRight: 10,
+  },
+  addButton: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 12,
+  },
+  folderQuestionsList: {
+    maxHeight: 300,
+    marginHorizontal: 16,
   },
   addQuestionBtn: {
     margin: 12,
