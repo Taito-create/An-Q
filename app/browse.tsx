@@ -111,16 +111,21 @@ export default function BrowseQuestionsScreen() {
   const deleteFolder = async (folderId: string) => {
     Alert.alert(
       '確認',
-      locale === 'ja' ? 'この問題集を削除しますか？（問題自体は削除されません）' : 'Delete this folder? (Questions will not be deleted)',
+      locale === 'ja' ? 'この問題集を削除しますか？' : 'Delete this folder?',
       [
         { text: t.cancel, style: 'cancel' },
         {
           text: t.deleteAction,
           style: 'destructive',
           onPress: async () => {
-            const updatedFolders = folders.filter(f => f.id !== folderId);
-            await saveFolders(updatedFolders);
-            Alert.alert('完了', locale === 'ja' ? '問題集を削除しました' : 'Folder deleted');
+            try {
+              const updatedFolders = folders.filter(f => f.id !== folderId);
+              await saveFolders(updatedFolders);
+              setFolders(updatedFolders);
+              Alert.alert('完了', locale === 'ja' ? '問題集を削除しました' : 'Folder deleted');
+            } catch (error) {
+              Alert.alert('エラー', locale === 'ja' ? '削除に失敗しました' : 'Failed to delete');
+            }
           }
         }
       ]
@@ -280,20 +285,27 @@ export default function BrowseQuestionsScreen() {
           : `${t.manageQuestions}（全 ${questions.length}${t.questionsCountLabel}）`}
       </Text>
 
-      {/* ヘッダーボタン */}
-      <View style={styles.headerButtons}>
+      {/* ヘッダーボタン - スクロール可能に */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.headerButtonsScroll}
+        contentContainerStyle={styles.headerButtons}
+      >
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
           onPress={() => setShowFoldersView(true)}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
           onPress={() => setShowFolderModal(true)}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📁 {t.folderCreate}</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
           onPress={() => {
@@ -305,16 +317,16 @@ export default function BrowseQuestionsScreen() {
             {isSelectionMode ? t.cancelSelection : t.batchEdit}
           </Text>
         </TouchableOpacity>
-        {/* コンパクトモード切替ボタン */}
+        
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
           onPress={() => setIsCompactMode(!isCompactMode)}
         >
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>
-            {isCompactMode ? '📖 詳細表示' : '📄 コンパクト'}
+            {isCompactMode ? '📖 詳細' : '📄 コンパクト'}
           </Text>
         </TouchableOpacity>
-        {/* タグ絞り込みボタン（タグがある場合のみ表示） */}
+        
         {availableTags.length > 0 && (
           <TouchableOpacity 
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: selectedFilterTag ? colors.primary + '20' : 'transparent' }]} 
@@ -325,7 +337,7 @@ export default function BrowseQuestionsScreen() {
             </Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
 
       {/* 一括タグ編集バー（選択モード時） */}
       {isSelectionMode && selectedQuestionIds.length > 0 && (
@@ -708,7 +720,21 @@ export default function BrowseQuestionsScreen() {
                 <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
+            {/* 問題追加ボタン */}
+            <TouchableOpacity 
+              style={[styles.addQuestionBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setSelectedFolderForAdd(selectedFolder);
+                const notInFolder = questions.filter(q => !selectedFolder?.questionIds.includes(q.id));
+                setAvailableQuestionsForAdd(notInFolder);
+                setSelectedQuestionIdsForAdd([]);
+                setShowAddToFolderModal(true);
+              }}
+            >
+              <Text style={styles.addQuestionBtnText}>+ 問題を追加</Text>
+            </TouchableOpacity>
+
             <ScrollView>
               {folderQuestions.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestionsInFolder}</Text>
@@ -722,27 +748,26 @@ export default function BrowseQuestionsScreen() {
                       <View style={styles.folderQuestionActions}>
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.primary }]}
-                          onPress={() => {
-                            Alert.alert('回答', getAnswerText(question));
-                          }}
+                          onPress={() => Alert.alert('回答', getAnswerText(question))}
                         >
                           <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{t.showAnswer}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.error }]}
-                          onPress={() => {
+                          onPress={async () => {
                             const updatedFolders = folders.map(f => {
                               if (f.id === selectedFolder?.id) {
                                 return { ...f, questionIds: f.questionIds.filter(id => id !== question.id) };
                               }
                               return f;
                             });
-                            saveFolders(updatedFolders);
+                            await saveFolders(updatedFolders);
+                            setFolders(updatedFolders);
                             setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
                             Alert.alert('完了', '問題集から除外しました');
                           }}
                         >
-                          <Text style={[styles.folderActionBtnText, { color: colors.error }]}>{t.removeFromFolder}</Text>
+                          <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -750,32 +775,6 @@ export default function BrowseQuestionsScreen() {
                 ))
               )}
             </ScrollView>
-            
-            {/* 問題集に問題を追加するバー */}
-            {isSelectionMode && selectedQuestionIds.length > 0 && selectedFolder && (
-              <TouchableOpacity 
-                style={[styles.addToFolderBar, { backgroundColor: colors.primary }]}
-                onPress={async () => {
-                  const updatedFolders = folders.map(f => {
-                    if (f.id === selectedFolder?.id) {
-                      const newIds = [...new Set([...f.questionIds, ...selectedQuestionIds])];
-                      return { ...f, questionIds: newIds };
-                    }
-                    return f;
-                  });
-                  await saveFolders(updatedFolders);
-                  const updatedQuestions = questions.filter(q => updatedFolders.find(f => f.id === selectedFolder?.id)?.questionIds.includes(q.id));
-                  setFolderQuestions(updatedQuestions);
-                  setSelectedQuestionIds([]);
-                  setIsSelectionMode(false);
-                  Alert.alert('完了', '選択した問題を問題集に追加しました');
-                }}
-              >
-                <Text style={styles.addToFolderBarText}>
-                  ➕ 選択した{selectedQuestionIds.length}問を「{selectedFolder?.name}」に追加
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </Modal>
@@ -855,11 +854,13 @@ const styles = StyleSheet.create({
   modalSaveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   modalSaveText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   // 追加スタイル
+  headerButtonsScroll: {
+    marginBottom: 12,
+  },
   headerButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginBottom: 16,
+    gap: 8,
+    paddingBottom: 4,
   },
   headerBtn: {
     paddingHorizontal: 12,
@@ -1025,6 +1026,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
     lineHeight: 22,
+  },
+  addQuestionBtn: {
+    margin: 12,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addQuestionBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   addToFolderBar: {
     marginTop: 16,
