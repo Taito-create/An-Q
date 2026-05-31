@@ -115,7 +115,7 @@ export default function BrowseQuestionsScreen() {
     return filtered;
   };
 
-  // 選択した問題集を一括削除する関数
+  // 選択した問題集を一括削除（AsyncStorageから直接読み込み）
   const deleteSelectedFolders = async () => {
     if (selectedFolderIds.length === 0) return;
 
@@ -129,13 +129,16 @@ export default function BrowseQuestionsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const updatedFolders = folders.filter(f => !selectedFolderIds.includes(f.id));
-              await saveFolders(updatedFolders);
+              const savedFolders = await AsyncStorage.getItem('question_folders');
+              const currentFolders = savedFolders ? JSON.parse(savedFolders) : [];
+              const updatedFolders = currentFolders.filter((f: any) => !selectedFolderIds.includes(f.id));
+              await AsyncStorage.setItem('question_folders', JSON.stringify(updatedFolders));
               setFolders(updatedFolders);
               setSelectedFolderIds([]);
               setIsFolderDeleteMode(false);
               Alert.alert('完了', `${selectedFolderIds.length}個の問題集を削除しました`);
             } catch (error) {
+              console.error('一括削除エラー:', error);
               Alert.alert('エラー', '削除に失敗しました');
             }
           }
@@ -144,23 +147,27 @@ export default function BrowseQuestionsScreen() {
     );
   };
 
-  const deleteFolder = async (folderId: string) => {
+  // 問題集削除（AsyncStorageから直接読み込み）
+  const deleteFolderById = async (folderId: string) => {
     Alert.alert(
       '確認',
-      locale === 'ja' ? 'この問題集を削除しますか？' : 'Delete this folder?',
+      'この問題集を削除しますか？',
       [
-        { text: t.cancel, style: 'cancel' },
+        { text: 'キャンセル', style: 'cancel' },
         {
-          text: t.deleteAction,
+          text: '削除',
           style: 'destructive',
           onPress: async () => {
             try {
-              const updatedFolders = folders.filter(f => f.id !== folderId);
-              await saveFolders(updatedFolders);
+              const savedFolders = await AsyncStorage.getItem('question_folders');
+              const currentFolders = savedFolders ? JSON.parse(savedFolders) : [];
+              const updatedFolders = currentFolders.filter((f: any) => f.id !== folderId);
+              await AsyncStorage.setItem('question_folders', JSON.stringify(updatedFolders));
               setFolders(updatedFolders);
-              Alert.alert('完了', locale === 'ja' ? '問題集を削除しました' : 'Folder deleted');
+              Alert.alert('完了', '問題集を削除しました');
             } catch (error) {
-              Alert.alert('エラー', locale === 'ja' ? '削除に失敗しました' : 'Failed to delete');
+              console.error('削除エラー:', error);
+              Alert.alert('エラー', '削除に失敗しました');
             }
           }
         }
@@ -185,21 +192,19 @@ export default function BrowseQuestionsScreen() {
   // フォルダ作成
   const createFolder = async () => {
     if (!newFolderName.trim()) {
-      Alert.alert('エラー', locale === 'ja' ? '問題集名を入力してください' : 'Please enter a folder name');
+      Alert.alert('エラー', '問題集名を入力してください');
       return;
     }
     const newFolder = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
       name: newFolderName.trim(),
       questionIds: [],
     };
-    await saveFolders([...folders, newFolder]);
+    const updatedFolders = [...folders, newFolder];
+    await saveFolders(updatedFolders);
     setNewFolderName('');
     setShowFolderModal(false);
-    Alert.alert(
-      locale === 'ja' ? '成功' : 'Success',
-      locale === 'ja' ? '問題集を作成しました' : 'Folder created successfully'
-    );
+    Alert.alert('成功', '問題集を作成しました');
   };
 
   // 一括タグ追加
@@ -310,6 +315,40 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
+  // 回答表示関数（AsyncStorageから最新データを直接取得）
+  const showAnswerForQuestion = async (questionId: number) => {
+    try {
+      const savedQuestions = await AsyncStorage.getItem('quiz_questions');
+      if (savedQuestions) {
+        const allQuestions = JSON.parse(savedQuestions);
+        const question = allQuestions.find((q: any) => q.id === questionId);
+        if (question) {
+          let answerText = '';
+          switch (question.answerType) {
+            case 'truefalse':
+              answerText = question.trueFalseAnswer ? '○' : '✕';
+              break;
+            case 'multiple':
+              const correctIdx = question.multipleChoice?.correctAnswer ?? 0;
+              answerText = question.multipleChoice?.options[correctIdx] || '';
+              break;
+            case 'descriptive':
+              answerText = question.descriptiveAnswer || '';
+              break;
+            default:
+              answerText = '回答が見つかりません';
+          }
+          Alert.alert('回答', answerText);
+        } else {
+          Alert.alert('回答', '問題が見つかりません');
+        }
+      }
+    } catch (error) {
+      console.error('回答表示エラー:', error);
+      Alert.alert('エラー', '回答の取得に失敗しました');
+    }
+  };
+
   // 回答テキストを取得（useCallback でメモ化）
   const getAnswerText = useCallback((item: Question): string => {
     switch (item.answerType) {
@@ -348,7 +387,7 @@ export default function BrowseQuestionsScreen() {
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
         </TouchableOpacity>
         
-        {/* 問題集削除モードボタン */}
+        {/* 問題集削除ボタン（📚問題集の右に表示） */}
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.error, backgroundColor: isFolderDeleteMode ? colors.error + '20' : 'transparent' }]} 
           onPress={() => {
@@ -357,7 +396,7 @@ export default function BrowseQuestionsScreen() {
           }}
         >
           <Text style={[styles.headerBtnText, { color: colors.error }]}>
-            {isFolderDeleteMode ? '✓ 削除キャンセル' : '🗑 問題集削除'}
+            🗑️ {isFolderDeleteMode ? 'キャンセル' : '削除'}
           </Text>
         </TouchableOpacity>
         
@@ -842,7 +881,7 @@ export default function BrowseQuestionsScreen() {
                       <View style={styles.folderQuestionActions}>
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.primary }]}
-                          onPress={() => Alert.alert('回答', getAnswerText(question))}
+                          onPress={() => showAnswerForQuestion(question.id)}
                         >
                           <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{t.showAnswer}</Text>
                         </TouchableOpacity>
