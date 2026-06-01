@@ -37,6 +37,7 @@ export default function BrowseQuestionsScreen() {
 
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
+  const [showFolderAnswerId, setShowFolderAnswerId] = useState<number | null>(null);
 
   // アコーディオン用 state
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
@@ -51,6 +52,7 @@ export default function BrowseQuestionsScreen() {
   const [showBatchTagModal, setShowBatchTagModal] = useState(false);
   const [batchTagInput, setBatchTagInput] = useState('');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isCompactMode, setIsCompactMode] = useState(false);
 
   // 問題集閲覧関連 state
   const [showFoldersView, setShowFoldersView] = useState(false);
@@ -84,7 +86,6 @@ export default function BrowseQuestionsScreen() {
         const allQuestions: Question[] = JSON.parse(data);
         const filteredQuestions = allQuestions.filter((q: any) => {
           if (!q.answerType) {
-            console.log('Skipping old format question:', q);
             return false;
           }
           return true;
@@ -259,7 +260,6 @@ export default function BrowseQuestionsScreen() {
       setQuestions(updatedList);
       setPendingDeleteId(null);
       await AsyncStorage.setItem('quiz_questions', JSON.stringify(updatedList));
-      console.log(`Deleted ID: ${id}. Remaining: ${updatedList.length}`);
     } catch (e) {
       console.error("削除エラー:", e);
       loadQuestions();
@@ -367,11 +367,20 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
-        {locale === 'en'
-          ? `${t.manageQuestions} (All ${questions.length} ${t.questionsCountLabel})`
-          : `${t.manageQuestions}（全 ${questions.length}${t.questionsCountLabel}）`}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={[styles.title, { color: colors.text }]}>{t.manageQuestions}</Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.countBadgeText}>{getFilteredQuestions().length}</Text>
+        </View>
+        {selectedFilterTag && (
+          <TouchableOpacity 
+            style={[styles.filterActiveBadge, { backgroundColor: colors.primary + '20' }]}
+            onPress={() => setSelectedFilterTag(null)}
+          >
+            <Text style={[styles.filterActiveBadgeText, { color: colors.primary }]}>🏷️ {selectedFilterTag} ✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* ヘッダーボタン - スクロール可能に */}
       <ScrollView 
@@ -387,25 +396,6 @@ export default function BrowseQuestionsScreen() {
           <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
         </TouchableOpacity>
         
-        {/* 問題集削除ボタン（📚問題集の右に表示） */}
-        <TouchableOpacity 
-          style={[styles.headerBtn, { borderColor: colors.error, backgroundColor: isFolderDeleteMode ? colors.error + '20' : 'transparent' }]} 
-          onPress={() => {
-            setIsFolderDeleteMode(!isFolderDeleteMode);
-            if (isFolderDeleteMode) setSelectedFolderIds([]);
-          }}
-        >
-          <Text style={[styles.headerBtnText, { color: colors.error }]}>
-            🗑️ {isFolderDeleteMode ? 'キャンセル' : '削除'}
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.headerBtn, { borderColor: colors.primary }]} 
-          onPress={() => setShowFolderModal(true)}
-        >
-          <Text style={[styles.headerBtnText, { color: colors.primary }]}>📁 {t.folderCreate}</Text>
-        </TouchableOpacity>
         
         <TouchableOpacity 
           style={[styles.headerBtn, { borderColor: colors.primary }]} 
@@ -429,6 +419,18 @@ export default function BrowseQuestionsScreen() {
             </Text>
           </TouchableOpacity>
         )}
+        
+        <TouchableOpacity 
+          style={[styles.headerBtn, { 
+            borderColor: colors.primary,
+            backgroundColor: isCompactMode ? colors.primary + '20' : 'transparent'
+          }]} 
+          onPress={() => setIsCompactMode(!isCompactMode)}
+        >
+          <Text style={[styles.headerBtnText, { color: colors.primary }]}>
+            {isCompactMode ? '📋 詳細' : '📄 コンパクト'}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* 一括タグ編集バー（選択モード時） */}
@@ -446,7 +448,7 @@ export default function BrowseQuestionsScreen() {
       <ScrollView>
         {[...getFilteredQuestions()].reverse().map((item) => (
           /* 問題カード - アコーディオン形式 */
-          <View key={item.id} style={[styles.card, { backgroundColor: colors.card }]}>
+          <View key={item.id} style={[styles.card, { backgroundColor: colors.card }, isCompactMode && styles.cardCompact]}>
             {/* 選択モード時のチェックボックス */}
             {isSelectionMode && (
               <TouchableOpacity 
@@ -466,24 +468,38 @@ export default function BrowseQuestionsScreen() {
             )}
             {/* ヘッダー部分（常に表示） */}
             <TouchableOpacity 
-              style={styles.cardHeader}
-              onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}
+              style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}
+              onPress={() => {
+                if (!isCompactMode) {
+                  setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id);
+                }
+              }}
             >
               <View style={styles.cardHeaderLeft}>
                 <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
                   {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
                 </Text>
-                <Text style={[styles.questionPreview, { color: colors.text }]} numberOfLines={1}>
+                <Text 
+                  style={[
+                    styles.questionPreview, 
+                    { color: colors.text },
+                    isCompactMode && styles.questionPreviewCompact
+                  ]} 
+                  numberOfLines={isCompactMode ? 1 : 2}
+                >
                   {item.question}
                 </Text>
               </View>
-              <Text style={[styles.expandIcon, { color: colors.primary }]}>
-                {expandedQuestionId === item.id ? '▲' : '▼'}
-              </Text>
+              {/* コンパクトモード時は展開アイコンを非表示 */}
+              {!isCompactMode && (
+                <Text style={[styles.expandIcon, { color: colors.primary }]}>
+                  {expandedQuestionId === item.id ? '▲' : '▼'}
+                </Text>
+              )}
             </TouchableOpacity>
 
-            {/* 展開時のみ表示（詳細） */}
-            {expandedQuestionId === item.id && (
+            {/* 展開時のみ表示（コンパクトモードでは非表示） */}
+            {!isCompactMode && expandedQuestionId === item.id && (
               <View style={styles.expandedContent}>
                 <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
                 
@@ -654,15 +670,48 @@ export default function BrowseQuestionsScreen() {
             <View style={styles.foldersModalHeader}>
               <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders}</Text>
               <View style={styles.foldersModalActions}>
+                {/* 問題集作成ボタン */}
+                <TouchableOpacity
+                  style={[styles.folderHeaderActionBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowFolderModal(true)}
+                >
+                  <Text style={styles.folderHeaderActionBtnText}>＋ 作成</Text>
+                </TouchableOpacity>
+
+                {/* 削除モード切り替えボタン */}
+                <TouchableOpacity
+                  style={[styles.folderHeaderActionBtn, { 
+                    backgroundColor: isFolderDeleteMode ? colors.error : colors.error + '20',
+                    borderWidth: 1,
+                    borderColor: colors.error,
+                  }]}
+                  onPress={() => {
+                    setIsFolderDeleteMode(!isFolderDeleteMode);
+                    if (isFolderDeleteMode) setSelectedFolderIds([]);
+                  }}
+                >
+                  <Text style={[styles.folderHeaderActionBtnText, { color: isFolderDeleteMode ? '#fff' : colors.error }]}>
+                    {isFolderDeleteMode ? `削除(${selectedFolderIds.length})` : '🗑️ 削除'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 削除実行ボタン（削除モードで1件以上選択時のみ） */}
                 {isFolderDeleteMode && selectedFolderIds.length > 0 && (
-                  <TouchableOpacity 
-                    style={[styles.confirmDeleteBtn, { backgroundColor: colors.error }]}
+                  <TouchableOpacity
+                    style={[styles.folderHeaderActionBtn, { backgroundColor: colors.error }]}
                     onPress={deleteSelectedFolders}
                   >
-                    <Text style={styles.confirmDeleteBtnText}>削除({selectedFolderIds.length})</Text>
+                    <Text style={styles.folderHeaderActionBtnText}>実行</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}>
+
+                {/* 閉じるボタン */}
+                <TouchableOpacity onPress={() => { 
+                  setShowFoldersView(false); 
+                  setSelectedFolder(null); 
+                  setIsFolderDeleteMode(false); 
+                  setSelectedFolderIds([]); 
+                }}>
                   <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -676,7 +725,7 @@ export default function BrowseQuestionsScreen() {
                   const folderQuestionCount = folder.questionIds.length;
                   const isSelected = selectedFolderIds.includes(folder.id);
                   return (
-                    <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }]}>
+                    <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }, isSelected && { backgroundColor: colors.error + '10' }]}>
                       {/* 削除モード時はチェックボックスを表示 */}
                       {isFolderDeleteMode && (
                         <TouchableOpacity 
@@ -822,7 +871,7 @@ export default function BrowseQuestionsScreen() {
           <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
             <View style={styles.folderDetailHeader}>
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
-              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
+              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}>
                 <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -881,9 +930,11 @@ export default function BrowseQuestionsScreen() {
                       <View style={styles.folderQuestionActions}>
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.primary }]}
-                          onPress={() => showAnswerForQuestion(question.id)}
+                          onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}
                         >
-                          <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{t.showAnswer}</Text>
+                          <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>
+                            {showFolderAnswerId === question.id ? '隠す' : t.showAnswer}
+                          </Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.error }]}
@@ -903,6 +954,12 @@ export default function BrowseQuestionsScreen() {
                           <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
                         </TouchableOpacity>
                       </View>
+                      {showFolderAnswerId === question.id && (
+                        <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                          <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
+                          <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(question)}</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 ))
@@ -1250,5 +1307,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  folderHeaderActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  folderHeaderActionBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16, paddingTop: 16 },
+  countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
+  countBadgeText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
+  cardCompact: {
+    marginVertical: 2,
+    borderRadius: 8,
+  },
+  cardHeaderCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  questionPreviewCompact: {
+    fontSize: 13,
   },
 });
