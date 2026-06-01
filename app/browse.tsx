@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Platform, TextInput, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { translations } from './translations';
@@ -24,6 +24,7 @@ interface Question {
 
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -67,6 +68,7 @@ export default function BrowseQuestionsScreen() {
   // 問題集削除モード用 state
   const [isFolderDeleteMode, setIsFolderDeleteMode] = useState(false);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
   // 問題追加用モーダルの state
   const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
@@ -74,10 +76,19 @@ export default function BrowseQuestionsScreen() {
   const [availableQuestionsForAdd, setAvailableQuestionsForAdd] = useState<Question[]>([]);
   const [selectedQuestionIdsForAdd, setSelectedQuestionIdsForAdd] = useState<number[]>([]);
 
+  // 問題編集用 state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingQuestionFull, setEditingQuestionFull] = useState<Question | null>(null);
+  const [editQuestionText, setEditQuestionText] = useState('');
+  const [editAnswerText, setEditAnswerText] = useState('');
+  const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
+  const [editMultipleOptions, setEditMultipleOptions] = useState<string[]>(['', '', '', '']);
+  const [editMultipleCorrect, setEditMultipleCorrect] = useState(0);
+
   useEffect(() => {
     loadQuestions();
     loadFolders();
-  }, []);
+  }, [location.key]);
 
   const loadQuestions = async () => {
     try {
@@ -117,35 +128,17 @@ export default function BrowseQuestionsScreen() {
   };
 
   // 選択した問題集を一括削除（AsyncStorageから直接読み込み）
-  const deleteSelectedFolders = async () => {
-    if (selectedFolderIds.length === 0) return;
-
-    Alert.alert(
-      '確認',
-      `選択した${selectedFolderIds.length}個の問題集を削除しますか？`,
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const savedFolders = await AsyncStorage.getItem('question_folders');
-              const currentFolders = savedFolders ? JSON.parse(savedFolders) : [];
-              const updatedFolders = currentFolders.filter((f: any) => !selectedFolderIds.includes(f.id));
-              await AsyncStorage.setItem('question_folders', JSON.stringify(updatedFolders));
-              setFolders(updatedFolders);
-              setSelectedFolderIds([]);
-              setIsFolderDeleteMode(false);
-              Alert.alert('完了', `${selectedFolderIds.length}個の問題集を削除しました`);
-            } catch (error) {
-              console.error('一括削除エラー:', error);
-              Alert.alert('エラー', '削除に失敗しました');
-            }
-          }
-        }
-      ]
-    );
+  const executeDeleteSelectedFolders = async () => {
+    try {
+      const updatedFolders = folders.filter(f => !selectedFolderIds.includes(f.id));
+      await AsyncStorage.setItem('question_folders', JSON.stringify(updatedFolders));
+      setFolders(updatedFolders);
+      setSelectedFolderIds([]);
+      setIsFolderDeleteMode(false);
+      setShowDeleteConfirmModal(false);
+    } catch (error) {
+      console.error('削除エラー:', error);
+    }
   };
 
   // 問題集削除（AsyncStorageから直接読み込み）
@@ -315,6 +308,39 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
+  // 問題編集を開始
+  const startEditQuestion = (question: Question) => {
+    setEditingQuestionFull(question);
+    setEditQuestionText(question.question);
+    setEditAnswerText(question.descriptiveAnswer || '');
+    setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
+    setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
+    setEditMultipleCorrect(question.multipleChoice?.correctAnswer ?? 0);
+    setShowEditModal(true);
+  };
+
+  // 問題編集を保存
+  const saveEditedQuestion = async () => {
+    if (!editingQuestionFull || !editQuestionText.trim()) return;
+
+    const updated: Question = {
+      ...editingQuestionFull,
+      question: editQuestionText.trim(),
+      descriptiveAnswer: editingQuestionFull.answerType === 'descriptive' ? editAnswerText.trim() : editingQuestionFull.descriptiveAnswer,
+      trueFalseAnswer: editingQuestionFull.answerType === 'truefalse' ? editTrueFalseAnswer : editingQuestionFull.trueFalseAnswer,
+      multipleChoice: editingQuestionFull.answerType === 'multiple'
+        ? { options: editMultipleOptions, correctAnswer: editMultipleCorrect }
+        : editingQuestionFull.multipleChoice,
+    };
+
+    const updatedQuestions = questions.map(q => q.id === updated.id ? updated : q);
+    await AsyncStorage.setItem('quiz_questions', JSON.stringify(updatedQuestions));
+    setQuestions(updatedQuestions);
+    setShowEditModal(false);
+    setEditingQuestionFull(null);
+    SoundManager.play('complete');
+  };
+
   // 回答表示関数（AsyncStorageから最新データを直接取得）
   const showAnswerForQuestion = async (questionId: number) => {
     try {
@@ -380,6 +406,25 @@ export default function BrowseQuestionsScreen() {
             <Text style={[styles.filterActiveBadgeText, { color: colors.primary }]}>🏷️ {selectedFilterTag} ✕</Text>
           </TouchableOpacity>
         )}
+        {/* コンパクト切り替えをタイトル行右端に配置 */}
+        <TouchableOpacity
+          style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
+          onPress={() => {
+            setIsCompactMode(!isCompactMode);
+            if (isCompactMode) setExpandedQuestionId(null);
+          }}
+        >
+          <Text style={[styles.compactToggleBtnText, { color: isCompactMode ? '#fff' : colors.primary }]}>
+            {isCompactMode ? '≡' : '☰'}
+          </Text>
+        </TouchableOpacity>
+        {/* 右上の戻るボタン */}
+        <TouchableOpacity
+          style={[styles.topBackBtn, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={styles.topBackBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       {/* ヘッダーボタン - スクロール可能に */}
@@ -419,18 +464,6 @@ export default function BrowseQuestionsScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity 
-          style={[styles.headerBtn, { 
-            borderColor: colors.primary,
-            backgroundColor: isCompactMode ? colors.primary + '20' : 'transparent'
-          }]} 
-          onPress={() => setIsCompactMode(!isCompactMode)}
-        >
-          <Text style={[styles.headerBtnText, { color: colors.primary }]}>
-            {isCompactMode ? '📋 詳細' : '📄 コンパクト'}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* 一括タグ編集バー（選択モード時） */}
@@ -476,9 +509,11 @@ export default function BrowseQuestionsScreen() {
               }}
             >
               <View style={styles.cardHeaderLeft}>
-                <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
-                  {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
-                </Text>
+                {!isCompactMode && (
+                  <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
+                    {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
+                  </Text>
+                )}
                 <Text 
                   style={[
                     styles.questionPreview, 
@@ -516,6 +551,9 @@ export default function BrowseQuestionsScreen() {
                 
                 {/* アクションボタン */}
                 <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => startEditQuestion(item)}>
+                    <Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => {
                     setShowAnswerId(showAnswerId === item.id ? null : item.id);
                   }}>
@@ -546,12 +584,6 @@ export default function BrowseQuestionsScreen() {
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>
         )}
       </ScrollView>
-      <TouchableOpacity 
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
-      </TouchableOpacity>
 
       {/* 削除確認 */}
       {pendingDeleteId !== null && (
@@ -567,6 +599,111 @@ export default function BrowseQuestionsScreen() {
           </View>
         </View>
       )}
+
+      {/* 問題文・回答 編集モーダル */}
+      <Modal visible={showEditModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={[styles.modalContainer, { backgroundColor: colors.card, width: '90%', maxWidth: 440 }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
+
+              {/* 問題文 */}
+              <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
+              <TextInput
+                style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]}
+                value={editQuestionText}
+                onChangeText={setEditQuestionText}
+                placeholder="問題文を入力"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+              />
+
+              {/* 回答（記述式） */}
+              {editingQuestionFull?.answerType === 'descriptive' && (
+                <>
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
+                  <TextInput
+                    style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+                    value={editAnswerText}
+                    onChangeText={setEditAnswerText}
+                    placeholder="回答を入力"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </>
+              )}
+
+              {/* 回答（○×） */}
+              {editingQuestionFull?.answerType === 'truefalse' && (
+                <>
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>回答</Text>
+                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                    <TouchableOpacity
+                      style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editTrueFalseAnswer ? colors.success : 'transparent', borderColor: colors.success }]}
+                      onPress={() => setEditTrueFalseAnswer(true)}
+                    >
+                      <Text style={[styles.modalCancelText, { color: editTrueFalseAnswer ? '#fff' : colors.success, fontSize: 20 }]}>○</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalCancelBtn, { flex: 1, backgroundColor: !editTrueFalseAnswer ? colors.error : 'transparent', borderColor: colors.error }]}
+                      onPress={() => setEditTrueFalseAnswer(false)}
+                    >
+                      <Text style={[styles.modalCancelText, { color: !editTrueFalseAnswer ? '#fff' : colors.error, fontSize: 20 }]}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {/* 回答（四択） */}
+              {editingQuestionFull?.answerType === 'multiple' && (
+                <>
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
+                  {editMultipleOptions.map((opt, i) => (
+                    <TextInput
+                      key={i}
+                      style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]}
+                      value={opt}
+                      onChangeText={text => {
+                        const newOpts = [...editMultipleOptions];
+                        newOpts[i] = text;
+                        setEditMultipleOptions(newOpts);
+                      }}
+                      placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? ' ✓ 正解' : ''}`}
+                      placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary}
+                    />
+                  ))}
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>正解番号</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                    {[0, 1, 2, 3].map(i => (
+                      <TouchableOpacity
+                        key={i}
+                        style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editMultipleCorrect === i ? colors.success : 'transparent', borderColor: colors.success }]}
+                        onPress={() => setEditMultipleCorrect(i)}
+                      >
+                        <Text style={[styles.modalCancelText, { color: editMultipleCorrect === i ? '#fff' : colors.success }]}>{i + 1}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                  onPress={() => { setShowEditModal(false); setEditingQuestionFull(null); }}
+                >
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                  onPress={saveEditedQuestion}
+                >
+                  <Text style={styles.modalSaveText}>保存</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* タグ編集モーダル */}
       <Modal visible={showTagModal} transparent animationType="fade">
@@ -638,6 +775,31 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{t.batchAddTags}</Text>
+            
+            {/* 選択中の問題の既存タグを表示 */}
+            {(() => {
+              const existingTags = new Set<string>();
+              questions
+                .filter(q => selectedQuestionIds.includes(q.id))
+                .forEach(q => (q.tags || []).forEach(tag => existingTags.add(tag)));
+              const tagArray = Array.from(existingTags);
+              if (tagArray.length === 0) return null;
+              return (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }]}>
+                    選択中の問題の既存タグ:
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {tagArray.map(tag => (
+                      <View key={tag} style={[styles.miniTag, { backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 6 }]}>
+                        <Text style={[styles.miniTagText, { color: colors.primary, fontSize: 13, fontWeight: 'bold' }]}>🏷️ {tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              );
+            })()}
+
             <TextInput
               style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
               value={batchTagInput}
@@ -673,7 +835,7 @@ export default function BrowseQuestionsScreen() {
                 {/* 問題集作成ボタン */}
                 <TouchableOpacity
                   style={[styles.folderHeaderActionBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setShowFolderModal(true)}
+                  onPress={() => { setNewFolderName(''); setShowFolderModal(true); }}
                 >
                   <Text style={styles.folderHeaderActionBtnText}>＋ 作成</Text>
                 </TouchableOpacity>
@@ -699,7 +861,7 @@ export default function BrowseQuestionsScreen() {
                 {isFolderDeleteMode && selectedFolderIds.length > 0 && (
                   <TouchableOpacity
                     style={[styles.folderHeaderActionBtn, { backgroundColor: colors.error }]}
-                    onPress={deleteSelectedFolders}
+                    onPress={() => setShowDeleteConfirmModal(true)}
                   >
                     <Text style={styles.folderHeaderActionBtnText}>実行</Text>
                   </TouchableOpacity>
@@ -769,6 +931,34 @@ export default function BrowseQuestionsScreen() {
                 })
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 問題集削除確認モーダル */}
+      <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              🗑️ {selectedFolderIds.length}個の問題集を削除しますか？
+            </Text>
+            <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 13 }]}>
+              この操作は取り消せません
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowDeleteConfirmModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.error }]}
+                onPress={executeDeleteSelectedFolders}
+              >
+                <Text style={styles.modalSaveText}>削除する</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -889,17 +1079,23 @@ export default function BrowseQuestionsScreen() {
                     key={question.id} 
                     style={[styles.addableQuestionItem, { borderBottomColor: colors.border }]}
                     onPress={async () => {
-                      const updatedFolders = folders.map(f => {
-                        if (f.id === selectedFolder?.id) {
-                          return { ...f, questionIds: [...f.questionIds, question.id] };
-                        }
-                        return f;
-                      });
+                      if (!selectedFolder) return;
+
+                      // 重複を防いで新しい questionIds を作る
+                      const newQuestionIds = [...new Set([...selectedFolder.questionIds, question.id])];
+
+                      // folders state と AsyncStorage を更新
+                      const updatedFolders = folders.map(f =>
+                        f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f
+                      );
                       await saveFolders(updatedFolders);
-                      setFolders(updatedFolders);
-                      const updatedQuestions = questions.filter(q => updatedFolders.find(f => f.id === selectedFolder?.id)?.questionIds.includes(q.id));
-                      setFolderQuestions(updatedQuestions);
-                      Alert.alert('完了', '問題を追加しました');
+
+                      // selectedFolder も同期して更新
+                      const updatedFolder = { ...selectedFolder, questionIds: newQuestionIds };
+                      setSelectedFolder(updatedFolder);
+
+                      // folderQuestions も同期
+                      setFolderQuestions(questions.filter(q => newQuestionIds.includes(q.id)));
                     }}
                   >
                     <Text style={[styles.addableQuestionText, { color: colors.text }]} numberOfLines={2}>
@@ -939,16 +1135,17 @@ export default function BrowseQuestionsScreen() {
                         <TouchableOpacity 
                           style={[styles.folderActionBtn, { borderColor: colors.error }]}
                           onPress={async () => {
-                            const updatedFolders = folders.map(f => {
-                              if (f.id === selectedFolder?.id) {
-                                return { ...f, questionIds: f.questionIds.filter(id => id !== question.id) };
-                              }
-                              return f;
-                            });
+                            if (!selectedFolder) return;
+
+                            const newQuestionIds = selectedFolder.questionIds.filter(id => id !== question.id);
+                            const updatedFolders = folders.map(f =>
+                              f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f
+                            );
                             await saveFolders(updatedFolders);
-                            setFolders(updatedFolders);
+
+                            // selectedFolder を同期（除外後にも追加可能欄を正しく更新するため）
+                            setSelectedFolder({ ...selectedFolder, questionIds: newQuestionIds });
                             setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
-                            Alert.alert('完了', '問題集から除外しました');
                           }}
                         >
                           <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
@@ -974,7 +1171,7 @@ export default function BrowseQuestionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#F5F7FA', paddingTop: 60 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+  title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
   cardHeader: {
     flexDirection: 'row',
@@ -1326,14 +1523,41 @@ const styles = StyleSheet.create({
   filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
   cardCompact: {
-    marginVertical: 2,
-    borderRadius: 8,
+    marginVertical: 1,
+    borderRadius: 6,
+    padding: 0,
   },
   cardHeaderCompact: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
   },
   questionPreviewCompact: {
-    fontSize: 13,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  compactToggleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  compactToggleBtnText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  topBackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  topBackBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

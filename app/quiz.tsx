@@ -108,6 +108,11 @@ export default function QuizScreen() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // プレ設定用 state
+  const [showPreSettings, setShowPreSettings] = useState(true);
+  const [preQuestionCount, setPreQuestionCount] = useState<number>(10);
+  const [isReverseMode, setIsReverseMode] = useState(false);
+
   // タイマー
   const [timerLimit, setTimerLimit] = useState(180); // 秒
   const [timeLeft, setTimeLeft] = useState(180);
@@ -177,6 +182,9 @@ export default function QuizScreen() {
         const sortedTags = Array.from(tagSet).sort();
         setAllTags(sortedTags);
         setSelectedTags(sortedTags); // デフォルトですべて選択
+
+        // デフォルト問題数
+        setPreQuestionCount(Math.min(enabled.length, 50));
       } else {
         // Initial sample questions
         const samples: Question[] = [
@@ -221,6 +229,7 @@ export default function QuizScreen() {
         const sortedTags = Array.from(tagSet).sort();
         setAllTags(sortedTags);
         setSelectedTags(sortedTags);
+        setPreQuestionCount(Math.min(samples.length, 50));
       }
     } catch (e) {
       console.error(e);
@@ -285,6 +294,16 @@ export default function QuizScreen() {
     }
   };
 
+  // 回答テキストを取得（リバースモード用）
+  const getAnswerDisplayText = (q: Question): string => {
+    switch (q.answerType) {
+      case 'truefalse': return q.trueFalseAnswer ? '○ (正しい)' : '× (誤り)';
+      case 'multiple': return q.multipleChoice?.options[q.multipleChoice.correctAnswer] || '';
+      case 'descriptive': return q.descriptiveAnswer || '';
+      default: return q.question;
+    }
+  };
+
   // ──────────────────────────────────────────────
   // カウントダウンタイマー
   // ──────────────────────────────────────────────
@@ -313,10 +332,11 @@ export default function QuizScreen() {
   };
 
   // ──────────────────────────────────────────────
-  // クイズ開始
+  // クイズ開始（タグフィルター＋問題数制限＋リバース反映）
   // ──────────────────────────────────────────────
   const startQuiz = () => {
-    const filtered = getFilteredQuestions();
+    let filtered = getFilteredQuestions();
+
     if (filtered.length === 0) {
       SoundManager.play('select');
       Alert.alert(t.error, locale === 'ja' ? '選択したタグに問題がありません。' : 'No questions with selected tags.', [
@@ -325,7 +345,10 @@ export default function QuizScreen() {
       return;
     }
     SoundManager.play('decide');
-    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+
+    // 問題数制限
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, preQuestionCount);
+
     setShuffledQuestions(shuffled);
     setCurrentIndex(0);
     setScore(0);
@@ -334,6 +357,7 @@ export default function QuizScreen() {
     setShowFeedback(false);
     setAnswered(false);
     setTimeLeft(timerLimit);
+    setShowPreSettings(false);
     setQuizStarted(true);
     setIsTimerActive(true);
     setShowReview(false);
@@ -377,9 +401,13 @@ export default function QuizScreen() {
         break;
       case 'descriptive':
         const userAnswerTrimmed = (answer as string).trim().toLowerCase();
-        const correctAnswerTrimmed = currentQuestion.descriptiveAnswer?.trim().toLowerCase() || '';
+        const correctAnswerTrimmed = isReverseMode
+          ? currentQuestion.question.trim().toLowerCase()
+          : (currentQuestion.descriptiveAnswer || '').trim().toLowerCase();
         correct = userAnswerTrimmed === correctAnswerTrimmed;
-        actualCorrectAnswer = currentQuestion.descriptiveAnswer || '';
+        actualCorrectAnswer = isReverseMode
+          ? currentQuestion.question
+          : (currentQuestion.descriptiveAnswer || '');
         if (!correct) {
           setFeedbackMessage(actualCorrectAnswer);
           setShowFeedback(true);
@@ -531,80 +559,129 @@ export default function QuizScreen() {
     }
   }, [currentIndex]);
 
-  if (!quizStarted) {
-    const minutes = Math.floor(timerLimit / 60);
+  // プレ設定画面
+  if (showPreSettings) {
     const filtered = getFilteredQuestions();
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.infoSubtitle, { color: colors.textSecondary }]}>{t.availableQuestions}: {filtered.length}</Text>
-        <Text style={[styles.infoSubtitle, { color: colors.textSecondary }]}>{t.timeLimit}: {minutes}{t.minutes}</Text>
-        <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.questionCount}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{filtered.length} {locale === 'ja' ? '問' : ''}</Text></View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.timeLimit}</Text><Text style={[styles.infoValue, { color: colors.text }]}>{minutes} {t.minutes}</Text></View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.infoRow}><Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t.randomOrder}</Text><Text style={[styles.infoValue, { color: colors.text }]}>ON</Text></View>
-        </View>
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 60, paddingBottom: 40 }}>
+          <Text style={[{ fontSize: 24, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: 32 }]}>
+            📝 クイズ設定
+          </Text>
 
-        {/* タグフィルターセクション */}
-        {allTags.length > 0 && (
-          <View style={[styles.tagFilterSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.tagFilterTitle, { color: colors.text }]}>{t.filterByTags}</Text>
-            <View style={styles.tagFilterRow}>
+          {/* 問題数ステッパー */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
+              問題数
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
               <TouchableOpacity
-                style={[
-                  styles.tagFilterChip,
-                  { borderColor: colors.primary },
-                  selectedTags.length === allTags.length && { backgroundColor: colors.primary }
-                ]}
-                onPress={toggleSelectAll}
+                style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
+                onPress={() => setPreQuestionCount(prev => Math.max(1, prev - 1))}
               >
-                <Text style={[
-                  styles.tagFilterChipText,
-                  { color: colors.primary },
-                  selectedTags.length === allTags.length && { color: '#fff' }
-                ]}>{t.selectAllTag} ({allTags.length})</Text>
+                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
+              </TouchableOpacity>
+              <Text style={[{ fontSize: 36, fontWeight: 'bold', color: colors.text, minWidth: 60, textAlign: 'center' }]}>
+                {preQuestionCount}
+              </Text>
+              <TouchableOpacity
+                style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
+                onPress={() => {
+                  const maxCount = filtered.length;
+                  setPreQuestionCount(prev => Math.min(maxCount, prev + 1));
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.tagFilterList}>
-              {allTags.map(tag => {
-                const isSelected = selectedTags.includes(tag);
-                const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
-                return (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tagFilterChip,
-                      { borderColor: colors.primary },
-                      isSelected && { backgroundColor: colors.primary }
-                    ]}
-                    onPress={() => toggleTag(tag)}
-                  >
-                    <Text style={[
-                      styles.tagFilterChipText,
-                      { color: colors.primary },
-                      isSelected && { color: '#fff' }
-                    ]}>{tag}: {count}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Text style={[{ textAlign: 'center', color: colors.textSecondary, fontSize: 13, marginTop: 8 }]}>
+              全 {filtered.length} 問中
+            </Text>
+          </View>
+
+          {/* リバースモードトグル */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  🔄 リバースモード
+                </Text>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                  回答を問題文として表示し、問題文を答えます
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[{
+                  width: 56, height: 30, borderRadius: 15,
+                  backgroundColor: isReverseMode ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 2,
+                }]}
+                onPress={() => setIsReverseMode(!isReverseMode)}
+              >
+                <View style={[{
+                  width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff',
+                  alignSelf: isReverseMode ? 'flex-end' : 'flex-start',
+                }]} />
+              </TouchableOpacity>
             </View>
           </View>
-        )}
 
-        <TouchableOpacity style={[styles.startButton, { backgroundColor: colors.primary }]} onPress={startQuiz}>
-          <Text style={[styles.startButtonText, { color: onPrimary }]}>{t.startQuizButton}</Text>
-        </TouchableOpacity>
-        {/* 戻るボタン：フルワイド固定 */}
-        <TouchableOpacity
-          style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            SoundManager.play('decide');
-            navigate('/');
-          }}
-        >
-          <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.back}</Text>
-        </TouchableOpacity>
+          {/* タグ絞り込み */}
+          {allTags.length > 0 && (
+            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 24 }]}>
+              <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
+                🏷️ タグで絞り込み
+              </Text>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }]}>
+                選択なし = すべての問題
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {allTags.map(tag => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[{
+                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                        backgroundColor: isSelected ? colors.primary : colors.primary + '15',
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                      }]}
+                      onPress={() => {
+                        SoundManager.play('select');
+                        setSelectedTags(prev =>
+                          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                        );
+                      }}
+                    >
+                      <Text style={[{ color: isSelected ? '#fff' : colors.primary, fontWeight: '600', fontSize: 14 }]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* スタートボタン */}
+          <TouchableOpacity
+            style={[{ backgroundColor: colors.primary, padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 }]}
+            onPress={startQuiz}
+          >
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>
+              ▶ スタート
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ alignItems: 'center', padding: 12 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>戻る</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
@@ -700,7 +777,12 @@ export default function QuizScreen() {
       >
         <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
           {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
-          <Text style={[styles.questionText, { color: colors.text }]}>{currentQuestion.question}</Text>
+          <Text style={[styles.questionText, { color: colors.text }]}>
+            {isReverseMode
+              ? getAnswerDisplayText(currentQuestion)
+              : currentQuestion.question
+            }
+          </Text>
         </View>
 
         {/* 正解時の表示（小さく簡潔に） */}
