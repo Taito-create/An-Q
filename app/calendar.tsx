@@ -270,8 +270,7 @@ const hasEvent = events.some((e) => e.date === dateStr);
 
   const getEventDisplayText = (event: ScheduledEvent) => {
     if (event.subjects && event.subjects.length > 0) {
-      const subjectsText = event.subjects.map(s => `${s.date}:${s.subject}`).join(', ');
-      return `${event.name}: ${subjectsText}`;
+      return event.name;
     }
     if (event.endDate) {
       return `${event.name} (${event.date} 〜 ${event.endDate})`;
@@ -483,10 +482,31 @@ const hasEvent = events.some((e) => e.date === dateStr);
                   setShowForm(true);
                 }}
               >
-                <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
-                  {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
+                {/* イベント名 */}
+                <Text style={[styles.eventName, { color: colors.text, fontWeight: 'bold', marginBottom: 4 }]}>
+                  {event.name}
                 </Text>
-                <Text style={[styles.eventName, { color: colors.text }]}>{getEventDisplayText(event)}</Text>
+                
+                {/* 教科ごとの日付がある場合：日付ごとに改行して表示 */}
+                {event.subjects && event.subjects.length > 0 ? (
+                  <View style={{ marginTop: 4, gap: 3 }}>
+                    {event.subjects.map((s, i) => (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[{ fontSize: 11, color: colors.textSecondary, minWidth: 85 }]}>
+                          {s.date}
+                        </Text>
+                        <Text style={[{ fontSize: 13, color: colors.text }]}>
+                          {s.subject}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  /* 通常のイベント：日付のみ表示 */
+                  <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+                    {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
+                  </Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.deleteIcon, { backgroundColor: colors.error }]}

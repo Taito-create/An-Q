@@ -344,7 +344,7 @@ const HomeScreen = () => {
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <View style={[styles.header, Platform.OS !== 'web' && styles.headerMobile]}>
+      <View style={styles.header}>
         <View style={styles.headerContent}>
           {examCountdown && (
             <View style={[styles.examCountdownBox, {
@@ -383,7 +383,7 @@ const HomeScreen = () => {
         </View>
 
         {/* Top Buttons */}
-        <View style={[styles.topButtons, Platform.OS !== 'web' && styles.topButtonsMobile]}>
+        <View style={[styles.topButtons, !isMobile && { marginLeft: 'auto', alignSelf: 'flex-start' }]}>
           {navMode === 'compact' && !reorderMode && (
             <>
               {buttonOrder.map(key => {
@@ -433,9 +433,17 @@ const HomeScreen = () => {
           <TooltipButton style={[styles.iconButton, { borderColor: reorderMode ? colors.warning : colors.primary }]} onPress={reorderMode ? cancelReorderMode : startReorderMode} label={t.reorderButtons}>
             <Text style={{ fontSize: 16, color: reorderMode ? colors.warning : colors.primary }}>⇄</Text>
           </TooltipButton>
-          <TooltipButton style={[styles.languageButton, { borderColor: colors.primary }]} onPress={toggleLanguage} label={t.language}>
-            <Globe size={16} color={colors.primary} />
-            <Text style={[styles.languageText, { color: colors.primary }]}>{currentLocale === 'ja' ? 'JP' : 'EN'}</Text>
+          <TooltipButton
+            style={[styles.iconButton, { borderColor: colors.primary }]}
+            onPress={toggleLanguage}
+            label={t.language}
+          >
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Globe size={12} color={colors.primary} />
+              <Text style={[styles.languageText, { color: colors.primary, fontSize: 9, marginTop: 1 }]}>
+                {currentLocale === 'ja' ? 'JP' : 'EN'}
+              </Text>
+            </View>
           </TooltipButton>
           <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
             <Settings size={16} color={colors.primary} />
@@ -629,14 +637,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  headerMobile: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
+    flexDirection: isMobile ? 'column' : 'row',
+    alignItems: isMobile ? 'stretch' : 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS !== 'web' ? 44 : 16,
+    paddingBottom: 8,
+    gap: isMobile ? 8 : 0,
   },
   titleContainer: {
     alignItems: 'center',
@@ -654,62 +660,49 @@ const styles = StyleSheet.create({
   },
   topButtons: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  topButtonsMobile: {
-    flexWrap: 'wrap',
-    marginTop: 12,
-    gap: 8,
+    flexWrap: isMobile ? 'nowrap' : 'wrap',
+    gap: 6,
+    alignItems: 'center',
   },
   timerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: isMobile ? 36 : 44,
+    height: isMobile ? 36 : 44,
+    borderRadius: isMobile ? 18 : 22,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   themeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: isMobile ? 36 : 44,
+    height: isMobile ? 36 : 44,
+    borderRadius: isMobile ? 18 : 22,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButton: {
-    width: isMobile ? 44 : 32,
-    height: isMobile ? 44 : 32,
-    borderRadius: isMobile ? 22 : 16,
+    width: isMobile ? 36 : 44,
+    height: isMobile ? 36 : 44,
+    borderRadius: isMobile ? 18 : 22,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  languageButton: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+  calendarButton: {
+    width: isMobile ? 36 : 44,
+    height: isMobile ? 36 : 44,
+    borderRadius: isMobile ? 18 : 22,
     backgroundColor: 'transparent',
-    flexDirection: 'row',
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
   },
   languageText: {
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  calendarButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerContent: {
     flex: 1,

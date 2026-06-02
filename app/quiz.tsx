@@ -108,10 +108,18 @@ export default function QuizScreen() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // 長押し用 ref
+  const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // プレ設定用 state
   const [showPreSettings, setShowPreSettings] = useState(true);
   const [preQuestionCount, setPreQuestionCount] = useState<number>(10);
   const [isReverseMode, setIsReverseMode] = useState(false);
+
+  // タイマー選択用 state
+  const [preTimerMinutes, setPreTimerMinutes] = useState<number | null>(null);
+  const [presetTimers, setPresetTimers] = useState<{ label: string; value: number | null }[]>([]);
 
   // タイマー
   const [timerLimit, setTimerLimit] = useState(180); // 秒
@@ -127,11 +135,56 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // 初期ロード
   // ──────────────────────────────────────────────
+  // 長押しハンドラ
+  const startLongPress = (direction: 'inc' | 'dec', maxCount: number) => {
+    stepTimeoutRef.current = setTimeout(() => {
+      stepIntervalRef.current = setInterval(() => {
+        setPreQuestionCount(prev => {
+          if (direction === 'inc') return Math.min(maxCount, prev + 1);
+          return Math.max(1, prev - 1);
+        });
+      }, 80);
+    }, 500);
+  };
+
+  const stopLongPress = () => {
+    if (stepTimeoutRef.current) clearTimeout(stepTimeoutRef.current);
+    if (stepIntervalRef.current) clearInterval(stepIntervalRef.current);
+  };
+
   useEffect(() => {
     loadQuestions();
     loadTimerSetting();
+    loadTimerPresets();
     SoundManager.initialize();
   }, []);
+
+  const loadTimerPresets = async () => {
+    try {
+      // デフォルトタイマー設定を読み込む
+      const timerVal = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      const defaultMinutes = timerVal ? parseInt(timerVal, 10) : 10;
+      setPreTimerMinutes(defaultMinutes);
+
+      // カスタムタイマーを読み込む
+      const customRaw = await AsyncStorage.getItem('CUSTOM_TIMERS');
+      const customTimers = customRaw ? JSON.parse(customRaw) : [];
+      const presets: { label: string; value: number | null }[] = [
+        { label: locale === 'ja' ? 'なし' : 'No limit', value: null },
+        { label: locale === 'ja' ? '小テスト用 (10分)' : 'Small Test (10min)', value: 10 },
+        { label: locale === 'ja' ? '試験用 (60分)' : 'Exam (60min)', value: 60 },
+        { label: locale === 'ja' ? '試験用 (90分)' : 'Exam (90min)', value: 90 },
+        { label: locale === 'ja' ? '試験用 (120分)' : 'Exam (120min)', value: 120 },
+        ...customTimers.map((ct: any) => ({
+          label: `${ct.name} (${ct.minutes}${locale === 'ja' ? '分' : 'min'})`,
+          value: ct.minutes,
+        })),
+      ];
+      setPresetTimers(presets);
+    } catch (e) {
+      console.error('Failed to load timer presets:', e);
+    }
+  };
 
   const loadQuestions = async () => {
     try {
@@ -334,7 +387,7 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // クイズ開始（タグフィルター＋問題数制限＋リバース反映）
   // ──────────────────────────────────────────────
-  const startQuiz = () => {
+  const startQuiz = async () => {
     let filtered = getFilteredQuestions();
 
     if (filtered.length === 0) {
@@ -345,6 +398,13 @@ export default function QuizScreen() {
       return;
     }
     SoundManager.play('decide');
+
+    // 選択タイマーを保存
+    if (preTimerMinutes !== null) {
+      await AsyncStorage.setItem('quiz_active_timer', preTimerMinutes.toString());
+    } else {
+      await AsyncStorage.removeItem('quiz_active_timer');
+    }
 
     // 問題数制限
     const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, preQuestionCount);
@@ -578,6 +638,9 @@ export default function QuizScreen() {
               <TouchableOpacity
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => setPreQuestionCount(prev => Math.max(1, prev - 1))}
+                onLongPress={() => startLongPress('dec', filtered.length)}
+                onPressOut={stopLongPress}
+                delayLongPress={500}
               >
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
               </TouchableOpacity>
@@ -590,6 +653,9 @@ export default function QuizScreen() {
                   const maxCount = filtered.length;
                   setPreQuestionCount(prev => Math.min(maxCount, prev + 1));
                 }}
+                onLongPress={() => startLongPress('inc', filtered.length)}
+                onPressOut={stopLongPress}
+                delayLongPress={500}
               >
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
               </TouchableOpacity>
@@ -627,6 +693,41 @@ export default function QuizScreen() {
             </View>
           </View>
 
+          {/* タイマー設定 */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
+              ⏱ {locale === 'ja' ? '制限時間' : 'Time Limit'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {presetTimers.map((preset, i) => {
+                  const isSelected = preTimerMinutes === preset.value;
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[{
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 20,
+                        borderWidth: 1.5,
+                        borderColor: colors.primary,
+                        backgroundColor: isSelected ? colors.primary : 'transparent',
+                      }]}
+                      onPress={() => {
+                        SoundManager.play('select');
+                        setPreTimerMinutes(preset.value);
+                      }}
+                    >
+                      <Text style={[{ color: isSelected ? '#fff' : colors.primary, fontWeight: '600', fontSize: 13 }]}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
           {/* タグ絞り込み */}
           {allTags.length > 0 && (
             <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 24 }]}>
@@ -634,7 +735,7 @@ export default function QuizScreen() {
                 🏷️ タグで絞り込み
               </Text>
               <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }]}>
-                選択なし = すべての問題
+                {locale === 'ja' ? '選択なし = すべての問題' : 'No selection = All questions'}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {allTags.map(tag => {
@@ -676,10 +777,18 @@ export default function QuizScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={{ alignItems: 'center', padding: 12 }}
+            style={[{ 
+              backgroundColor: colors.primary,
+              padding: 14,
+              borderRadius: 12,
+              alignItems: 'center',
+              marginTop: 4,
+            }]}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
-            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>戻る</Text>
+            <Text style={{ color: onPrimary, fontSize: 16, fontWeight: 'bold' }}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

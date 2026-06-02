@@ -198,6 +198,7 @@ export default function BrowseQuestionsScreen() {
     await saveFolders(updatedFolders);
     setNewFolderName('');
     setShowFolderModal(false);
+    setShowFoldersView(true);  // 作成後に一覧へ戻る
     Alert.alert('成功', '問題集を作成しました');
   };
 
@@ -604,7 +605,7 @@ export default function BrowseQuestionsScreen() {
       <Modal visible={showEditModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <View style={[styles.modalContainer, { backgroundColor: colors.card, width: '90%', maxWidth: 440 }]}>
+            <View style={[styles.modalContainer, { backgroundColor: colors.card, width: '95%', maxWidth: 560, maxHeight: '90%' }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
 
               {/* 問題文 */}
@@ -623,11 +624,12 @@ export default function BrowseQuestionsScreen() {
                 <>
                   <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
                   <TextInput
-                    style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+                    style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]}
                     value={editAnswerText}
                     onChangeText={setEditAnswerText}
                     placeholder="回答を入力"
                     placeholderTextColor={colors.textSecondary}
+                    multiline
                   />
                 </>
               )}
@@ -755,7 +757,7 @@ export default function BrowseQuestionsScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalCancelBtn, { borderColor: colors.border }]}
-                onPress={() => setShowFolderModal(false)}
+                onPress={() => { setShowFolderModal(false); setShowFoldersView(true); }}
               >
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text>
               </TouchableOpacity>
@@ -835,7 +837,11 @@ export default function BrowseQuestionsScreen() {
                 {/* 問題集作成ボタン */}
                 <TouchableOpacity
                   style={[styles.folderHeaderActionBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => { setNewFolderName(''); setShowFolderModal(true); }}
+                  onPress={() => {
+                    setNewFolderName('');
+                    setShowFoldersView(false);   // 一覧を閉じてから
+                    setShowFolderModal(true);    // 作成を開く
+                  }}
                 >
                   <Text style={styles.folderHeaderActionBtnText}>＋ 作成</Text>
                 </TouchableOpacity>
@@ -973,7 +979,9 @@ export default function BrowseQuestionsScreen() {
                 style={[styles.tagFilterChip, selectedFilterTag === null && { backgroundColor: colors.primary }]}
                 onPress={() => { setSelectedFilterTag(null); setShowTagFilterModal(false); }}
               >
-                <Text style={[styles.tagFilterChipText, selectedFilterTag === null && { color: '#fff' }]}>📋 全問</Text>
+                <Text style={[styles.tagFilterChipText, selectedFilterTag === null && { color: '#fff' }]}>
+                  📋 {locale === 'ja' ? '全問' : 'All'}
+                </Text>
               </TouchableOpacity>
               {availableTags.map(tag => (
                 <TouchableOpacity 

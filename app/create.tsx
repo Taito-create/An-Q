@@ -197,7 +197,7 @@ export default function CreateQuestionScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.question}</Text>
         <TextInput 
-          style={styles.input} 
+          style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} 
           value={question} 
           onChangeText={setQuestion} 
           placeholder={t.question}
@@ -207,10 +207,11 @@ export default function CreateQuestionScreen() {
         {/* Answer Input based on type */}
         {answerType === 'descriptive' && (
           <TextInput 
-            style={styles.input} 
+            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} 
             value={descriptiveAnswer} 
             onChangeText={setDescriptiveAnswer} 
             placeholder={t.answer}
+            multiline
           />
         )}
         
