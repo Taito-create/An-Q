@@ -7,7 +7,7 @@ import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 
-const { width } = Dimensions.get('window');
+const { width: windowWidth } = Dimensions.get('window');
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -50,7 +50,8 @@ export default function CalendarScreen() {
   const screenType = useResponsive();
   
   const isMobile = screenType !== 'desktop';
-  const cellSize = isMobile ? Math.min(width / 7 - 8, 44) : Math.min(width / 7 - 4, 70);
+  const cellMargin = isMobile ? 2 : 3;
+  const cellWidth = `${(100 - (7 * cellMargin * 2)) / 7}%`;
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState('');
@@ -301,7 +302,19 @@ export default function CalendarScreen() {
     return exams;
   };
 
-  // カレンダー本体のレンダリング
+  const getEventCountForDay = (date: string) => {
+    let count = 0;
+    events.forEach(event => {
+      if (event.date === date) {
+        count++;
+      } else if (event.endDate && event.date <= date && event.endDate >= date) {
+        count++;
+      }
+    });
+    return count;
+  };
+
+  // カレンダー本体のレンダリング（7列グリッド）
   const renderCalendar = () => (
     <>
       <View style={[styles.monthHeader, isMobile && { paddingHorizontal: 16 }]}>
@@ -316,44 +329,91 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 曜日表示 */}
-      <View style={styles.weekDaysRow}>
-        {weekDays.map(day => (
-          <Text key={day} style={[styles.weekDayText, { color: colors.textSecondary, fontSize: isMobile ? 12 : 15 }]}>
-            {day}
-          </Text>
+      {/* 曜日ヘッダー（7列） */}
+      <View style={[
+        styles.calendarGrid,
+        {
+          marginBottom: isMobile ? 12 : 24,
+          gap: isMobile ? 4 : 8,
+        }
+      ]}>
+        {weekDays.map((day, i) => (
+          <View key={`header-${i}`} style={styles.gridCell}>
+            <Text style={[
+              styles.weekdayHeader,
+              {
+                color: colors.textSecondary,
+                fontSize: isMobile ? 12 : 14,
+                paddingBottom: isMobile ? 6 : 12,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }
+            ]}>
+              {day}
+            </Text>
+          </View>
         ))}
-      </View>
 
-      {/* 日付表示 */}
-      <View style={styles.daysGrid}>
+        {/* 日付セル（7列グリッドに自動配置） */}
         {days.map((day, index) => {
           const dateStr = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
-          const examsOnDate = dateStr ? getExamsOnDate(dateStr) : [];
           const dayStyle = day ? getDayStyle(day) : null;
+          const examsOnDate = dateStr ? getExamsOnDate(dateStr) : [];
+          const eventCount = dateStr ? getEventCountForDay(dateStr) : 0;
+
           return (
             <TouchableOpacity
               key={index}
               style={[
-                styles.dayCell,
-                { width: cellSize, height: cellSize, borderRadius: isMobile ? cellSize / 2 : 10 },
-                day && dayStyle ? { backgroundColor: dayStyle.bgColor } : null,
+                styles.gridCell,
+                day ? { opacity: 1 } : { opacity: 0 },
               ]}
               onPress={() => day && onDayPress(day)}
               disabled={!day}
             >
               {day && (
-                <>
-                  <Text style={[styles.dayText, { fontSize: isMobile ? 14 : 18, fontWeight: isMobile ? '500' : '600' }, dayStyle && { color: dayStyle.textColor }]}>
+                <View style={[
+                  styles.dayCell,
+                  {
+                    backgroundColor: dayStyle?.bgColor || 'transparent',
+                    borderRadius: isMobile ? 6 : 8,
+                  },
+                ]}>
+                  <Text style={[
+                    styles.dayText,
+                    {
+                      color: dayStyle?.textColor || colors.text,
+                      fontSize: isMobile ? 14 : 18,
+                      fontWeight: dayStyle?.bgColor === colors.primary ? '700' : '500',
+                    }
+                  ]}>
                     {day}
                   </Text>
+                  
+                  {/* 予定アイコン（試験のドット or 件数バッジ） */}
                   {examsOnDate.length > 0 && (
-                    <View style={[styles.eventDot, { backgroundColor: colors.error, width: isMobile ? 4 : 8, height: isMobile ? 4 : 8 }]} />
+                    <View style={[
+                      styles.eventDot,
+                      {
+                        backgroundColor: colors.error,
+                        width: isMobile ? 6 : 8,
+                        height: isMobile ? 6 : 8,
+                        borderRadius: isMobile ? 3 : 4,
+                      }
+                    ]} />
                   )}
-                  {dayStyle?.hasEvent && examsOnDate.length === 0 && (
-                    <View style={[styles.eventDot, { backgroundColor: colors.success, width: isMobile ? 4 : 8, height: isMobile ? 4 : 8 }]} />
+                  {eventCount > 0 && examsOnDate.length === 0 && (
+                    <View style={[
+                      styles.eventDot,
+                      {
+                        backgroundColor: colors.success,
+                        width: isMobile ? 6 : 8,
+                        height: isMobile ? 6 : 8,
+                        borderRadius: isMobile ? 3 : 4,
+                      }
+                    ]} />
                   )}
-                </>
+                </View>
               )}
             </TouchableOpacity>
           );
@@ -619,12 +679,46 @@ const styles = StyleSheet.create({
   monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%' },
   monthArrow: { fontSize: 24, fontWeight: 'bold', paddingHorizontal: 16 },
   monthText: { fontSize: 18, fontWeight: 'bold' },
-  weekDaysRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8, width: '100%' },
-  weekDayText: { width: '14.28%', textAlign: 'center', fontWeight: 'bold' },
-  daysGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  dayCell: { justifyContent: 'center', alignItems: 'center', margin: 2, position: 'relative' },
-  dayText: { fontWeight: '500' },
-  eventDot: { position: 'absolute', bottom: 2, borderRadius: 4 },
+
+  // 7列グリッド（React Native は CSS Grid 非対応のため flexWrap で代用）
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+  },
+  gridCell: {
+    width: '14.28%', // 100% / 7 = 14.28%
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // 曜日ヘッダー
+  weekdayHeader: {
+    fontWeight: '600',
+    textAlign: 'center',
+    width: '100%',
+  },
+
+  // 日付セル
+  dayCell: {
+    width: '90%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  dayText: {
+    textAlign: 'center',
+  },
+  eventDot: {
+    position: 'absolute',
+    bottom: 2,
+  },
+
+  // フォーム
   formContainer: { margin: 16, padding: 16, borderRadius: 12, borderWidth: 1 },
   formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   selectedDateText: { fontSize: 14, marginBottom: 12 },
@@ -638,6 +732,8 @@ const styles = StyleSheet.create({
   cancelButtonText: { fontWeight: 'bold' },
   deleteEventButton: { padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 8 },
   deleteEventButtonText: { color: '#fff', fontWeight: 'bold' },
+
+  // 予定一覧
   eventListContainer: { margin: 16, marginTop: 0 },
   eventListTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   eventItem: { padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -646,6 +742,8 @@ const styles = StyleSheet.create({
   eventName: { fontSize: 14, fontWeight: '500', flexWrap: 'wrap', flexShrink: 1 },
   deleteIcon: { padding: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   deleteIconText: { fontSize: 14, color: '#fff' },
+
+  // 教科サブフォーム
   subjectsContainer: { marginBottom: 12 },
   subjectsTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
   subjectRow: { flexDirection: 'row', gap: 8, marginBottom: 8, alignItems: 'center' },
@@ -655,6 +753,7 @@ const styles = StyleSheet.create({
   removeSubjectText: { fontSize: 16, fontWeight: 'bold' },
   addSubjectBtn: { padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, marginTop: 4 },
   addSubjectText: { fontWeight: 'bold' },
+
   sectionTitle: { fontWeight: 'bold', marginBottom: 12 },
   noEventsText: { fontSize: 14, textAlign: 'center', marginTop: 20 },
 });
