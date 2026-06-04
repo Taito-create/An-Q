@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  ScrollView, StatusBar, Alert, Dimensions
+  ScrollView, StatusBar, Alert
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,14 +14,72 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { Play, Plus, BarChart3, Music, Calendar, Settings, Globe, ScrollText, Award, ShoppingBag, Timer, Palette, Repeat2 } from 'lucide-react';
 
-const { width: screenWidth } = Dimensions.get('window');
-const isMobile = screenWidth < 768;
+// === 修正1: レスポンシブ判定用フック ===
+const useResponsive = () => {
+  const [screenType, setScreenType] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
+
+  useEffect(() => {
+    const checkScreen = () => {
+      const width = window.innerWidth;
+      if (width < 640) setScreenType('mobile');
+      else if (width < 1024) setScreenType('tablet');
+      else setScreenType('desktop');
+    };
+    
+    checkScreen();
+    window.addEventListener('resize', checkScreen);
+    return () => window.removeEventListener('resize', checkScreen);
+  }, []);
+
+  return screenType;
+};
 
 const HomeScreen = () => {
   const navigate = useNavigate();
   const { colors, fs, pattern, onPrimary } = useTheme();
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
+  const screenType = useResponsive();
+
+  // === 修正2: デバイス別コンテナスタイル ===
+  const containerStyles = {
+    mobile: {
+      maxWidth: '100%' as const,
+      padding: 16,
+      paddingTop: Platform.OS !== 'web' ? 44 : 16,
+    },
+    tablet: {
+      maxWidth: '100%' as const,
+      padding: 24,
+      paddingTop: 24,
+    },
+    desktop: {
+      maxWidth: 1200,
+      marginLeft: 'auto' as const,
+      marginRight: 'auto' as const,
+      padding: 32,
+      paddingTop: 32,
+    },
+  };
+
+  // === 修正5: カード・ボタンサイズ ===
+  const cardPadding = {
+    mobile: { padding: 12 },
+    tablet: { padding: 14 },
+    desktop: { padding: 16 },
+  };
+
+  const buttonPadding = {
+    mobile: { paddingVertical: 14, paddingHorizontal: 12 },
+    tablet: { paddingVertical: 15, paddingHorizontal: 14 },
+    desktop: { paddingVertical: 18, paddingHorizontal: 16 },
+  };
+
+  const fontSize = {
+    title: screenType === 'desktop' ? 18 : screenType === 'tablet' ? 16 : 15,
+    body: screenType === 'desktop' ? 15 : screenType === 'tablet' ? 14 : 13,
+    small: screenType === 'desktop' ? 12 : screenType === 'tablet' ? 11 : 10,
+  };
 
   // 言語変更を監視
   useEffect(() => {
@@ -338,291 +396,517 @@ const HomeScreen = () => {
     SoundManager.play('select');
   };
 
-  return (
-    <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          {examCountdown && (
-            <View style={[styles.examCountdownBox, {
-              backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
-              borderColor: colors.border,
-            }]}>
-              <Text style={[styles.examCountdownTitle, { color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary }]}>
-                {examCountdown.examName}
-              </Text>
-              <Text style={[styles.examCountdownDays, {
-                color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
-                fontSize: fs(28),
-                fontWeight: 'bold',
-              }]}>
-                {locale === 'ja' ? `${examCountdown.examName} まであと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days until ${examCountdown.examName}`}
-              </Text>
-            </View>
-          )}
-          {/* タイトルと名言を横並び */}
-          <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text, fontSize: fs(28) }]}>An-Q</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: fs(14) }]}>
-                {currentLocale === 'ja' ? '覚えるな、脳にインストールせよ' : 'Don\'t memorize, install into your brain'}
-              </Text>
-            </View>
-            {motivationalMessage && (
-              <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', flex: 1.2 }]}>
-                <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
-                <Text style={[styles.motivationalText, { color: colors.text, fontSize: fs(11) }]} numberOfLines={3}>
-                  {motivationalMessage}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
+  // === 修正4: メインコンテンツスタイル ===
+  const mainContentStyle = {
+    mobile: { flexDirection: 'column' as const, gap: 12 },
+    tablet: { flexDirection: 'column' as const, gap: 14 },
+    desktop: { 
+      display: 'flex' as const,
+      flexDirection: 'row' as const,
+      gap: 16,
+      marginBottom: 24,
+    },
+  };
 
-        {/* Top Buttons */}
-        <View style={[styles.topButtons, !isMobile && { marginLeft: 'auto', alignSelf: 'flex-start' }]}>
-          {navMode === 'compact' && !reorderMode && (
-            <>
-              {buttonOrder.map(key => {
-                const btnDef: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
-                  calendar:      { icon: <Calendar size={16} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
-                  mission:       { icon: <ScrollText size={16} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
-                  title:         { icon: <Award size={16} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
-                  shop:          { icon: <ShoppingBag size={16} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
-                  manage:        { icon: <Timer size={16} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
-                  themeSettings: { icon: <Palette size={16} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
-                };
-                const def = btnDef[key];
-                if (!def) return null;
-                return (
-                  <TooltipButton key={key} style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate(def.route); }} label={def.label}>
-                    {def.icon}
-                  </TooltipButton>
-                );
-              })}
-            </>
-          )}
-          {navMode === 'compact' && reorderMode && (
-            <>
-              {buttonOrder.map(key => {
-                const iconMap: Record<string, string> = {
-                  calendar: '◧', mission: '◰',
-                  title: '◱', shop: '◲',
-                  manage: '◳', themeSettings: '◴',
-                };
-                const selIdx = reorderSelection.indexOf(key);
-                return (
-                  <TouchableOpacity key={key} style={[styles.iconButton, { borderColor: selIdx >= 0 ? colors.primary : colors.border, backgroundColor: selIdx >= 0 ? colors.primary + '20' : 'transparent' }]} onPress={() => handleReorderTap(key)}>
-                    {selIdx >= 0
-                      ? <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>{selIdx + 1}</Text>
-                      : <Text style={{ fontSize: 16, color: colors.textSecondary }}>{iconMap[key]}</Text>}
-                  </TouchableOpacity>
-                );
-              })}
-              <TouchableOpacity style={[styles.iconButton, { borderColor: colors.error }]} onPress={cancelReorderMode}>
-                <Text style={{ fontSize: 16, color: colors.error }}>✕</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={toggleNavMode} label={t.navModeToggle}>
-            <Repeat2 size={16} color={colors.primary} />
-          </TooltipButton>
-          <TooltipButton style={[styles.iconButton, { borderColor: reorderMode ? colors.warning : colors.primary }]} onPress={reorderMode ? cancelReorderMode : startReorderMode} label={t.reorderButtons}>
-            <Text style={{ fontSize: 16, color: reorderMode ? colors.warning : colors.primary }}>⇄</Text>
-          </TooltipButton>
-          <TooltipButton
-            style={[styles.iconButton, { borderColor: colors.primary }]}
-            onPress={toggleLanguage}
-            label={t.language}
-          >
-            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Globe size={12} color={colors.primary} />
-              <Text style={[styles.languageText, { color: colors.primary, fontSize: 9, marginTop: 1 }]}>
-                {currentLocale === 'ja' ? 'JP' : 'EN'}
-              </Text>
-            </View>
-          </TooltipButton>
-          <TooltipButton style={[styles.iconButton, { borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
-            <Settings size={16} color={colors.primary} />
-          </TooltipButton>
-        </View>
+  const leftColumnStyle = {
+    mobile: { flex: 1 },
+    tablet: { flex: 1 },
+    desktop: { flex: 2, minWidth: 0 },
+  };
+
+  const rightColumnStyle = {
+    mobile: { flex: 1 },
+    tablet: { flex: 1 },
+    desktop: { flex: 1, minWidth: 0 },
+  };
+
+  // === 修正10: ホバー状態（PCのみ） ===
+  const [hovered, setHovered] = useState(false);
+  const hoverProps = screenType === 'desktop' ? {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+  } : {};
+
+  // ナビゲーションカードの固定カード定義
+  const fixedCards = [
+    { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'manageQuestions' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
+    { key: 'music',  icon: 'music', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
+  ];
+
+  const defaultExtraOrder = ['calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings'];
+  const extraDefs: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
+    calendar:      { icon: <Calendar size={26} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
+    mission:       { icon: <ScrollText size={26} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
+    title:         { icon: <Award size={26} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
+    shop:          { icon: <ShoppingBag size={26} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
+    manage:        { icon: <Timer size={26} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
+    themeSettings: { icon: <Palette size={26} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
+  };
+
+  const renderStatsCard = () => (
+    <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card }]}>
+      <View style={styles.statItem}>
+        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
       </View>
-
-      {/* Stats */}
-      <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fs(12) }]}>{t.questionsCountLabel}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{timerMinutes}{t.minutes}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fs(12) }]}>{t.timer}</Text>
-        </View>
+      <View style={styles.statItem}>
+        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{timerMinutes}{t.minutes}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.timer}</Text>
       </View>
+    </View>
+  );
 
-      {/* 今日の1問 */}
-      {todayQuestion && (
-        <TouchableOpacity
-          style={[styles.todayCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
-        >
-          <View style={styles.todayHeader}>
-            <Text style={styles.todayEmoji}>◧</Text>
-            <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fs(13) }]}>
-              {t.todayQuestion}
-            </Text>
-          </View>
-          <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fs(14) }]} numberOfLines={2}>
-            {todayQuestion.question}
+  const renderTodayQuestion = () => {
+    if (!todayQuestion) return null;
+    return (
+      <TouchableOpacity
+        style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+        onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+      >
+        <View style={styles.todayHeader}>
+          <Text style={styles.todayEmoji}>◧</Text>
+          <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
+            {t.todayQuestion}
           </Text>
-        </TouchableOpacity>
-      )}
+        </View>
+        <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fontSize.body }]} numberOfLines={2}>
+          {todayQuestion.question}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
-      {/* 苦手問題モード */}
-      {weakQuestionCount > 0 && (
-        <TouchableOpacity
-          style={[styles.weakCard, { backgroundColor: colors.error + '15', borderColor: colors.error }]}
-          onPress={async () => {
-            SoundManager.play('decide');
-            await AsyncStorage.setItem('quiz_mode', 'weak');
-            navigate('/quiz');
-          }}
-        >
-          <Text style={styles.weakEmoji}>⚠</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.weakLabel, { color: colors.error, fontSize: fs(13) }]}>
-              {t.weakQuestionsQuiz}
-            </Text>
-            <Text style={[styles.weakDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>
-              {locale === 'ja' ? `${weakQuestionCount}${t.reviewWeakQuestions}` : `${t.reviewWeakQuestions} (${weakQuestionCount})`}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 16, color: colors.error }}>›</Text>
-        </TouchableOpacity>
-      )}
+  const renderWeakCard = () => {
+    if (weakQuestionCount <= 0) return null;
+    return (
+      <TouchableOpacity
+        style={[styles.weakCard, cardPadding[screenType], { backgroundColor: colors.error + '15', borderColor: colors.error }]}
+        onPress={async () => {
+          SoundManager.play('decide');
+          await AsyncStorage.setItem('quiz_mode', 'weak');
+          navigate('/quiz');
+        }}
+      >
+        <Text style={styles.weakEmoji}>⚠</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.weakLabel, { color: colors.error, fontSize: fontSize.body }]}>
+            {t.weakQuestionsQuiz}
+          </Text>
+          <Text style={[styles.weakDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>
+            {locale === 'ja' ? `${weakQuestionCount}${t.reviewWeakQuestions}` : `${t.reviewWeakQuestions} (${weakQuestionCount})`}
+          </Text>
+        </View>
+        <Text style={{ fontSize: 16, color: colors.error }}>›</Text>
+      </TouchableOpacity>
+    );
+  };
 
-      {/* Main Actions */}
-      <View style={styles.mainActions}>
-        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}>
-          <Play size={20} color={onPrimary} style={{ marginRight: 8 }} />
-          <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(18) }]}>{t.startQuizButton}</Text>
+  const renderMainButtons = () => (
+    <View style={{ gap: buttonPadding[screenType].paddingVertical }}>
+      <TouchableOpacity
+        style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
+        onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+        {...(screenType === 'desktop' ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {})}
+      >
+        <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
+        <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card }]}
+        onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+      >
+        <Plus size={screenType === 'desktop' ? 28 : 24} color={colors.primary} style={{ marginRight: 8 }} />
+        <Text style={[styles.secondaryButtonText, { color: colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // === 修正6: セカンダリボタン行 ===
+  const renderSecondaryButtons = () => (
+    <View style={{
+      display: 'flex',
+      flexDirection: 'row',
+      flexWrap: 'nowrap' as const,
+      gap: screenType === 'desktop' ? 12 : 8,
+      marginBottom: screenType === 'desktop' ? 20 : 12,
+    }}>
+      <TouchableOpacity style={[styles.secondaryBtn, { 
+        flex: 1,
+        paddingVertical: buttonPadding[screenType].paddingVertical,
+        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+      }]} onPress={() => { SoundManager.play('decide'); navigate('/create'); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.createQuestion}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.secondaryBtn, { 
+        flex: 1,
+        paddingVertical: buttonPadding[screenType].paddingVertical,
+        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+      }]} onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.manageQuestions}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.secondaryBtn, { 
+        flex: 1,
+        paddingVertical: buttonPadding[screenType].paddingVertical,
+        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+      }]} onPress={() => { SoundManager.play('decide'); navigate('/results'); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.viewResults}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // === 修正8: ナビゲーションリンク（PC時非表示） ===
+  const renderNavLinks = () => {
+    if (screenType === 'desktop') return null;
+    return (
+      <View style={{ gap: 8, marginTop: 12 }}>
+        <TouchableOpacity style={styles.linkButton} onPress={() => { SoundManager.play('decide'); navigate('/credits'); }}>
+          <Text style={{ color: colors.primary, fontSize: fontSize.body }}>{t.aboutApp}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.primary, backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate('/create'); }}>
-          <Plus size={24} color={colors.primary} style={{ marginRight: 8 }} />
-          <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>{t.createQuestion}</Text>
+        <TouchableOpacity style={styles.linkButton} onPress={() => { SoundManager.play('decide'); navigate('/feedback'); }}>
+          <Text style={{ color: colors.primary, fontSize: fontSize.body }}>{t.submitFeedback}</Text>
         </TouchableOpacity>
       </View>
+    );
+  };
 
-      {/* Navigation Cards */}
-      {(() => {
-        // 上部固定カード（学習履歴・音楽設定のみ）
-        const fixedCards = [
-      { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'manageQuestions' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
-          { key: 'music',  icon: 'music', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
-        ];
+  // ナビゲーションカードセクション（既存のコードを統合）
+  const renderNavigationCards = () => {
+    const extraOrder: string[] = (cardOrder.filter(k => k in extraDefs).length === Object.keys(extraDefs).length)
+      ? cardOrder.filter(k => k in extraDefs)
+      : defaultExtraOrder;
+    const orderedExtra = extraOrder.map(k => ({ key: k, ...extraDefs[k] }));
 
-        // 「その他の機能」ボタン（並び替え可能）
-        const defaultExtraOrder = ['calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings'];
-        const extraDefs: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
-          calendar:      { icon: <Calendar size={26} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
-          mission:       { icon: <ScrollText size={26} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
-          title:         { icon: <Award size={26} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
-          shop:          { icon: <ShoppingBag size={26} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
-          manage:        { icon: <Timer size={26} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
-          themeSettings: { icon: <Palette size={26} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
-        };
-        const extraOrder: string[] = (cardOrder.filter(k => k in extraDefs).length === Object.keys(extraDefs).length)
-          ? cardOrder.filter(k => k in extraDefs)
-          : defaultExtraOrder;
-        const orderedExtra = extraOrder.map(k => ({ key: k, ...extraDefs[k] }));
-
-        // bigGridモード
-        if (navMode === 'bigGrid') {
-          return (
-            <View>
-              {/* 上部固定カード（グリッド） */}
-              <View style={styles.grid}>
-                {fixedCards.map(card => {
-                  const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
-                  return (
-                    <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
-                      <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-                        <IconComponent size={28} color={card.iconColor} />
-                      </View>
-                      <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
-                      <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* その他の機能 */}
-              <Text style={[styles.reorderHint, { color: colors.textSecondary, marginTop: 16, marginBottom: 6 }]}>
-                {reorderMode
-                  ? (`${reorderSelection.length}/${orderedExtra.length} ${t.reorderModeActive}`)
-                  : (t.moreFeatures)}
-              </Text>
-              <View style={styles.bigGrid}>
-                {orderedExtra.map(btn => {
-                  const selIdx = reorderSelection.indexOf(btn.key);
-                  const isSelected = selIdx !== -1;
-                  return (
-                    <TouchableOpacity
-                      key={btn.key}
-                      style={[styles.bigCard, {
-                        backgroundColor: isSelected ? colors.primary + '20' : colors.card,
-                        borderColor: isSelected ? colors.primary : colors.border,
-                        borderWidth: isSelected ? 2 : 1,
-                      }]}
-                      onPress={() => {
-                        if (reorderMode) {
-                          handleReorderTap(btn.key);
-                        } else {
-                          SoundManager.play('decide');
-                          navigate(btn.route);
-                        }
-                      }}
-                    >
-                      {isSelected && (
-                        <View style={[styles.selBadge, { backgroundColor: colors.primary }]}>
-                          <Text style={[styles.selBadgeText, { color: onPrimary }]}>{selIdx + 1}</Text>
-                        </View>
-                      )}
-                      <View style={[styles.bigCardIcon, { backgroundColor: colors.primary + '20' }]}>
-                        {btn.icon}
-                      </View>
-                      <Text style={[styles.bigCardTitle, { color: colors.text, fontSize: fs(14) }]}>
-                        {btn.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          );
-        }
-
-        // compactモード（学習履歴・音楽設定のみ、左右対称）
-        return (
-          <View style={styles.fixedCardRow}>
+    if (navMode === 'bigGrid') {
+      return (
+        <View>
+          <View style={styles.grid}>
             {fixedCards.map(card => {
               const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
               return (
-                <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
+                <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
                   <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
                     <IconComponent size={28} color={card.iconColor} />
                   </View>
-                  <Text style={[styles.navTitle, { color: colors.text, fontSize: fs(15) }]}>{t[card.titleKey]}</Text>
-                  <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{t[card.descKey]}</Text>
+                  <Text style={[styles.navTitle, { color: colors.text, fontSize: fontSize.title }]}>{t[card.titleKey]}</Text>
+                  <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t[card.descKey]}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        );
-      })()}
+
+          <Text style={[styles.reorderHint, { color: colors.textSecondary, marginTop: 16, marginBottom: 6 }]}>
+            {reorderMode
+              ? (`${reorderSelection.length}/${orderedExtra.length} ${t.reorderModeActive}`)
+              : (t.moreFeatures)}
+          </Text>
+          <View style={styles.bigGrid}>
+            {orderedExtra.map(btn => {
+              const selIdx = reorderSelection.indexOf(btn.key);
+              const isSelected = selIdx !== -1;
+              return (
+                <TouchableOpacity
+                  key={btn.key}
+                  style={[styles.bigCard, {
+                    backgroundColor: isSelected ? colors.primary + '20' : colors.card,
+                    borderColor: isSelected ? colors.primary : colors.border,
+                    borderWidth: isSelected ? 2 : 1,
+                  }]}
+                  onPress={() => {
+                    if (reorderMode) {
+                      handleReorderTap(btn.key);
+                    } else {
+                      SoundManager.play('decide');
+                      navigate(btn.route);
+                    }
+                  }}
+                >
+                  {isSelected && (
+                    <View style={[styles.selBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.selBadgeText, { color: onPrimary }]}>{selIdx + 1}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.bigCardIcon, { backgroundColor: colors.primary + '20' }]}>
+                    {btn.icon}
+                  </View>
+                  <Text style={[styles.bigCardTitle, { color: colors.text, fontSize: fontSize.body }]}>
+                    {btn.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      );
+    }
+
+    // compact mode
+    return (
+      <View style={styles.fixedCardRow}>
+        {fixedCards.map(card => {
+          const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
+          return (
+            <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
+              <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
+                <IconComponent size={28} color={card.iconColor} />
+              </View>
+              <Text style={[styles.navTitle, { color: colors.text, fontSize: fontSize.title }]}>{t[card.titleKey]}</Text>
+              <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t[card.descKey]}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // === 共通のheaderとtopButtons（修正3） ===
+  const renderHeader = () => (
+    <View style={[
+      styles.header,
+      screenType === 'desktop' && { 
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }
+    ]}>
+      {/* 左側：タイトル */}
+      <View style={{ flex: 1 }}>
+        <Text style={[
+          styles.appTitle,
+          {
+            fontSize: screenType === 'desktop' ? 32 : screenType === 'tablet' ? 28 : 24,
+            fontWeight: 'bold',
+            color: colors.primary,
+          }
+        ]}>
+          An-Q
+        </Text>
+        <Text style={[
+          styles.appSubtitle,
+          {
+            fontSize: screenType === 'desktop' ? 13 : screenType === 'tablet' ? 12 : 11,
+            color: colors.textSecondary,
+            marginTop: 4,
+          }
+        ]}>
+          {currentLocale === 'ja' ? '覚えるな、脳にインストールせよ' : "Don't memorize, install into your brain"}
+        </Text>
+      </View>
+
+      {/* 右側：アイコンボタン */}
+      <View style={[
+        styles.topButtons,
+        screenType === 'desktop' && { gap: 12 }
+      ]}>
+        {navMode === 'compact' && !reorderMode && (
+          <>
+            {buttonOrder.map(key => {
+              const btnDef: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
+                calendar:      { icon: <Calendar size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
+                mission:       { icon: <ScrollText size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
+                title:         { icon: <Award size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
+                shop:          { icon: <ShoppingBag size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
+                manage:        { icon: <Timer size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
+                themeSettings: { icon: <Palette size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
+              };
+              const def = btnDef[key];
+              if (!def) return null;
+              return (
+                <TooltipButton key={key} style={[styles.iconButton, { 
+                  width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+                  height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+                  borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+                  borderColor: colors.primary 
+                }]} onPress={() => { SoundManager.play('decide'); navigate(def.route); }} label={def.label}>
+                  {def.icon}
+                </TooltipButton>
+              );
+            })}
+          </>
+        )}
+        {navMode === 'compact' && reorderMode && (
+          <>
+            {buttonOrder.map(key => {
+              const iconMap: Record<string, string> = {
+                calendar: '◧', mission: '◰',
+                title: '◱', shop: '◲',
+                manage: '◳', themeSettings: '◴',
+              };
+              const selIdx = reorderSelection.indexOf(key);
+              return (
+                <TouchableOpacity key={key} style={[styles.iconButton, { 
+                  width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+                  height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+                  borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+                  borderColor: selIdx >= 0 ? colors.primary : colors.border, backgroundColor: selIdx >= 0 ? colors.primary + '20' : 'transparent' 
+                }]} onPress={() => handleReorderTap(key)}>
+                  {selIdx >= 0
+                    ? <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>{selIdx + 1}</Text>
+                    : <Text style={{ fontSize: 16, color: colors.textSecondary }}>{iconMap[key]}</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={[styles.iconButton, { 
+              width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+              height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+              borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+              borderColor: colors.error 
+            }]} onPress={cancelReorderMode}>
+              <Text style={{ fontSize: 16, color: colors.error }}>✕</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={toggleNavMode} label={t.navModeToggle}>
+          <Repeat2 size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        </TooltipButton>
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: reorderMode ? colors.warning : colors.primary 
+        }]} onPress={reorderMode ? cancelReorderMode : startReorderMode} label={t.reorderButtons}>
+          <Text style={{ fontSize: 16, color: reorderMode ? colors.warning : colors.primary }}>⇄</Text>
+        </TooltipButton>
+        <TooltipButton
+          style={[styles.iconButton, { 
+            width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+            height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+            borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+            borderColor: colors.primary 
+          }]}
+          onPress={toggleLanguage}
+          label={t.language}
+        >
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Globe size={screenType === 'desktop' ? 14 : 12} color={colors.primary} />
+            <Text style={[styles.languageText, { color: colors.primary, fontSize: screenType === 'desktop' ? 10 : 9, marginTop: 1 }]}>
+              {currentLocale === 'ja' ? 'JP' : 'EN'}
+            </Text>
+          </View>
+        </TooltipButton>
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
+          <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        </TooltipButton>
+      </View>
+    </View>
+  );
+
+  return (
+    <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, containerStyles[screenType]]}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* 試験カウントダウン */}
+      {examCountdown && (
+        <View style={[styles.examCountdownBox, {
+          backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
+          borderColor: colors.border,
+        }]}>
+          <Text style={[styles.examCountdownTitle, { color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary }]}>
+            {examCountdown.examName}
+          </Text>
+          <Text style={[styles.examCountdownDays, {
+            color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
+            fontSize: fs(28),
+            fontWeight: 'bold',
+          }]}>
+            {locale === 'ja' ? `${examCountdown.examName} まであと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days until ${examCountdown.examName}`}
+          </Text>
+        </View>
+      )}
+
+      {/* Header */}
+      {renderHeader()}
+
+      {/* モチベーションメッセージ */}
+      {motivationalMessage && (
+        <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', marginBottom: 12 }]}>
+          <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
+          <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
+            {motivationalMessage}
+          </Text>
+        </View>
+      )}
+
+      {/* === 修正4: デスクトップ時2カラムレイアウト === */}
+      {screenType === 'desktop' ? (
+        <View style={mainContentStyle.desktop}>
+          {/* 左カラム */}
+          <View style={leftColumnStyle.desktop}>
+            {renderStatsCard()}
+            {renderWeakCard()}
+            {renderMainButtons()}
+            {renderSecondaryButtons()}
+            {renderNavigationCards()}
+          </View>
+
+          {/* 右カラム */}
+          <View style={rightColumnStyle.desktop}>
+            {/* スタッツ（縦積み） */}
+            <View style={{ gap: 12 }}>
+              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
+                <Text style={[styles.statBlockNumber, { color: colors.primary, fontSize: fs(28) }]}>{totalQuestions}</Text>
+                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
+              </View>
+              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
+                <Text style={[styles.statBlockNumber, { color: colors.error, fontSize: fs(28) }]}>{weakQuestionCount}</Text>
+                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.weakQuestionsQuiz}</Text>
+              </View>
+              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
+                <Text style={[styles.statBlockNumber, { color: colors.primary, fontSize: fs(28) }]}>{timerMinutes}{t.minutes}</Text>
+                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.timer}</Text>
+              </View>
+            </View>
+            
+            {/* 今日の1問 */}
+            <View style={{ marginTop: 16 }}>
+              {renderTodayQuestion()}
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={mainContentStyle[screenType]}>
+          {/* モバイル・タブレット：1列で順番に並ぶ */}
+          {renderStatsCard()}
+          {todayQuestion && (
+            <TouchableOpacity
+              style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+              onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+            >
+              <View style={styles.todayHeader}>
+                <Text style={styles.todayEmoji}>◧</Text>
+                <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
+                  {t.todayQuestion}
+                </Text>
+              </View>
+              <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fontSize.body }]} numberOfLines={2}>
+                {todayQuestion.question}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {renderWeakCard()}
+          {renderMainButtons()}
+          {renderSecondaryButtons()}
+          {renderNavigationCards()}
+          {renderNavLinks()}
+        </View>
+      )}
+
     </ScrollView>
     </PatternBackground>
   );
@@ -637,87 +921,81 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    flexDirection: isMobile ? 'column' : 'row',
-    alignItems: isMobile ? 'stretch' : 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS !== 'web' ? 44 : 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
+    paddingTop: 0,
     paddingBottom: 8,
-    gap: isMobile ? 8 : 0,
   },
-  titleContainer: {
-    alignItems: 'center',
-    flex: 1,
+  appTitle: {
+    fontWeight: 'bold',
+  },
+  appSubtitle: {
+    marginTop: 4,
   },
   title: {
-    fontSize: isMobile ? 24 : 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: isMobile ? 12 : 14,
+    fontSize: 12,
     color: '#666',
   },
   topButtons: {
     flexDirection: 'row',
-    flexWrap: isMobile ? 'nowrap' : 'wrap',
+    flexWrap: 'wrap',
     gap: 6,
     alignItems: 'center',
   },
   timerButton: {
-    width: isMobile ? 36 : 44,
-    height: isMobile ? 36 : 44,
-    borderRadius: isMobile ? 18 : 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   themeButton: {
-    width: isMobile ? 36 : 44,
-    height: isMobile ? 36 : 44,
-    borderRadius: isMobile ? 18 : 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButton: {
-    width: isMobile ? 36 : 44,
-    height: isMobile ? 36 : 44,
-    borderRadius: isMobile ? 18 : 22,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   calendarButton: {
-    width: isMobile ? 36 : 44,
-    height: isMobile ? 36 : 44,
-    borderRadius: isMobile ? 18 : 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'transparent',
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   languageText: {
-    fontSize: 12,
     fontWeight: 'bold',
   },
-  headerContent: {
-    flex: 1,
-  },
   titleRow: {
-    flexDirection: isMobile ? 'column' : 'row',
-    alignItems: isMobile ? 'flex-start' : 'center',
-    gap: isMobile ? 4 : 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  todayCard: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 12 },
+  todayCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12 },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   todayEmoji: { fontSize: 16 },
   todayLabel: { fontWeight: 'bold' },
   todayQuestion: { lineHeight: 20 },
-  weakCard: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  weakCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   weakEmoji: { fontSize: 20 },
   weakLabel: { fontWeight: 'bold', marginBottom: 2 },
   weakDesc: {},
@@ -729,13 +1007,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   motivationalText: {
-    fontSize: 11,
     fontStyle: 'italic',
     flex: 1,
     lineHeight: 16,
   },
+  headerContent: {
+    flex: 1,
+  },
   examCountdownBox: {
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginVertical: 12,
     padding: 14,
     borderRadius: 12,
@@ -755,21 +1035,17 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 30,
-    backgroundColor: '#FFF',
+    marginBottom: 12,
     borderRadius: 12,
-    padding: 20,
   },
   statItem: {
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
     fontWeight: 'bold',
     color: '#007AFF',
   },
   statLabel: {
-    fontSize: 12,
     color: '#666',
     marginTop: 4,
   },
@@ -778,31 +1054,23 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
     borderRadius: 12,
-    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: '#FFF',
-    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
   },
   secondaryButton: {
-    backgroundColor: '#FFF',
     borderWidth: 2,
-    borderColor: '#007AFF',
     borderRadius: 12,
-    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
   },
@@ -823,7 +1091,6 @@ const styles = StyleSheet.create({
   },
   navCard: {
     width: '47%',
-    backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -842,13 +1109,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   navTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
     color: '#1A1A1A',
     marginBottom: 4,
   },
   navDesc: {
-    fontSize: 12,
     color: '#666',
     textAlign: 'center',
   },
@@ -922,6 +1187,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  secondaryBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkButton: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  statBlock: {
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statBlockNumber: {
+    fontWeight: 'bold',
+  },
+  statBlockLabel: {
+    marginTop: 4,
   },
 });
 
