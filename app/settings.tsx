@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize } from './theme';
 import { useLocale } from './hooks/useLocale';
+import { AnimationLevel, animationConfigs } from './animations';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: string }[] = [
   { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue',   emoji: '🔵' },
@@ -27,7 +28,7 @@ export default function SettingsScreen() {
   const ja = locale === 'ja';
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
-  const [isAnimationEnabled, setIsAnimationEnabled] = useState(true);
+  const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
 
   useEffect(() => {
     loadAnimationSetting();
@@ -35,18 +36,18 @@ export default function SettingsScreen() {
 
   const loadAnimationSetting = async () => {
     try {
-      const saved = await AsyncStorage.getItem('is_animation_enabled');
-      if (saved !== null) {
-        setIsAnimationEnabled(saved === 'true');
+      const saved = await AsyncStorage.getItem('animation_level');
+      if (saved === 'none' || saved === 'lite' || saved === 'standard' || saved === 'rich') {
+        setAnimationLevel(saved);
       }
     } catch (e) {
       console.error('Failed to load animation setting:', e);
     }
   };
 
-  const handleAnimationToggle = async (val: boolean) => {
-    setIsAnimationEnabled(val);
-    await AsyncStorage.setItem('is_animation_enabled', val ? 'true' : 'false');
+  const handleAnimationLevelChange = async (level: AnimationLevel) => {
+    setAnimationLevel(level);
+    await AsyncStorage.setItem('animation_level', level);
     SoundManager.play('decide');
   };
 
@@ -210,12 +211,56 @@ export default function SettingsScreen() {
             {ja ? 'アニメーション' : 'Animations'}
           </Text>
           <Switch
-            value={isAnimationEnabled}
-            onValueChange={handleAnimationToggle}
+            value={animationLevel !== 'none'}
+            onValueChange={(val) => handleAnimationLevelChange(val ? 'standard' : 'none')}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFF"
           />
         </View>
+
+        {/* アニメーションレベル選択（ON の時のみ表示） */}
+        {animationLevel !== 'none' && (
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <Text style={[styles.sectionLabel, { color: colors.text, fontSize: 12 }]}>
+              {ja ? 'アニメーションレベル' : 'Animation Level'}
+            </Text>
+            {(['lite', 'standard', 'rich'] as AnimationLevel[]).map((level) => (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.animationOptionBtn,
+                  { borderColor: colors.border, backgroundColor: colors.background },
+                  animationLevel === level && { backgroundColor: colors.primary + '20', borderColor: colors.primary, borderWidth: 2 }
+                ]}
+                onPress={() => handleAnimationLevelChange(level)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, { color: colors.text, fontWeight: animationLevel === level ? '700' : '500' }]}>
+                    {animationConfigs[level].label}
+                  </Text>
+                  <Text style={[styles.optionDesc, { color: colors.textSecondary, fontSize: 12 }]}>
+                    {animationConfigs[level].description}
+                  </Text>
+                  <View style={{ marginTop: 6, flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    {animationConfigs[level].features.map((f, i) => (
+                      <View
+                        key={i}
+                        style={[styles.featureBadge, { backgroundColor: colors.primary + '20' }]}
+                      >
+                        <Text style={[styles.featureBadgeText, { color: colors.primary, fontSize: 10 }]}>
+                          {f}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                {animationLevel === level && (
+                  <Text style={[{ color: colors.primary, fontSize: 16, fontWeight: 'bold' }]}>✓</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Preview */}
@@ -281,6 +326,19 @@ const styles = StyleSheet.create({
   suggestDot: { width: 32, height: 32, borderRadius: 16, borderWidth: 2 },
   row: { flexDirection: 'row', gap: 12 },
   fontButton: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minHeight: 56 },
+  sectionLabel: { fontWeight: '600', marginBottom: 8 },
+  animationOptionBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  optionLabel: { fontSize: 14, fontWeight: '600' },
+  optionDesc: { marginTop: 2 },
+  featureBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
+  featureBadgeText: { fontWeight: '500' },
   previewBox: { padding: 16, borderRadius: 12, borderWidth: 1, gap: 10 },
   previewButton: { padding: 12, borderRadius: 20, alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 20 },
   previewButtonText: { color: 'white', fontWeight: 'bold' },

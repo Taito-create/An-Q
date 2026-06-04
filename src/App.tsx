@@ -16,6 +16,7 @@ const ManageTimerScreen = lazy(() => import('../app/manage'));
 const MissionScreen = lazy(() => import('../app/mission'));
 const MissionDetailScreen = lazy(() => import('../app/missionScreen'));
 const MusicScreen = lazy(() => import('../app/music'));
+const StatisticsScreen = lazy(() => import('../app/statistics'));
 const QuizScreen = lazy(() => import('../app/quiz'));
 const ReorderConfirmScreen = lazy(() => import('../app/reorderConfirm'));
 const ResultsScreen = lazy(() => import('../app/results'));
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/mission" element={<MissionScreen />} />
           <Route path="/missionScreen" element={<MissionDetailScreen />} />
           <Route path="/music" element={<MusicScreen />} />
+          <Route path="/statistics" element={<StatisticsScreen />} />
           <Route path="/quiz" element={<QuizScreen />} />
           <Route path="/reorderConfirm" element={<ReorderConfirmScreen />} />
           <Route path="/results" element={<ResultsScreen />} />

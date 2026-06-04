@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  ScrollView, StatusBar, Alert
+  ScrollView, StatusBar, Alert, Animated
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +12,8 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
-import { Play, Plus, Music, Calendar, Settings, Globe, Palette } from 'lucide-react';
+import { Play, Plus, Music, Settings, Globe, Palette } from 'lucide-react';
+import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -40,6 +41,21 @@ const HomeScreen = () => {
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
+
+  // アニメーションレベル設定
+  const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
+
+  useEffect(() => {
+    const loadAnimationLevel = async () => {
+      try {
+        const level = await AsyncStorage.getItem('animation_level');
+        if (level) setAnimationLevel(level as AnimationLevel);
+      } catch (e) {
+        console.error('Failed to load animation level:', e);
+      }
+    };
+    loadAnimationLevel();
+  }, []);
 
   // デバイス別コンテナスタイル
   const containerStyles = {
@@ -307,6 +323,11 @@ const HomeScreen = () => {
     }
   };
 
+  // アニメーション用
+  const shakeAnim = animationLevel !== 'none' ? createShakeAnimation(animationLevel === 'rich' ? 2 : 1) : undefined;
+  const pulseIntensity = animationLevel === 'rich' ? 1.08 : animationLevel === 'standard' ? 1.05 : 1;
+  const pulseAnim = animationLevel !== 'none' && animationLevel !== 'lite' ? createPulseAnimation(pulseIntensity) : undefined;
+
   // メインコンテンツスタイル
   const mainContentStyle = {
     mobile: { flexDirection: 'column' as const, gap: 12 },
@@ -391,13 +412,26 @@ const HomeScreen = () => {
 
   const renderMainButtons = () => (
     <View style={{ gap: buttonPadding[screenType].paddingVertical }}>
-      <TouchableOpacity
-        style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
-      >
-        <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
-        <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
-      </TouchableOpacity>
+      {/* クイズ開始ボタン（Shakeアニメーション対応） */}
+      {animationLevel !== 'none' ? (
+        <Animated.View style={shakeAnim}>
+          <TouchableOpacity
+            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
+            onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+          >
+            <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
+            <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+        >
+          <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
+          <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card }]}
         onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
@@ -408,80 +442,74 @@ const HomeScreen = () => {
     </View>
   );
 
-  // セカンダリボタン行：予定登録 / タイマー / ミッション
-  const renderSecondaryButtons = () => (
-    <View style={{
-      display: 'flex',
-      flexDirection: 'row',
-      flexWrap: 'nowrap' as const,
-      gap: screenType === 'desktop' ? 12 : 8,
-      marginBottom: screenType === 'desktop' ? 20 : 12,
-    }}>
-      <TouchableOpacity style={[styles.secondaryBtn, { 
-        flex: 1,
-        paddingVertical: buttonPadding[screenType].paddingVertical,
-        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
-        backgroundColor: colors.card,
-        borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>📅 {t.calendar}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.secondaryBtn, { 
-        flex: 1,
-        paddingVertical: buttonPadding[screenType].paddingVertical,
-        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
-        backgroundColor: colors.card,
-        borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); showTimerAlert(); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>⏱ {t.timer}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.secondaryBtn, { 
-        flex: 1,
-        paddingVertical: buttonPadding[screenType].paddingVertical,
-        paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
-        backgroundColor: colors.card,
-        borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); navigate('/mission'); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>🎖 {t.mission}</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // セカンダリボタン行：問題管理 / タイマー / ミッション（アイコンなし）
+  const renderSecondaryButtons = () => {
+    const buttons = [
+      { label: '問題管理', onPress: () => { SoundManager.play('decide'); navigate('/browse'); } },
+      { label: 'タイマー', onPress: () => { SoundManager.play('decide'); showTimerAlert(); } },
+      { label: 'ミッション', onPress: () => { SoundManager.play('decide'); navigate('/mission'); } },
+    ];
+    // 英語の場合
+    const labels = currentLocale === 'en' 
+      ? ['Browse', 'Timer', 'Missions']
+      : ['問題管理', 'タイマー', 'ミッション'];
 
-  // フィーチャーカード：クイック復習 + 週間目標
+    return (
+      <View style={{
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap' as const,
+        gap: screenType === 'desktop' ? 12 : 8,
+        marginBottom: screenType === 'desktop' ? 20 : 12,
+      }}>
+        {buttons.map((btn, i) => {
+          const btnContent = (
+            <TouchableOpacity style={[styles.secondaryBtn, { 
+              flex: 1,
+              paddingVertical: buttonPadding[screenType].paddingVertical,
+              paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            }]} onPress={btn.onPress}>
+              <Text style={{ fontSize: fontSize.body, color: colors.text }}>{labels[i]}</Text>
+            </TouchableOpacity>
+          );
+          // standard/rich でパルス効果
+          if (pulseAnim && (i === 0 || i === 1)) {
+            return <Animated.View key={i} style={{ flex: 1 }}>{btnContent}</Animated.View>;
+          }
+          return <React.Fragment key={i}>{btnContent}</React.Fragment>;
+        })}
+      </View>
+    );
+  };
+
+  // フィーチャーカード：問題管理 + 週間目標
   const renderFeatureCards = () => (
     <View style={styles.featureCardsRow}>
       <TouchableOpacity
         style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border }]}
-        onPress={async () => {
-          SoundManager.play('decide');
-          if (quickReviewQuestions.length > 0) {
-            await AsyncStorage.setItem('quick_review_ids', JSON.stringify(quickReviewQuestions.map(q => q.id)));
-          }
-          await AsyncStorage.setItem('quiz_mode', 'quick_review');
-          navigate('/quiz');
-        }}
+        onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}
       >
-        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>🎯</Text>
+        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📝</Text>
         <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
-          {locale === 'ja' ? 'クイック復習' : 'Quick Review'}
+          {locale === 'ja' ? '問題管理' : 'Manage'}
         </Text>
         <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary }]}>
-          {quickReviewQuestions.length > 0 
-            ? (locale === 'ja' ? `${quickReviewQuestions.length}問` : `${quickReviewQuestions.length} questions`)
-            : (locale === 'ja' ? 'なし' : 'None')}
+          {locale === 'ja' ? '一覧・編集' : 'View & Edit'}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '15', borderColor: colors.border }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/mission'); }}
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.success + '10', borderColor: colors.border }]}
+        onPress={() => { SoundManager.play('decide'); navigate('/statistics'); }}
       >
         <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📊</Text>
-        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
+        <Text style={[styles.featureCardTitle, { color: colors.success }]}>
           {locale === 'ja' ? '週間目標' : 'Weekly Goal'}
         </Text>
         <View style={[styles.progressBarSmall, { backgroundColor: colors.border }]}>
-          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.primary }]} />
+          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.success }]} />
         </View>
         <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary, marginTop: 4 }]}>
           68% {locale === 'ja' ? '達成中' : 'completed'}
@@ -521,20 +549,11 @@ const HomeScreen = () => {
         </Text>
       </View>
 
-      {/* 右側：5つのアイコンボタン */}
+      {/* 右側：4つのアイコンボタン（カレンダー削除） */}
       <View style={[
         styles.topButtons,
         screenType === 'desktop' && { gap: 12 }
       ]}>
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }} label={t.calendar}>
-          <Calendar size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
-
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
@@ -579,7 +598,7 @@ const HomeScreen = () => {
     </View>
   );
 
-  // モバイル用：学習時間・正答率セクション
+  // モバイル用：正答率のみ（本日の学習時間削除）
   const renderMobileInfoSections = () => {
     if (screenType === 'desktop') return null;
     return (
@@ -597,18 +616,7 @@ const HomeScreen = () => {
           </TouchableOpacity>
         )}
 
-        {/* 本日の学習時間 */}
-        <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>⏱ {locale === 'ja' ? '本日の学習時間' : 'Today\'s Study Time'}</Text>
-          <Text style={[styles.mobileInfoValue, { color: colors.text, marginTop: 8 }]}>
-            {locale === 'ja' ? '24分' : '24 min'}
-          </Text>
-          <Text style={[styles.mobileInfoSubtext, { color: colors.textSecondary }]}>
-            {locale === 'ja' ? '目標：60分（40%達成）' : 'Goal: 60 min (40% done)'}
-          </Text>
-        </View>
-
-        {/* 今週の正答率 */}
+        {/* 今週の正答率（本日の学習時間削除） */}
         <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>📈 {locale === 'ja' ? '今週の正答率' : 'Weekly Accuracy'}</Text>
           <Text style={[styles.mobileAccuracyValue, { color: colors.primary, marginTop: 8 }]}>
