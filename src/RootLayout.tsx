@@ -18,6 +18,32 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const [bgmReady, setBgmReady] = useState(false);
   const location = useLocation();
 
+  // スクリーンタイム計測
+  useEffect(() => {
+    const sessionStart = Date.now();
+    const interval = setInterval(async () => {
+      const elapsed = Math.floor((Date.now() - sessionStart) / 1000 / 60);
+      if (elapsed > 0) {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const key = `screen_time_${today}`;
+          const current = await AsyncStorage.getItem(key);
+          const total = (current ? parseInt(current, 10) : 0) + 1;
+          await AsyncStorage.setItem(key, total.toString());
+          // 週間合計も更新
+          const weekKey = 'weekly_screen_time_minutes';
+          const weekTotal = await AsyncStorage.getItem(weekKey);
+          const newWeekTotal = (weekTotal ? parseInt(weekTotal, 10) : 0) + 1;
+          await AsyncStorage.setItem(weekKey, newWeekTotal.toString());
+        } catch (e) {
+          // silent
+        }
+      }
+    }, 60000); // 1分ごとに+1分
+    
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const initializeSettings = async () => {
       // BGMのデフォルト値を設定（まだ存在しない場合のみ）

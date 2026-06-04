@@ -442,17 +442,17 @@ const HomeScreen = () => {
     </View>
   );
 
-  // セカンダリボタン行：問題管理 / タイマー / ミッション（アイコンなし）
+  // セカンダリボタン行：予定登録 / タイマー / ミッション（アイコンなし）
   const renderSecondaryButtons = () => {
     const buttons = [
-      { label: '問題管理', onPress: () => { SoundManager.play('decide'); navigate('/browse'); } },
-      { label: 'タイマー', onPress: () => { SoundManager.play('decide'); showTimerAlert(); } },
-      { label: 'ミッション', onPress: () => { SoundManager.play('decide'); navigate('/mission'); } },
+      { label: '予定登録', onPress: () => { SoundManager.play('decide'); navigate('/calendar'); } },
+      { label: 'タイマー', onPress: () => { SoundManager.play('decide'); navigate('/manage'); } },
+      { label: 'ミッション', onPress: () => { SoundManager.play('decide'); navigate('/missions'); } },
     ];
     // 英語の場合
     const labels = currentLocale === 'en' 
-      ? ['Browse', 'Timer', 'Missions']
-      : ['問題管理', 'タイマー', 'ミッション'];
+      ? ['Calendar', 'Timer', 'Missions']
+      : ['予定登録', 'タイマー', 'ミッション'];
 
     return (
       <View style={{
@@ -667,39 +667,14 @@ const HomeScreen = () => {
         </View>
       )}
 
-      {/* デスクトップ時2カラムレイアウト */}
+      {/* デスクトップ時1カラムレイアウト（右カラム削除） */}
       {screenType === 'desktop' ? (
-        <View style={mainContentStyle.desktop}>
-          {/* 左カラム */}
-          <View style={leftColumnStyle.desktop}>
-            {renderStatsCard()}
-            {renderWeakCard()}
-            {renderMainButtons()}
-            {renderSecondaryButtons()}
-            {renderFeatureCards()}
-          </View>
-
-          {/* 右カラム */}
-          <View style={rightColumnStyle.desktop}>
-            <View style={{ gap: 12 }}>
-              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
-                <Text style={[styles.statBlockNumber, { color: colors.primary, fontSize: fs(28) }]}>{totalQuestions}</Text>
-                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
-              </View>
-              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
-                <Text style={[styles.statBlockNumber, { color: colors.error, fontSize: fs(28) }]}>{weakQuestionCount}</Text>
-                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.weakQuestionsQuiz}</Text>
-              </View>
-              <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
-                <Text style={[styles.statBlockNumber, { color: colors.primary, fontSize: fs(28) }]}>{timerMinutes}{t.minutes}</Text>
-                <Text style={[styles.statBlockLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.timer}</Text>
-              </View>
-            </View>
-            
-            <View style={{ marginTop: 16 }}>
-              {renderTodayQuestion()}
-            </View>
-          </View>
+        <View style={{ flexDirection: 'column' as const, gap: 0 }}>
+          {renderStatsCard()}
+          {renderWeakCard()}
+          {renderMainButtons()}
+          {renderSecondaryButtons()}
+          {renderFeatureCards()}
         </View>
       ) : (
         <View style={mainContentStyle[screenType]}>

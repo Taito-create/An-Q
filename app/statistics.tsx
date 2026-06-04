@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
+import { LineChart, BarChart } from 'react-native-chart-kit';
+
+const screenWidth = Dimensions.get('window').width - 48;
 
 export default function StatisticsScreen() {
   const navigate = useNavigate();
@@ -14,16 +17,46 @@ export default function StatisticsScreen() {
   const t = translations[locale];
 
   const [stats, setStats] = useState({
-    screenTime: 0,          // 分単位
+    screenTime: 0,
     questionsCreated: 0,
     quizPlayed: 0,
-    correctRate: 0,         // パーセンテージ
+    correctRate: 0,
   });
+  const [screenTimeData, setScreenTimeData] = useState<number[]>([]);
+  const [questionsCreatedData, setQuestionsCreatedData] = useState<number[]>([]);
+  const [quizPlaysData, setQuizPlaysData] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadWeeklyStats();
+    loadAllData();
+    const interval = setInterval(loadAllData, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const getWeekLabels = () => {
+    const now = new Date();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      days.push(locale === 'ja'
+        ? ['日', '月', '火', '水', '木', '金', '土'][d.getDay()]
+        : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
+      );
+    }
+    return days;
+  };
+
+  const loadAllData = async () => {
+    setIsLoading(true);
+    await Promise.all([
+      loadWeeklyStats(),
+      loadWeeklyScreenTimeHistory(),
+      loadWeeklyQuestionsHistory(),
+      loadWeeklyQuizHistory(),
+    ]);
+    setIsLoading(false);
+  };
 
   const loadWeeklyStats = async () => {
     try {
@@ -45,18 +78,90 @@ export default function StatisticsScreen() {
       const correctCount = weekResults.filter((r: any) => r.isCorrect).length;
       const correctRate = weekResults.length > 0 ? Math.round((correctCount / weekResults.length) * 100) : 0;
 
-      setStats({
-        screenTime,
-        questionsCreated,
-        quizPlayed,
-        correctRate,
-      });
+      setStats({ screenTime, questionsCreated, quizPlayed, correctRate });
     } catch (error) {
       console.error('Failed to load weekly stats:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
+
+  const loadWeeklyScreenTimeHistory = async () => {
+    try {
+      const days: number[] = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const minutes = await AsyncStorage.getItem(`screen_time_${dateStr}`);
+        days.push(minutes ? parseInt(minutes, 10) : 0);
+      }
+      setScreenTimeData(days);
+    } catch (e) {
+      console.error('Failed to load screen time history:', e);
+    }
+  };
+
+  const loadWeeklyQuestionsHistory = async () => {
+    try {
+      const days: number[] = [];
+      const now = new Date();
+      const allQuestions = JSON.parse(await AsyncStorage.getItem('quiz_questions') || '[]');
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStart = date.getTime();
+        const dateEnd = dateStart + 86400000;
+        const count = allQuestions.filter((q: any) => q.createdAt >= dateStart && q.createdAt < dateEnd).length;
+        days.push(count);
+      }
+      setQuestionsCreatedData(days);
+    } catch (e) {
+      console.error('Failed to load questions history:', e);
+    }
+  };
+
+  const loadWeeklyQuizHistory = async () => {
+    try {
+      const days: number[] = [];
+      const now = new Date();
+      const history = JSON.parse(await AsyncStorage.getItem('quizHistory') || '[]');
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStart = date.toISOString().split('T')[0];
+        const count = history.filter((h: any) => h.date?.startsWith(dateStart)).length;
+        days.push(count);
+      }
+      setQuizPlaysData(days);
+    } catch (e) {
+      console.error('Failed to load quiz history:', e);
+    }
+  };
+
+  const weekLabels = getWeekLabels();
+
+  const chartConfig = {
+    backgroundColor: colors.card,
+    backgroundGradientFrom: colors.card,
+    backgroundGradientTo: colors.card,
+    decimalCount: 0,
+    color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(110, 110, 138, ${opacity})`,
+    style: { borderRadius: 12 },
+    propsForDots: { r: 5, strokeWidth: 2, stroke: colors.primary },
+    propsForBackgroundLines: { strokeDasharray: '3,3', stroke: colors.border },
+  };
+
+  const barChartConfig = (primaryColor: string) => ({
+    backgroundColor: colors.card,
+    backgroundGradientFrom: colors.card,
+    backgroundGradientTo: colors.card,
+    decimalCount: 0,
+    color: (opacity = 1) => `${primaryColor}${opacity === 1 ? 'CC' : Math.round(opacity * 255).toString(16).padStart(2, '0')}`,
+    labelColor: (opacity = 1) => `rgba(110, 110, 138, ${opacity})`,
+    style: { borderRadius: 12 },
+    propsForBackgroundLines: { strokeDasharray: '3,3', stroke: colors.border },
+  });
 
   if (isLoading) {
     return (
@@ -68,7 +173,7 @@ export default function StatisticsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* ヘッダー */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           📊 {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
@@ -77,65 +182,84 @@ export default function StatisticsScreen() {
           style={[styles.backButton, { backgroundColor: colors.primary }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>
-            {t.back}
-          </Text>
+          <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* スクリーンタイムグラフ */}
+        {/* スクリーンタイム推移（折れ線グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            ⏱ {locale === 'ja' ? 'スクリーンタイム' : 'Screen Time'}
+            ⏱ {locale === 'ja' ? 'スクリーンタイム推移' : 'Screen Time History'}
           </Text>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.primary, fontSize: 36 }]}>
-              {stats.screenTime}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              {locale === 'ja' ? '分' : 'minutes'}
-            </Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { 
-              width: `${Math.min((stats.screenTime / 300) * 100, 100)}%`,
-              backgroundColor: colors.primary 
-            }]} />
-          </View>
-          <Text style={[styles.progressLabel, { color: colors.textSecondary, fontSize: 12 }]}>
-            {locale === 'ja' ? '目標: 300分/週' : 'Goal: 300 min/week'}
+          <LineChart
+            data={{
+              labels: weekLabels,
+              datasets: [{ data: screenTimeData.length > 0 ? screenTimeData : [0, 0, 0, 0, 0, 0, 0] }],
+            }}
+            width={screenWidth}
+            height={200}
+            yAxisSuffix={locale === 'ja' ? '分' : 'm'}
+            chartConfig={{
+              ...chartConfig,
+              color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
+            }}
+            bezier
+            style={{ borderRadius: 12 }}
+          />
+          <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '今週平均' : 'Weekly avg'}: {Math.round(screenTimeData.reduce((a, b) => a + b, 0) / 7)}{locale === 'ja' ? '分' : 'min'}
           </Text>
         </View>
 
-        {/* 問題作成数 */}
+        {/* 問題作成数の推移（棒グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            ✏️ {locale === 'ja' ? '作成した問題数' : 'Problems Created'}
+            ✏️ {locale === 'ja' ? '作成問題数の推移' : 'Problems Created'}
           </Text>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.primary, fontSize: 36 }]}>
-              {stats.questionsCreated}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              {locale === 'ja' ? '問' : 'problems'}
-            </Text>
-          </View>
+          <BarChart
+            data={{
+              labels: weekLabels,
+              datasets: [{ data: questionsCreatedData.length > 0 ? questionsCreatedData : [0, 0, 0, 0, 0, 0, 0] }],
+            }}
+            width={screenWidth}
+            height={200}
+            yAxisLabel=""
+            yAxisSuffix={locale === 'ja' ? '問' : ''}
+            chartConfig={{
+              ...barChartConfig('rgba(76, 175, 80, 1)'),
+              color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+            }}
+            style={{ borderRadius: 12 }}
+          />
+          <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '今週作成' : 'This week'}: {questionsCreatedData.reduce((a, b) => a + b, 0)}{locale === 'ja' ? '問' : ' problems'}
+          </Text>
         </View>
 
-        {/* クイズプレイ数 */}
+        {/* クイズプレイ回数の推移（棒グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            🎮 {locale === 'ja' ? 'クイズ実施回数' : 'Quiz Plays'}
+            🎮 {locale === 'ja' ? 'クイズプレイ回数の推移' : 'Quiz Plays'}
           </Text>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: colors.primary, fontSize: 36 }]}>
-              {stats.quizPlayed}
-            </Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              {locale === 'ja' ? '回' : 'times'}
-            </Text>
-          </View>
+          <BarChart
+            data={{
+              labels: weekLabels,
+              datasets: [{ data: quizPlaysData.length > 0 ? quizPlaysData : [0, 0, 0, 0, 0, 0, 0] }],
+            }}
+            width={screenWidth}
+            height={200}
+            yAxisLabel=""
+            yAxisSuffix={locale === 'ja' ? '回' : ''}
+            chartConfig={{
+              ...barChartConfig('rgba(33, 150, 243, 1)'),
+              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
+            }}
+            style={{ borderRadius: 12 }}
+          />
+          <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '今週実施' : 'This week'}: {quizPlaysData.reduce((a, b) => a + b, 0)}{locale === 'ja' ? '回' : ' times'}
+          </Text>
         </View>
 
         {/* 正答率 */}
@@ -152,10 +276,7 @@ export default function StatisticsScreen() {
             </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { 
-              width: `${stats.correctRate}%`,
-              backgroundColor: colors.success 
-            }]} />
+            <View style={[styles.progressFill, { width: `${stats.correctRate}%`, backgroundColor: colors.success }]} />
           </View>
         </View>
 
@@ -177,7 +298,7 @@ const styles = StyleSheet.create({
   statBox: { alignItems: 'center', marginBottom: 12 },
   statValue: { fontWeight: '700' },
   statLabel: { fontSize: 12, marginTop: 4 },
+  statDetail: { fontSize: 12, marginTop: 8, textAlign: 'center' },
   progressBar: { width: '100%', height: 8, backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
-  progressLabel: { marginTop: 8, textAlign: 'center' },
 });
