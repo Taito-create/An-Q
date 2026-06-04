@@ -12,9 +12,9 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
-import { Play, Plus, BarChart3, Music, Calendar, Settings, Globe, ScrollText, Award, ShoppingBag, Timer, Palette, Repeat2 } from 'lucide-react';
+import { Play, Plus, Music, Calendar, Settings, Globe, Palette } from 'lucide-react';
 
-// === 修正1: レスポンシブ判定用フック ===
+// レスポンシブ判定用フック
 const useResponsive = () => {
   const [screenType, setScreenType] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
 
@@ -41,7 +41,7 @@ const HomeScreen = () => {
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
 
-  // === 修正2: デバイス別コンテナスタイル ===
+  // デバイス別コンテナスタイル
   const containerStyles = {
     mobile: {
       maxWidth: '100%' as const,
@@ -62,7 +62,7 @@ const HomeScreen = () => {
     },
   };
 
-  // === 修正5: カード・ボタンサイズ ===
+  // カード・ボタンサイズ
   const cardPadding = {
     mobile: { padding: 12 },
     tablet: { padding: 14 },
@@ -114,21 +114,28 @@ const HomeScreen = () => {
   const [motivationalMessage, setMotivationalMessage] = useState('');
   const [examDates, setExamDates] = useState<any[]>([]);
   const [examCountdown, setExamCountdown] = useState<{daysLeft: number, examName: string} | null>(null);
-  const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('grid');
-  const [cardOrder, setCardOrder] = useState<string[]>(['browse', 'music', 'calendar']);
-  const [navMode, setNavMode] = useState<'compact' | 'bigGrid'>('compact');
-  const [reorderSelection, setReorderSelection] = useState<string[]>([]);
-  const [reorderMode, setReorderMode] = useState(false);
-  // 右上ボタンの順序（コンパクトモード用）
-  const [buttonOrder, setButtonOrder] = useState<string[]>([
-    'calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings',
-  ]);
+  const [quickReviewQuestions, setQuickReviewQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     loadSettings();
     SoundManager.initialize();
     loadExamCountdown();
+    loadQuickReviewQuestions();
   }, []);
+
+  const loadQuickReviewQuestions = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('quiz_questions');
+      if (stored) {
+        const allQuestions = JSON.parse(stored);
+        const weakQuestions = allQuestions.filter((q: any) => q.mistakeCount > 0);
+        const shuffled = [...weakQuestions].sort(() => Math.random() - 0.5).slice(0, 3);
+        setQuickReviewQuestions(shuffled);
+      }
+    } catch (e) {
+      console.error('Failed to load quick review:', e);
+    }
+  };
 
   const loadExamCountdown = async () => {
     try {
@@ -139,7 +146,6 @@ const HomeScreen = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Find the next exam date
       let nextExam = null;
       for (const exam of examDates) {
         const examDate = new Date(exam.date);
@@ -183,7 +189,6 @@ const HomeScreen = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Find the nearest upcoming exam date
     const upcomingExams = examDates
       .map(exam => ({
         ...exam,
@@ -196,10 +201,8 @@ const HomeScreen = () => {
       const nearestExam = upcomingExams[0];
       const daysUntil = Math.ceil((nearestExam.dateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-      // Show motivational message if exam is within 7 days
       if (daysUntil <= 7) {
         const messages = locale === 'ja' ? [
-          // 日本の偉人・著名人
           '「諦めたらそこで試合終了ですよ」— 安西先生（スラムダンク）',
           '「努力した者が全て報われるとは限らん。しかし、成功した者は皆すべからく努力しておる」— 安西先生',
           '「継続は力なり」— 格言',
@@ -235,35 +238,23 @@ const HomeScreen = () => {
 
   const loadSettings = async () => {
     try {
-      // Load questions
       const savedQuestions = await AsyncStorage.getItem('quiz_questions');
       if (savedQuestions) {
         const questions = JSON.parse(savedQuestions);
         setTotalQuestions(questions.length);
-        // 今日の1問（日付をシードにしてランダム選択）
         if (questions.length > 0) {
           const today = new Date();
           const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
           const idx = seed % questions.length;
           setTodayQuestion(questions[idx]);
         }
-        // 苦手問題数（mistakeCount > 0）
         const weak = questions.filter((q: any) => (q.mistakeCount ?? 0) > 0);
         setWeakQuestionCount(weak.length);
       }
 
-      // Load timer setting with migration from old keys
       await loadTimerSetting();
 
-      // Load layout settings
       const savedLayout = await AsyncStorage.getItem('home_layout_mode');
-      if (savedLayout === 'grid' || savedLayout === 'list') setLayoutMode(savedLayout);
-      const savedOrder = await AsyncStorage.getItem('home_card_order');
-      if (savedOrder) setCardOrder(JSON.parse(savedOrder));
-      const savedNavMode = await AsyncStorage.getItem('home_nav_mode');
-      if (savedNavMode === 'compact' || savedNavMode === 'bigGrid') setNavMode(savedNavMode);
-      const savedButtonOrder = await AsyncStorage.getItem('home_button_order');
-      if (savedButtonOrder) setButtonOrder(JSON.parse(savedButtonOrder));
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -271,29 +262,23 @@ const HomeScreen = () => {
 
   const loadTimerSetting = async () => {
     try {
-      // 1. 'APP_TIMER_SETTING' キーで保存された値を優先的に読み込む
       let timerValue = await AsyncStorage.getItem('APP_TIMER_SETTING');
       let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
 
-      // 2. 値が存在しない場合、古いキーをチェックして移行する
       if (storedMinutes === null) {
         const oldTimerValue = await AsyncStorage.getItem('timerSetting');
         if (oldTimerValue !== null) {
           storedMinutes = parseInt(oldTimerValue, 10);
-          // 古いキーの値を新しいキーにコピー
           await AsyncStorage.setItem('APP_TIMER_SETTING', storedMinutes.toString());
-          // 古いキーは削除
           await AsyncStorage.removeItem('timerSetting');
-          console.log(`Migrated timer setting from 'timerSetting' to 'APP_TIMER_SETTING': ${storedMinutes}`);
         }
       }
 
-      // 3. 最終的に有効な分数を設定する（デフォルトは5分）
       const finalMinutes = (storedMinutes !== null && !isNaN(storedMinutes)) ? storedMinutes : 5;
       setTimerMinutes(finalMinutes);
     } catch (error) {
       console.error('Failed to load timer setting:', error);
-      setTimerMinutes(5); // エラー時はデフォルト値に設定
+      setTimerMinutes(5);
     }
   };
 
@@ -303,26 +288,11 @@ const HomeScreen = () => {
       t.selectTimer,
       '',
       [
-        {
-          text: '1min',
-          onPress: () => saveTimer(1)
-        },
-        {
-          text: '3min',
-          onPress: () => saveTimer(3)
-        },
-        {
-          text: '5min',
-          onPress: () => saveTimer(5)
-        },
-        {
-          text: '10min',
-          onPress: () => saveTimer(10)
-        },
-        {
-          text: t.cancel,
-          style: 'cancel'
-        }
+        { text: '1min', onPress: () => saveTimer(1) },
+        { text: '3min', onPress: () => saveTimer(3) },
+        { text: '5min', onPress: () => saveTimer(5) },
+        { text: '10min', onPress: () => saveTimer(10) },
+        { text: t.cancel, style: 'cancel' }
       ]
     );
   };
@@ -337,66 +307,7 @@ const HomeScreen = () => {
     }
   };
 
-  const toggleLayoutMode = async () => {
-    const next = layoutMode === 'grid' ? 'list' : 'grid';
-    setLayoutMode(next);
-    await AsyncStorage.setItem('home_layout_mode', next);
-    SoundManager.play('select');
-  };
-
-  const toggleNavMode = async () => {
-    const next = navMode === 'compact' ? 'bigGrid' : 'compact';
-    setNavMode(next);
-    setReorderSelection([]);
-    setReorderMode(false);
-    await AsyncStorage.setItem('home_nav_mode', next);
-    SoundManager.play('select');
-  };
-
-  // ボタン配置換えモード開始/タップ処理
-  const startReorderMode = () => {
-    setReorderMode(true);
-    setReorderSelection([]);
-    SoundManager.play('select');
-  };
-
-  const handleReorderTap = (key: string) => {
-    if (!reorderMode) return;
-    const allKeys = navMode === 'compact'
-      ? buttonOrder
-      : ['calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings'];
-
-    const newSel = reorderSelection.includes(key)
-      ? reorderSelection.filter(k => k !== key)
-      : [...reorderSelection, key];
-    setReorderSelection(newSel);
-
-    if (newSel.length === allKeys.length) {
-      // 全選択完了 → 確認画面へ
-      const before = navMode === 'compact' ? buttonOrder : cardOrder.filter(k => k in { calendar: 1, mission: 1, title: 1, shop: 1, manage: 1, themeSettings: 1 });
-      navigate(`/reorderConfirm?before=${encodeURIComponent(JSON.stringify(before.length ? before : allKeys))}&after=${encodeURIComponent(JSON.stringify(newSel))}&mode=${navMode}&locale=${locale}`);
-      setReorderMode(false);
-      setReorderSelection([]);
-    }
-  };
-
-  const cancelReorderMode = () => {
-    setReorderMode(false);
-    setReorderSelection([]);
-    SoundManager.play('decide');
-  };
-
-  const moveCard = async (index: number, direction: 'up' | 'down') => {
-    const newOrder = [...cardOrder];
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= newOrder.length) return;
-    [newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]];
-    setCardOrder(newOrder);
-    await AsyncStorage.setItem('home_card_order', JSON.stringify(newOrder));
-    SoundManager.play('select');
-  };
-
-  // === 修正4: メインコンテンツスタイル ===
+  // メインコンテンツスタイル
   const mainContentStyle = {
     mobile: { flexDirection: 'column' as const, gap: 12 },
     tablet: { flexDirection: 'column' as const, gap: 14 },
@@ -418,29 +329,6 @@ const HomeScreen = () => {
     mobile: { flex: 1 },
     tablet: { flex: 1 },
     desktop: { flex: 1, minWidth: 0 },
-  };
-
-  // === 修正10: ホバー状態（PCのみ） ===
-  const [hovered, setHovered] = useState(false);
-  const hoverProps = screenType === 'desktop' ? {
-    onMouseEnter: () => setHovered(true),
-    onMouseLeave: () => setHovered(false),
-  } : {};
-
-  // ナビゲーションカードの固定カード定義
-  const fixedCards = [
-    { key: 'browse', icon: 'barChart', iconBg: colors.primary + '20',   iconColor: colors.primary,   route: '/browse', titleKey: 'manageQuestions' as keyof typeof t, descKey: 'learningDesc' as keyof typeof t },
-    { key: 'music',  icon: 'music', iconBg: colors.secondary + '30', iconColor: colors.secondary, route: '/music',  titleKey: 'musicSettings'   as keyof typeof t, descKey: 'musicDesc'     as keyof typeof t },
-  ];
-
-  const defaultExtraOrder = ['calendar', 'mission', 'title', 'shop', 'manage', 'themeSettings'];
-  const extraDefs: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
-    calendar:      { icon: <Calendar size={26} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
-    mission:       { icon: <ScrollText size={26} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
-    title:         { icon: <Award size={26} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
-    shop:          { icon: <ShoppingBag size={26} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
-    manage:        { icon: <Timer size={26} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
-    themeSettings: { icon: <Palette size={26} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
   };
 
   const renderStatsCard = () => (
@@ -506,7 +394,6 @@ const HomeScreen = () => {
       <TouchableOpacity
         style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
-        {...(screenType === 'desktop' ? { onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false) } : {})}
       >
         <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
         <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
@@ -521,7 +408,7 @@ const HomeScreen = () => {
     </View>
   );
 
-  // === 修正6: セカンダリボタン行 ===
+  // セカンダリボタン行：予定登録 / タイマー / ミッション
   const renderSecondaryButtons = () => (
     <View style={{
       display: 'flex',
@@ -536,8 +423,8 @@ const HomeScreen = () => {
         paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
         backgroundColor: colors.card,
         borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); navigate('/create'); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.createQuestion}</Text>
+      }]} onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>📅 {t.calendar}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.secondaryBtn, { 
         flex: 1,
@@ -545,8 +432,8 @@ const HomeScreen = () => {
         paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
         backgroundColor: colors.card,
         borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.manageQuestions}</Text>
+      }]} onPress={() => { SoundManager.play('decide'); showTimerAlert(); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>⏱ {t.timer}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.secondaryBtn, { 
         flex: 1,
@@ -554,117 +441,56 @@ const HomeScreen = () => {
         paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
         backgroundColor: colors.card,
         borderColor: colors.border,
-      }]} onPress={() => { SoundManager.play('decide'); navigate('/results'); }}>
-        <Text style={{ fontSize: fontSize.body, color: colors.text }}>{t.viewResults}</Text>
+      }]} onPress={() => { SoundManager.play('decide'); navigate('/mission'); }}>
+        <Text style={{ fontSize: fontSize.body, color: colors.text }}>🎖 {t.mission}</Text>
       </TouchableOpacity>
     </View>
   );
 
-  // === 修正8: ナビゲーションリンク（PC時非表示） ===
-  const renderNavLinks = () => {
-    if (screenType === 'desktop') return null;
-    return (
-      <View style={{ gap: 8, marginTop: 12 }}>
-        <TouchableOpacity style={styles.linkButton} onPress={() => { SoundManager.play('decide'); navigate('/credits'); }}>
-          <Text style={{ color: colors.primary, fontSize: fontSize.body }}>{t.aboutApp}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkButton} onPress={() => { SoundManager.play('decide'); navigate('/feedback'); }}>
-          <Text style={{ color: colors.primary, fontSize: fontSize.body }}>{t.submitFeedback}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  // フィーチャーカード：クイック復習 + 週間目標
+  const renderFeatureCards = () => (
+    <View style={styles.featureCardsRow}>
+      <TouchableOpacity
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border }]}
+        onPress={async () => {
+          SoundManager.play('decide');
+          if (quickReviewQuestions.length > 0) {
+            await AsyncStorage.setItem('quick_review_ids', JSON.stringify(quickReviewQuestions.map(q => q.id)));
+          }
+          await AsyncStorage.setItem('quiz_mode', 'quick_review');
+          navigate('/quiz');
+        }}
+      >
+        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>🎯</Text>
+        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
+          {locale === 'ja' ? 'クイック復習' : 'Quick Review'}
+        </Text>
+        <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary }]}>
+          {quickReviewQuestions.length > 0 
+            ? (locale === 'ja' ? `${quickReviewQuestions.length}問` : `${quickReviewQuestions.length} questions`)
+            : (locale === 'ja' ? 'なし' : 'None')}
+        </Text>
+      </TouchableOpacity>
 
-  // ナビゲーションカードセクション（既存のコードを統合）
-  const renderNavigationCards = () => {
-    const extraOrder: string[] = (cardOrder.filter(k => k in extraDefs).length === Object.keys(extraDefs).length)
-      ? cardOrder.filter(k => k in extraDefs)
-      : defaultExtraOrder;
-    const orderedExtra = extraOrder.map(k => ({ key: k, ...extraDefs[k] }));
-
-    if (navMode === 'bigGrid') {
-      return (
-        <View>
-          <View style={styles.grid}>
-            {fixedCards.map(card => {
-              const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
-              return (
-                <TouchableOpacity key={card.key} style={[styles.navCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
-                  <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-                    <IconComponent size={28} color={card.iconColor} />
-                  </View>
-                  <Text style={[styles.navTitle, { color: colors.text, fontSize: fontSize.title }]}>{t[card.titleKey]}</Text>
-                  <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t[card.descKey]}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={[styles.reorderHint, { color: colors.textSecondary, marginTop: 16, marginBottom: 6 }]}>
-            {reorderMode
-              ? (`${reorderSelection.length}/${orderedExtra.length} ${t.reorderModeActive}`)
-              : (t.moreFeatures)}
-          </Text>
-          <View style={styles.bigGrid}>
-            {orderedExtra.map(btn => {
-              const selIdx = reorderSelection.indexOf(btn.key);
-              const isSelected = selIdx !== -1;
-              return (
-                <TouchableOpacity
-                  key={btn.key}
-                  style={[styles.bigCard, {
-                    backgroundColor: isSelected ? colors.primary + '20' : colors.card,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    borderWidth: isSelected ? 2 : 1,
-                  }]}
-                  onPress={() => {
-                    if (reorderMode) {
-                      handleReorderTap(btn.key);
-                    } else {
-                      SoundManager.play('decide');
-                      navigate(btn.route);
-                    }
-                  }}
-                >
-                  {isSelected && (
-                    <View style={[styles.selBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={[styles.selBadgeText, { color: onPrimary }]}>{selIdx + 1}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.bigCardIcon, { backgroundColor: colors.primary + '20' }]}>
-                    {btn.icon}
-                  </View>
-                  <Text style={[styles.bigCardTitle, { color: colors.text, fontSize: fontSize.body }]}>
-                    {btn.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      <TouchableOpacity
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '15', borderColor: colors.border }]}
+        onPress={() => { SoundManager.play('decide'); navigate('/mission'); }}
+      >
+        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📊</Text>
+        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
+          {locale === 'ja' ? '週間目標' : 'Weekly Goal'}
+        </Text>
+        <View style={[styles.progressBarSmall, { backgroundColor: colors.border }]}>
+          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.primary }]} />
         </View>
-      );
-    }
+        <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary, marginTop: 4 }]}>
+          68% {locale === 'ja' ? '達成中' : 'completed'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-    // compact mode
-    return (
-      <View style={styles.fixedCardRow}>
-        {fixedCards.map(card => {
-          const IconComponent = card.icon === 'barChart' ? BarChart3 : Music;
-          return (
-            <TouchableOpacity key={card.key} style={[styles.fixedCard, { backgroundColor: colors.card }]} onPress={() => { SoundManager.play('decide'); navigate(card.route); }}>
-              <View style={[styles.iconCircle, { backgroundColor: card.iconBg }]}>
-                <IconComponent size={28} color={card.iconColor} />
-              </View>
-              <Text style={[styles.navTitle, { color: colors.text, fontSize: fontSize.title }]}>{t[card.titleKey]}</Text>
-              <Text style={[styles.navDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t[card.descKey]}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    );
-  };
-
-  // === 共通のheaderとtopButtons（修正3） ===
+  // ヘッダー
   const renderHeader = () => (
     <View style={[
       styles.header,
@@ -674,7 +500,6 @@ const HomeScreen = () => {
         borderBottomColor: colors.border,
       }
     ]}>
-      {/* 左側：タイトル */}
       <View style={{ flex: 1 }}>
         <Text style={[
           styles.appTitle,
@@ -683,9 +508,7 @@ const HomeScreen = () => {
             fontWeight: 'bold',
             color: colors.primary,
           }
-        ]}>
-          An-Q
-        </Text>
+        ]}>An-Q</Text>
         <Text style={[
           styles.appSubtitle,
           {
@@ -698,95 +521,35 @@ const HomeScreen = () => {
         </Text>
       </View>
 
-      {/* 右側：アイコンボタン */}
+      {/* 右側：5つのアイコンボタン */}
       <View style={[
         styles.topButtons,
         screenType === 'desktop' && { gap: 12 }
       ]}>
-        {navMode === 'compact' && !reorderMode && (
-          <>
-            {buttonOrder.map(key => {
-              const btnDef: Record<string, { icon: React.ReactNode; label: string; route: string }> = {
-                calendar:      { icon: <Calendar size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                     label: t.calendar,       route: '/calendar' },
-                mission:       { icon: <ScrollText size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                  label: t.mission,        route: '/mission' },
-                title:         { icon: <Award size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                       label: t.titleLabel,     route: '/title' },
-                shop:          { icon: <ShoppingBag size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                 label: t.shop,           route: '/shop' },
-                manage:        { icon: <Timer size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                       label: t.timerSettings,  route: '/manage' },
-                themeSettings: { icon: <Palette size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />,                     label: t.themeSetting,    route: '/settings' },
-              };
-              const def = btnDef[key];
-              if (!def) return null;
-              return (
-                <TooltipButton key={key} style={[styles.iconButton, { 
-                  width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-                  height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-                  borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-                  borderColor: colors.primary 
-                }]} onPress={() => { SoundManager.play('decide'); navigate(def.route); }} label={def.label}>
-                  {def.icon}
-                </TooltipButton>
-              );
-            })}
-          </>
-        )}
-        {navMode === 'compact' && reorderMode && (
-          <>
-            {buttonOrder.map(key => {
-              const iconMap: Record<string, string> = {
-                calendar: '◧', mission: '◰',
-                title: '◱', shop: '◲',
-                manage: '◳', themeSettings: '◴',
-              };
-              const selIdx = reorderSelection.indexOf(key);
-              return (
-                <TouchableOpacity key={key} style={[styles.iconButton, { 
-                  width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-                  height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-                  borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-                  borderColor: selIdx >= 0 ? colors.primary : colors.border, backgroundColor: selIdx >= 0 ? colors.primary + '20' : 'transparent' 
-                }]} onPress={() => handleReorderTap(key)}>
-                  {selIdx >= 0
-                    ? <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>{selIdx + 1}</Text>
-                    : <Text style={{ fontSize: 16, color: colors.textSecondary }}>{iconMap[key]}</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity style={[styles.iconButton, { 
-              width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-              height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-              borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-              borderColor: colors.error 
-            }]} onPress={cancelReorderMode}>
-              <Text style={{ fontSize: 16, color: colors.error }}>✕</Text>
-            </TouchableOpacity>
-          </>
-        )}
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
           borderColor: colors.primary 
-        }]} onPress={toggleNavMode} label={t.navModeToggle}>
-          <Repeat2 size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }} label={t.calendar}>
+          <Calendar size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
+
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: reorderMode ? colors.warning : colors.primary 
-        }]} onPress={reorderMode ? cancelReorderMode : startReorderMode} label={t.reorderButtons}>
-          <Text style={{ fontSize: 16, color: reorderMode ? colors.warning : colors.primary }}>⇄</Text>
+          borderColor: colors.primary 
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/settings'); }} label={t.themeSetting}>
+          <Palette size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
-        <TooltipButton
-          style={[styles.iconButton, { 
-            width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-            height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-            borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-            borderColor: colors.primary 
-          }]}
-          onPress={toggleLanguage}
-          label={t.language}
-        >
+
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={toggleLanguage} label={t.language}>
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Globe size={screenType === 'desktop' ? 14 : 12} color={colors.primary} />
             <Text style={[styles.languageText, { color: colors.primary, fontSize: screenType === 'desktop' ? 10 : 9, marginTop: 1 }]}>
@@ -794,17 +557,70 @@ const HomeScreen = () => {
             </Text>
           </View>
         </TooltipButton>
+
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
           borderColor: colors.primary 
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.settings}>
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/music'); }} label={t.musicSettings}>
+          <Music size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        </TooltipButton>
+
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.appSettings}>
           <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
       </View>
     </View>
   );
+
+  // モバイル用：学習時間・正答率セクション
+  const renderMobileInfoSections = () => {
+    if (screenType === 'desktop') return null;
+    return (
+      <View style={{ marginTop: 12, gap: 12 }}>
+        {/* 今日の1問 */}
+        {todayQuestion && (
+          <TouchableOpacity
+            style={[styles.todayCard, { padding: 14, backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+            onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+          >
+            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>◧ {t.todayQuestion}</Text>
+            <Text style={[styles.mobileQuestionText, { color: colors.text, marginTop: 8 }]}>
+              {todayQuestion.question}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 本日の学習時間 */}
+        <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>⏱ {locale === 'ja' ? '本日の学習時間' : 'Today\'s Study Time'}</Text>
+          <Text style={[styles.mobileInfoValue, { color: colors.text, marginTop: 8 }]}>
+            {locale === 'ja' ? '24分' : '24 min'}
+          </Text>
+          <Text style={[styles.mobileInfoSubtext, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '目標：60分（40%達成）' : 'Goal: 60 min (40% done)'}
+          </Text>
+        </View>
+
+        {/* 今週の正答率 */}
+        <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>📈 {locale === 'ja' ? '今週の正答率' : 'Weekly Accuracy'}</Text>
+          <Text style={[styles.mobileAccuracyValue, { color: colors.primary, marginTop: 8 }]}>
+            78%
+          </Text>
+          <Text style={[styles.mobileInfoSubtext, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '先週比 +5%' : '+5% vs last week'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
@@ -843,7 +659,7 @@ const HomeScreen = () => {
         </View>
       )}
 
-      {/* === 修正4: デスクトップ時2カラムレイアウト === */}
+      {/* デスクトップ時2カラムレイアウト */}
       {screenType === 'desktop' ? (
         <View style={mainContentStyle.desktop}>
           {/* 左カラム */}
@@ -852,12 +668,11 @@ const HomeScreen = () => {
             {renderWeakCard()}
             {renderMainButtons()}
             {renderSecondaryButtons()}
-            {renderNavigationCards()}
+            {renderFeatureCards()}
           </View>
 
           {/* 右カラム */}
           <View style={rightColumnStyle.desktop}>
-            {/* スタッツ（縦積み） */}
             <View style={{ gap: 12 }}>
               <View style={[styles.statBlock, { backgroundColor: colors.card, ...cardPadding.desktop }]}>
                 <Text style={[styles.statBlockNumber, { color: colors.primary, fontSize: fs(28) }]}>{totalQuestions}</Text>
@@ -873,7 +688,6 @@ const HomeScreen = () => {
               </View>
             </View>
             
-            {/* 今日の1問 */}
             <View style={{ marginTop: 16 }}>
               {renderTodayQuestion()}
             </View>
@@ -881,29 +695,12 @@ const HomeScreen = () => {
         </View>
       ) : (
         <View style={mainContentStyle[screenType]}>
-          {/* モバイル・タブレット：1列で順番に並ぶ */}
           {renderStatsCard()}
-          {todayQuestion && (
-            <TouchableOpacity
-              style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-              onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
-            >
-              <View style={styles.todayHeader}>
-                <Text style={styles.todayEmoji}>◧</Text>
-                <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
-                  {t.todayQuestion}
-                </Text>
-              </View>
-              <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fontSize.body }]} numberOfLines={2}>
-                {todayQuestion.question}
-              </Text>
-            </TouchableOpacity>
-          )}
           {renderWeakCard()}
           {renderMainButtons()}
           {renderSecondaryButtons()}
-          {renderNavigationCards()}
-          {renderNavLinks()}
+          {renderFeatureCards()}
+          {renderMobileInfoSections()}
         </View>
       )}
 
@@ -933,39 +730,11 @@ const styles = StyleSheet.create({
   appSubtitle: {
     marginTop: 4,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#666',
-  },
   topButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
     alignItems: 'center',
-  },
-  timerButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  themeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   iconButton: {
     backgroundColor: 'transparent',
@@ -973,22 +742,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calendarButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   languageText: {
     fontWeight: 'bold',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   todayCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12 },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
@@ -1010,9 +765,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     flex: 1,
     lineHeight: 16,
-  },
-  headerContent: {
-    flex: 1,
   },
   examCountdownBox: {
     marginHorizontal: 0,
@@ -1049,10 +801,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  mainActions: {
-    marginBottom: 30,
-    gap: 15,
-  },
   primaryButton: {
     borderRadius: 12,
     flexDirection: 'row',
@@ -1074,129 +822,68 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 12,
   },
-  grid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  fixedCardRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  fixedCard: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  navCard: {
-    width: '47%',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  iconSimple: {
-    fontSize: 22,
-    fontWeight: '300',
-    textAlign: 'center',
-  },
-  navTitle: {
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  navDesc: {
-    color: '#666',
-    textAlign: 'center',
-  },
-  listContainer: {
-    gap: 10,
-  },
-  listCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    gap: 12,
-  },
-  listCardText: {
-    flex: 1,
-  },
-  orderButtons: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  orderBtn: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    paddingHorizontal: 4,
-  },
-  bigGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  bigCard: {
-    width: '47%',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  bigCardIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  bigCardTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  bigCardDesc: {
-    textAlign: 'center',
-  },
-  selBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selBadgeText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  reorderHint: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
   secondaryBtn: {
     borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  linkButton: {
-    paddingVertical: 10,
+  featureCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  featureCard: {
+    borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
+    borderWidth: 1,
+  },
+  featureCardIcon: {
+    marginBottom: 8,
+  },
+  featureCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  featureCardSubtitle: {
+    fontSize: 12,
+  },
+  progressBarSmall: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  mobileSectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  mobileQuestionText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  mobileInfoValue: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  mobileAccuracyValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  mobileInfoSubtext: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  infoCard: {
+    borderRadius: 12,
+    borderWidth: 1,
   },
   statBlock: {
     borderRadius: 12,

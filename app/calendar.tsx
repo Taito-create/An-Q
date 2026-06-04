@@ -7,10 +7,27 @@ import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 
-const { width, height } = Dimensions.get('window');
-const isMobile = width < 768;
-// 画面サイズに応じてセルサイズを調整
-const cellSize = isMobile ? Math.min(width / 7 - 8, 44) : Math.min(width / 7 - 4, 60);
+const { width } = Dimensions.get('window');
+
+// レスポンシブ判定用フック
+const useResponsive = () => {
+  const [screenType, setScreenType] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
+
+  useEffect(() => {
+    const checkScreen = () => {
+      const w = window.innerWidth;
+      if (w < 640) setScreenType('mobile');
+      else if (w < 1024) setScreenType('tablet');
+      else setScreenType('desktop');
+    };
+    
+    checkScreen();
+    window.addEventListener('resize', checkScreen);
+    return () => window.removeEventListener('resize', checkScreen);
+  }, []);
+
+  return screenType;
+};
 
 interface SubjectExam {
   subject: string;
@@ -30,7 +47,11 @@ export default function CalendarScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  const screenType = useResponsive();
   
+  const isMobile = screenType !== 'desktop';
+  const cellSize = isMobile ? Math.min(width / 7 - 8, 44) : Math.min(width / 7 - 4, 70);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState('');
   const [events, setEvents] = useState<ScheduledEvent[]>([]);
@@ -86,14 +107,13 @@ export default function CalendarScreen() {
   const firstDay = getFirstDayOfMonth(year, month);
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
-const days: Array<number | null> = [];
+  const days: Array<number | null> = [];
   for (let i = 0; i < firstDay; i++) {
     days.push(null);
   }
   for (let i = 1; i <= daysInMonth; i++) {
     days.push(i);
   }
-
 
   const goPrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -198,7 +218,6 @@ const days: Array<number | null> = [];
     setEditingEventId(null);
   };
 
-  // 削除確認ダイアログ付きの削除関数
   const deleteEvent = async (eventId: string, eventDate: string) => {
     Alert.alert(
       '確認', 
@@ -243,7 +262,7 @@ const days: Array<number | null> = [];
     const isToday = dateStr === todayStr;
     const isPast = new Date(dateStr) < new Date(todayStr);
     const isSelected = dateStr === selectedDate;
-const hasEvent = events.some((e) => e.date === dateStr);
+    const hasEvent = events.some((e) => e.date === dateStr);
     const isInEventRange = events.some((e) => e.endDate && e.date <= dateStr && e.endDate >= dateStr);
 
     let bgColor = 'transparent';
@@ -268,16 +287,6 @@ const hasEvent = events.some((e) => e.date === dateStr);
     return { bgColor, textColor, hasEvent: hasEvent || isInEventRange };
   };
 
-  const getEventDisplayText = (event: ScheduledEvent) => {
-    if (event.subjects && event.subjects.length > 0) {
-      return event.name;
-    }
-    if (event.endDate) {
-      return `${event.name} (${event.date} 〜 ${event.endDate})`;
-    }
-    return `${event.name} (${event.date})`;
-  };
-
   const getExamsOnDate = (date: string) => {
     const exams: string[] = [];
     events.forEach(event => {
@@ -290,6 +299,220 @@ const hasEvent = events.some((e) => e.date === dateStr);
       }
     });
     return exams;
+  };
+
+  // カレンダー本体のレンダリング
+  const renderCalendar = () => (
+    <>
+      <View style={[styles.monthHeader, isMobile && { paddingHorizontal: 16 }]}>
+        <TouchableOpacity onPress={goPrevMonth}>
+          <Text style={[styles.monthArrow, { color: colors.primary }]}>＜</Text>
+        </TouchableOpacity>
+        <Text style={[styles.monthText, { color: colors.text, fontSize: isMobile ? 18 : 22 }]}>
+          {year}年 {month + 1}月
+        </Text>
+        <TouchableOpacity onPress={goNextMonth}>
+          <Text style={[styles.monthArrow, { color: colors.primary }]}>＞</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 曜日表示 */}
+      <View style={styles.weekDaysRow}>
+        {weekDays.map(day => (
+          <Text key={day} style={[styles.weekDayText, { color: colors.textSecondary, fontSize: isMobile ? 12 : 15 }]}>
+            {day}
+          </Text>
+        ))}
+      </View>
+
+      {/* 日付表示 */}
+      <View style={styles.daysGrid}>
+        {days.map((day, index) => {
+          const dateStr = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+          const examsOnDate = dateStr ? getExamsOnDate(dateStr) : [];
+          const dayStyle = day ? getDayStyle(day) : null;
+          return (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.dayCell,
+                { width: cellSize, height: cellSize, borderRadius: isMobile ? cellSize / 2 : 10 },
+                day && dayStyle ? { backgroundColor: dayStyle.bgColor } : null,
+              ]}
+              onPress={() => day && onDayPress(day)}
+              disabled={!day}
+            >
+              {day && (
+                <>
+                  <Text style={[styles.dayText, { fontSize: isMobile ? 14 : 18, fontWeight: isMobile ? '500' : '600' }, dayStyle && { color: dayStyle.textColor }]}>
+                    {day}
+                  </Text>
+                  {examsOnDate.length > 0 && (
+                    <View style={[styles.eventDot, { backgroundColor: colors.error, width: isMobile ? 4 : 8, height: isMobile ? 4 : 8 }]} />
+                  )}
+                  {dayStyle?.hasEvent && examsOnDate.length === 0 && (
+                    <View style={[styles.eventDot, { backgroundColor: colors.success, width: isMobile ? 4 : 8, height: isMobile ? 4 : 8 }]} />
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </>
+  );
+
+  // 予定登録フォーム
+  const renderForm = () => {
+    if (!showForm || !selectedDate) return null;
+    return (
+      <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.formTitle, { color: colors.text }]}>
+          {editingEventId ? '予定を編集' : '予定を登録'}
+        </Text>
+        <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>
+          開始日: {selectedDate}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.toggleButton, { borderColor: colors.primary }]}
+          onPress={() => setIsRange(!isRange)}
+        >
+          <Text style={[styles.toggleButtonText, { color: colors.primary }]}>
+            {isRange ? '✓ 期間指定' : '○ 期間指定'}
+          </Text>
+        </TouchableOpacity>
+
+        {isRange && (
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
+            value={endDate}
+            onChangeText={setEndDate}
+            placeholder="終了日 (YYYY-MM-DD)"
+            placeholderTextColor={colors.textSecondary}
+          />
+        )}
+
+        <TextInput
+          style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
+          value={eventName}
+          onChangeText={setEventName}
+          placeholder="予定名 (例: 中間試験)"
+          placeholderTextColor={colors.textSecondary}
+        />
+
+        {eventName.includes('試験') && (
+          <View style={styles.subjectsContainer}>
+            <Text style={[styles.subjectsTitle, { color: colors.text }]}>教科ごとの試験日</Text>
+            {subjectInputs.map((input, idx) => (
+              <View key={idx} style={styles.subjectRow}>
+                <TextInput
+                  style={[styles.subjectInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, flex: 1 }]}
+                  value={input.subject}
+                  onChangeText={(text) => updateSubject(idx, 'subject', text)}
+                  placeholder="教科名"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <TextInput
+                  style={[styles.subjectDateInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, width: 110 }]}
+                  value={input.date}
+                  onChangeText={(text) => updateSubject(idx, 'date', text)}
+                  placeholder="日付"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <TouchableOpacity onPress={() => removeSubject(idx)} style={styles.removeSubjectBtn}>
+                  <Text style={[styles.removeSubjectText, { color: colors.error }]}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={[styles.addSubjectBtn, { borderColor: colors.primary }]} onPress={addSubjectInput}>
+              <Text style={[styles.addSubjectText, { color: colors.primary }]}>+ 教科を追加</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.formButtons}>
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={saveEvent}>
+            <Text style={[styles.saveButtonText, { color: onPrimary }]}>保存</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={resetForm}>
+            <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
+          </TouchableOpacity>
+        </View>
+
+        {events.some(e => (editingEventId ? e.id === editingEventId : e.date === selectedDate)) && (
+          <TouchableOpacity 
+            style={[styles.deleteEventButton, { backgroundColor: colors.error }]} 
+            onPress={() => {
+              const targetEvent = events.find(e => editingEventId ? e.id === editingEventId : e.date === selectedDate);
+              if (targetEvent) {
+                deleteEvent(targetEvent.id, targetEvent.date);
+              }
+            }}
+          >
+            <Text style={styles.deleteEventButtonText}>この予定を削除</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // 予定一覧
+  const renderEventList = () => {
+    if (events.length === 0) return null;
+    return (
+      <View style={styles.eventListContainer}>
+        <Text style={[styles.eventListTitle, { color: colors.text, fontSize: isMobile ? 16 : 18 }]}>予定一覧</Text>
+        {events.map(event => (
+          <View
+            key={event.id}
+            style={[styles.eventItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <TouchableOpacity
+              style={styles.eventContent}
+              onPress={() => {
+                setSelectedDate(event.date);
+                setEditingEventId(event.id);
+                setEventName(event.name);
+                setEndDate(event.endDate || '');
+                setIsRange(!!event.endDate);
+                setSubjectInputs(event.subjects || []);
+                setShowForm(true);
+              }}
+            >
+              <Text style={[styles.eventName, { color: colors.text, fontWeight: 'bold', marginBottom: 4, fontSize: isMobile ? 14 : 15 }]}>
+                {event.name}
+              </Text>
+              
+              {event.subjects && event.subjects.length > 0 ? (
+                <View style={{ marginTop: 4, gap: 3 }}>
+                  {event.subjects.map((s, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[{ fontSize: 11, color: colors.textSecondary, minWidth: 85 }]}>
+                        {s.date}
+                      </Text>
+                      <Text style={[{ fontSize: 13, color: colors.text }]}>
+                        {s.subject}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+                  {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteIcon, { backgroundColor: colors.error }]}
+              onPress={() => deleteEvent(event.id, event.date)}
+            >
+              <Text style={styles.deleteIconText}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -310,212 +533,75 @@ const hasEvent = events.some((e) => e.date === dateStr);
         </TouchableOpacity>
       </View>
 
-      <View style={styles.calendarContainer}>
-        {/* 月切り替えヘッダー */}
-        <View style={styles.monthHeader}>
-          <TouchableOpacity onPress={goPrevMonth}>
-            <Text style={[styles.monthArrow, { color: colors.primary }]}>＜</Text>
-          </TouchableOpacity>
-          <Text style={[styles.monthText, { color: colors.text }]}>
-            {year}年 {month + 1}月
-          </Text>
-          <TouchableOpacity onPress={goNextMonth}>
-            <Text style={[styles.monthArrow, { color: colors.primary }]}>＞</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 曜日表示 */}
-        <View style={styles.weekDaysRow}>
-          {weekDays.map(day => (
-            <Text key={day} style={[styles.weekDayText, { color: colors.textSecondary, fontSize: isMobile ? 12 : 14 }]}>
-              {day}
-            </Text>
-          ))}
-        </View>
-
-        {/* 日付表示 */}
-        <View style={styles.daysGrid}>
-          {days.map((day, index) => {
-            const dateStr = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
-            const examsOnDate = dateStr ? getExamsOnDate(dateStr) : [];
-            const dayStyle = day ? getDayStyle(day) : null;
-            return (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.dayCell,
-                  { width: cellSize, height: cellSize, borderRadius: cellSize / 2 },
-                  day && dayStyle ? { backgroundColor: dayStyle.bgColor } : null,
-                ]}
-                onPress={() => day && onDayPress(day)}
-                disabled={!day}
-              >
-                {day && (
-                  <>
-                    <Text style={[styles.dayText, { fontSize: isMobile ? 14 : 16 }, dayStyle && { color: dayStyle.textColor }]}>
-                      {day}
-                    </Text>
-                    {examsOnDate.length > 0 && (
-                      <View style={[styles.eventDot, { backgroundColor: colors.error, width: isMobile ? 4 : 6, height: isMobile ? 4 : 6 }]} />
-                    )}
-                    {dayStyle?.hasEvent && examsOnDate.length === 0 && (
-                      <View style={[styles.eventDot, { backgroundColor: colors.success, width: isMobile ? 4 : 6, height: isMobile ? 4 : 6 }]} />
-                    )}
-                  </>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* 予定登録フォーム */}
-      {showForm && selectedDate && (
-        <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.formTitle, { color: colors.text }]}>
-            {editingEventId ? '予定を編集' : '予定を登録'}
-          </Text>
-          <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>
-            開始日: {selectedDate}
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.toggleButton, { borderColor: colors.primary }]}
-            onPress={() => setIsRange(!isRange)}
-          >
-            <Text style={[styles.toggleButtonText, { color: colors.primary }]}>
-              {isRange ? '✓ 期間指定' : '○ 期間指定'}
-            </Text>
-          </TouchableOpacity>
-
-          {isRange && (
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="終了日 (YYYY-MM-DD)"
-              placeholderTextColor={colors.textSecondary}
-            />
-          )}
-
-          <TextInput
-            style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
-            value={eventName}
-            onChangeText={setEventName}
-            placeholder="予定名 (例: 中間試験)"
-            placeholderTextColor={colors.textSecondary}
-          />
-
-          {eventName.includes('試験') && (
-            <View style={styles.subjectsContainer}>
-              <Text style={[styles.subjectsTitle, { color: colors.text }]}>教科ごとの試験日</Text>
-              {subjectInputs.map((input, idx) => (
-                <View key={idx} style={styles.subjectRow}>
-                  <TextInput
-                    style={[styles.subjectInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, flex: 1 }]}
-                    value={input.subject}
-                    onChangeText={(text) => updateSubject(idx, 'subject', text)}
-                    placeholder="教科名"
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                  <TextInput
-                    style={[styles.subjectDateInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, width: 110 }]}
-                    value={input.date}
-                    onChangeText={(text) => updateSubject(idx, 'date', text)}
-                    placeholder="日付"
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                  <TouchableOpacity onPress={() => removeSubject(idx)} style={styles.removeSubjectBtn}>
-                    <Text style={[styles.removeSubjectText, { color: colors.error }]}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <TouchableOpacity style={[styles.addSubjectBtn, { borderColor: colors.primary }]} onPress={addSubjectInput}>
-                <Text style={[styles.addSubjectText, { color: colors.primary }]}>+ 教科を追加</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.formButtons}>
-            <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={saveEvent}>
-              <Text style={[styles.saveButtonText, { color: onPrimary }]}>保存</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={resetForm}>
-              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
-            </TouchableOpacity>
+      {/* PC時：2カラムレイアウト */}
+      {screenType === 'desktop' ? (
+        <View style={{ flexDirection: 'row', gap: 24, padding: 16 }}>
+          {/* 左：カレンダー */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {renderCalendar()}
+            {renderForm()}
           </View>
 
-          {events.some(e => (editingEventId ? e.id === editingEventId : e.date === selectedDate)) && (
-            <TouchableOpacity 
-              style={[styles.deleteEventButton, { backgroundColor: colors.error }]} 
-              onPress={() => {
-                const targetEvent = events.find(e => editingEventId ? e.id === editingEventId : e.date === selectedDate);
-                if (targetEvent) {
-                  deleteEvent(targetEvent.id, targetEvent.date);
-                }
-              }}
-            >
-              <Text style={styles.deleteEventButtonText}>この予定を削除</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* 予定一覧 */}
-      {events.length > 0 && (
-        <View style={styles.eventListContainer}>
-          <Text style={[styles.eventListTitle, { color: colors.text }]}>予定一覧</Text>
-          {events.map(event => (
-            <View
-              key={event.id}
-              style={[styles.eventItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <TouchableOpacity
-                style={styles.eventContent}
-                onPress={() => {
-                  setSelectedDate(event.date);
-                  setEditingEventId(event.id);
-                  setEventName(event.name);
-                  setEndDate(event.endDate || '');
-                  setIsRange(!!event.endDate);
-                  setSubjectInputs(event.subjects || []);
-                  setShowForm(true);
-                }}
-              >
-                {/* イベント名 */}
-                <Text style={[styles.eventName, { color: colors.text, fontWeight: 'bold', marginBottom: 4 }]}>
-                  {event.name}
-                </Text>
-                
-                {/* 教科ごとの日付がある場合：日付ごとに改行して表示 */}
-                {event.subjects && event.subjects.length > 0 ? (
-                  <View style={{ marginTop: 4, gap: 3 }}>
-                    {event.subjects.map((s, i) => (
-                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[{ fontSize: 11, color: colors.textSecondary, minWidth: 85 }]}>
-                          {s.date}
+          {/* 右：予定一覧 */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, marginBottom: 12 }]}>予定一覧</Text>
+            <ScrollView>
+              {events.length > 0 ? (
+                events.map(event => (
+                  <View
+                    key={event.id}
+                    style={[styles.eventItem, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}
+                  >
+                    <TouchableOpacity
+                      style={styles.eventContent}
+                      onPress={() => {
+                        setSelectedDate(event.date);
+                        setEditingEventId(event.id);
+                        setEventName(event.name);
+                        setEndDate(event.endDate || '');
+                        setIsRange(!!event.endDate);
+                        setSubjectInputs(event.subjects || []);
+                        setShowForm(true);
+                      }}
+                    >
+                      <Text style={[styles.eventName, { color: colors.text, fontWeight: 'bold', fontSize: 15 }]}>
+                        {event.name}
+                      </Text>
+                      {event.subjects && event.subjects.length > 0 ? (
+                        <View style={{ marginTop: 8, gap: 8 }}>
+                          {event.subjects.map((s, i) => (
+                            <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
+                              <Text style={{ fontSize: 13, color: colors.textSecondary, minWidth: 100 }}>{s.date}</Text>
+                              <Text style={{ fontSize: 13, color: colors.text }}>{s.subject}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+                          {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
                         </Text>
-                        <Text style={[{ fontSize: 13, color: colors.text }]}>
-                          {s.subject}
-                        </Text>
-                      </View>
-                    ))}
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.deleteIcon, { backgroundColor: colors.error }]}
+                      onPress={() => deleteEvent(event.id, event.date)}
+                    >
+                      <Text style={styles.deleteIconText}>🗑️</Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  /* 通常のイベント：日付のみ表示 */
-                  <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
-                    {event.date}{event.endDate ? ` 〜 ${event.endDate}` : ''}
-                  </Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.deleteIcon, { backgroundColor: colors.error }]}
-                onPress={() => deleteEvent(event.id, event.date)}
-              >
-                <Text style={styles.deleteIconText}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                ))
+              ) : (
+                <Text style={[styles.noEventsText, { color: colors.textSecondary }]}>登録された予定はありません</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      ) : (
+        /* モバイル：既存のレイアウト */
+        <View style={styles.calendarContainer}>
+          {renderCalendar()}
+          {renderForm()}
+          {renderEventList()}
         </View>
       )}
     </ScrollView>
@@ -530,7 +616,7 @@ const styles = StyleSheet.create({
   backButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   backButtonText: { fontWeight: 'bold' },
   calendarContainer: { padding: 16, alignItems: 'center' },
-  monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%', paddingHorizontal: 16 },
+  monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%' },
   monthArrow: { fontSize: 24, fontWeight: 'bold', paddingHorizontal: 16 },
   monthText: { fontSize: 18, fontWeight: 'bold' },
   weekDaysRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8, width: '100%' },
@@ -538,7 +624,7 @@ const styles = StyleSheet.create({
   daysGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   dayCell: { justifyContent: 'center', alignItems: 'center', margin: 2, position: 'relative' },
   dayText: { fontWeight: '500' },
-  eventDot: { position: 'absolute', bottom: 2, borderRadius: 3 },
+  eventDot: { position: 'absolute', bottom: 2, borderRadius: 4 },
   formContainer: { margin: 16, padding: 16, borderRadius: 12, borderWidth: 1 },
   formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   selectedDateText: { fontSize: 14, marginBottom: 12 },
@@ -569,5 +655,6 @@ const styles = StyleSheet.create({
   removeSubjectText: { fontSize: 16, fontWeight: 'bold' },
   addSubjectBtn: { padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, marginTop: 4 },
   addSubjectText: { fontWeight: 'bold' },
+  sectionTitle: { fontWeight: 'bold', marginBottom: 12 },
+  noEventsText: { fontSize: 14, textAlign: 'center', marginTop: 20 },
 });
-

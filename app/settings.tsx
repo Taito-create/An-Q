@@ -3,10 +3,8 @@ import { StyleSheet, ScrollView, Text, View, TouchableOpacity, TextInput, Switch
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
-import { useTheme, ThemeName, FontSize, PatternType } from './theme';
+import { useTheme, ThemeName, FontSize } from './theme';
 import { useLocale } from './hooks/useLocale';
-import { useSE } from './seContext';
-import { useBGM } from './bgmContext';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: string }[] = [
   { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue',   emoji: '🔵' },
@@ -27,11 +25,30 @@ export default function SettingsScreen() {
   const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
   const locale = useLocale();
   const ja = locale === 'ja';
-  const { bgmEnabled, toggleBGM } = useBGM();
-  const { seEnabled, toggleSE } = useSE();
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
-  const [forceUpdate, setForceUpdate] = useState(Date.now());
+  const [isAnimationEnabled, setIsAnimationEnabled] = useState(true);
+
+  useEffect(() => {
+    loadAnimationSetting();
+  }, []);
+
+  const loadAnimationSetting = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('is_animation_enabled');
+      if (saved !== null) {
+        setIsAnimationEnabled(saved === 'true');
+      }
+    } catch (e) {
+      console.error('Failed to load animation setting:', e);
+    }
+  };
+
+  const handleAnimationToggle = async (val: boolean) => {
+    setIsAnimationEnabled(val);
+    await AsyncStorage.setItem('is_animation_enabled', val ? 'true' : 'false');
+    SoundManager.play('decide');
+  };
 
   const handleThemeSelect = (theme: ThemeName) => {
     setTheme(theme);
@@ -89,36 +106,6 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             );
           })}
-        </View>
-      </View>
-
-      {/* BGM Toggle */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <View style={styles.settingRow}>
-          <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
-            BGM
-          </Text>
-          <Switch
-            value={bgmEnabled}
-            onValueChange={toggleBGM}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor="#FFF"
-          />
-        </View>
-      </View>
-
-      {/* SE Toggle */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <View style={styles.settingRow}>
-          <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
-            {ja ? '効果音' : 'Sound Effects'}
-          </Text>
-          <Switch
-            value={seEnabled}
-            onValueChange={toggleSE}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor="#FFF"
-          />
         </View>
       </View>
 
@@ -213,44 +200,21 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Pattern */}
+      {/* エフェクト：アニメーション設定 */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
-          {ja ? '背景模様' : 'Background Pattern'}
+          {ja ? 'エフェクト' : 'Effects'}
         </Text>
-        <Text style={[styles.sectionDesc, { color: colors.textSecondary, fontSize: Math.round(13 * scale) }]}>
-          {ja ? '画面の背景に模様を追加できます' : 'Add a decorative pattern to the background'}
-        </Text>
-        <View style={styles.themeGrid}>
-          {([
-            { key: 'none',     labelJa: 'なし',   labelEn: 'None',     icon: '○' },
-            { key: 'dots',     labelJa: 'ドット',  labelEn: 'Dots',     icon: '·' },
-            { key: 'stripes',  labelJa: 'ストライプ', labelEn: 'Stripes', icon: '/' },
-            { key: 'grid',     labelJa: '格子',   labelEn: 'Grid',     icon: '+' },
-            { key: 'waves',    labelJa: '波線',   labelEn: 'Waves',    icon: '~' },
-            { key: 'diamonds', labelJa: 'ダイヤ',  labelEn: 'Diamonds', icon: '◇' },
-          ] as { key: PatternType; labelJa: string; labelEn: string; icon: string }[]).map(opt => {
-            const selected = pattern === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.themeCard, {
-                  backgroundColor: selected ? colors.primary + '20' : colors.background,
-                  borderColor: selected ? colors.primary : colors.border,
-                  borderWidth: selected ? 2 : 1,
-                }]}
-                onPress={() => { setPattern(opt.key); SoundManager.play('decide'); }}
-              >
-                <Text style={{ fontSize: 20, marginBottom: 4, color: selected ? colors.primary : colors.textSecondary }}>
-                  {opt.icon}
-                </Text>
-                <Text style={[styles.themeLabel, { color: selected ? colors.primary : colors.text, fontSize: Math.round(10 * scale) }]}>
-                  {ja ? opt.labelJa : opt.labelEn}
-                </Text>
-                {selected && <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.settingRow}>
+          <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+            {ja ? 'アニメーション' : 'Animations'}
+          </Text>
+          <Switch
+            value={isAnimationEnabled}
+            onValueChange={handleAnimationToggle}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFF"
+          />
         </View>
       </View>
 
