@@ -6,9 +6,10 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
-import { LineChart, BarChart } from 'react-native-chart-kit';
-
-const screenWidth = Dimensions.get('window').width - 48;
+import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 
 export default function StatisticsScreen() {
   const navigate = useNavigate();
@@ -140,28 +141,27 @@ export default function StatisticsScreen() {
 
   const weekLabels = getWeekLabels();
 
-  const chartConfig = {
-    backgroundColor: colors.card,
-    backgroundGradientFrom: colors.card,
-    backgroundGradientTo: colors.card,
-    decimalCount: 0,
-    color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(110, 110, 138, ${opacity})`,
-    style: { borderRadius: 12 },
-    propsForDots: { r: 5, strokeWidth: 2, stroke: colors.primary },
-    propsForBackgroundLines: { strokeDasharray: '3,3', stroke: colors.border },
-  };
+  // recharts 用データ変換
+  const screenTimeChartData = weekLabels.map((label, i) => ({
+    day: label,
+    time: screenTimeData[i] || 0,
+  }));
 
-  const barChartConfig = (primaryColor: string) => ({
+  const questionsChartData = weekLabels.map((label, i) => ({
+    day: label,
+    count: questionsCreatedData[i] || 0,
+  }));
+
+  const quizPlaysChartData = weekLabels.map((label, i) => ({
+    day: label,
+    plays: quizPlaysData[i] || 0,
+  }));
+
+  const tooltipStyle = {
     backgroundColor: colors.card,
-    backgroundGradientFrom: colors.card,
-    backgroundGradientTo: colors.card,
-    decimalCount: 0,
-    color: (opacity = 1) => `${primaryColor}${opacity === 1 ? 'CC' : Math.round(opacity * 255).toString(16).padStart(2, '0')}`,
-    labelColor: (opacity = 1) => `rgba(110, 110, 138, ${opacity})`,
-    style: { borderRadius: 12 },
-    propsForBackgroundLines: { strokeDasharray: '3,3', stroke: colors.border },
-  });
+    border: `1px solid ${colors.border}`,
+    borderRadius: 8,
+  };
 
   if (isLoading) {
     return (
@@ -192,23 +192,18 @@ export default function StatisticsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             ⏱ {locale === 'ja' ? 'スクリーンタイム推移' : 'Screen Time History'}
           </Text>
-          <LineChart
-            data={{
-              labels: weekLabels,
-              datasets: [{ data: screenTimeData.length > 0 ? screenTimeData : [0, 0, 0, 0, 0, 0, 0] }],
-            }}
-            width={screenWidth}
-            height={200}
-            yAxisSuffix={locale === 'ja' ? '分' : 'm'}
-            chartConfig={{
-              ...chartConfig,
-              color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
-            }}
-            bezier
-            style={{ borderRadius: 12 }}
-          />
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={screenTimeChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
+              <XAxis dataKey="day" stroke={colors.textSecondary} tick={{ fontSize: 12 }} />
+              <YAxis stroke={colors.textSecondary} tick={{ fontSize: 12 }} label={{ value: locale === 'ja' ? '分' : 'min', angle: -90, position: 'insideLeft', style: { fill: colors.textSecondary } }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: colors.text }} />
+              <Legend />
+              <Line type="monotone" dataKey="time" stroke={colors.primary} strokeWidth={2} dot={{ fill: colors.primary, r: 5 }} activeDot={{ r: 7 }} name={locale === 'ja' ? 'スクリーンタイム' : 'Screen Time'} />
+            </LineChart>
+          </ResponsiveContainer>
           <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
-            {locale === 'ja' ? '今週平均' : 'Weekly avg'}: {Math.round(screenTimeData.reduce((a, b) => a + b, 0) / 7)}{locale === 'ja' ? '分' : 'min'}
+            {locale === 'ja' ? '今週平均' : 'Weekly avg'}: {screenTimeData.length > 0 ? Math.round(screenTimeData.reduce((a, b) => a + b, 0) / 7) : 0}{locale === 'ja' ? '分' : 'min'}
           </Text>
         </View>
 
@@ -217,21 +212,16 @@ export default function StatisticsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             ✏️ {locale === 'ja' ? '作成問題数の推移' : 'Problems Created'}
           </Text>
-          <BarChart
-            data={{
-              labels: weekLabels,
-              datasets: [{ data: questionsCreatedData.length > 0 ? questionsCreatedData : [0, 0, 0, 0, 0, 0, 0] }],
-            }}
-            width={screenWidth}
-            height={200}
-            yAxisLabel=""
-            yAxisSuffix={locale === 'ja' ? '問' : ''}
-            chartConfig={{
-              ...barChartConfig('rgba(76, 175, 80, 1)'),
-              color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-            }}
-            style={{ borderRadius: 12 }}
-          />
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={questionsChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
+              <XAxis dataKey="day" stroke={colors.textSecondary} tick={{ fontSize: 12 }} />
+              <YAxis stroke={colors.textSecondary} tick={{ fontSize: 12 }} label={{ value: locale === 'ja' ? '問' : '', angle: -90, position: 'insideLeft', style: { fill: colors.textSecondary } }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: colors.text }} />
+              <Legend />
+              <Bar dataKey="count" fill={colors.success} radius={[8, 8, 0, 0]} name={locale === 'ja' ? '作成問題数' : 'Created'} />
+            </BarChart>
+          </ResponsiveContainer>
           <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
             {locale === 'ja' ? '今週作成' : 'This week'}: {questionsCreatedData.reduce((a, b) => a + b, 0)}{locale === 'ja' ? '問' : ' problems'}
           </Text>
@@ -242,21 +232,16 @@ export default function StatisticsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             🎮 {locale === 'ja' ? 'クイズプレイ回数の推移' : 'Quiz Plays'}
           </Text>
-          <BarChart
-            data={{
-              labels: weekLabels,
-              datasets: [{ data: quizPlaysData.length > 0 ? quizPlaysData : [0, 0, 0, 0, 0, 0, 0] }],
-            }}
-            width={screenWidth}
-            height={200}
-            yAxisLabel=""
-            yAxisSuffix={locale === 'ja' ? '回' : ''}
-            chartConfig={{
-              ...barChartConfig('rgba(33, 150, 243, 1)'),
-              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
-            }}
-            style={{ borderRadius: 12 }}
-          />
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={quizPlaysChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
+              <XAxis dataKey="day" stroke={colors.textSecondary} tick={{ fontSize: 12 }} />
+              <YAxis stroke={colors.textSecondary} tick={{ fontSize: 12 }} label={{ value: locale === 'ja' ? '回' : '', angle: -90, position: 'insideLeft', style: { fill: colors.textSecondary } }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: colors.text }} />
+              <Legend />
+              <Bar dataKey="plays" fill={colors.primary} radius={[8, 8, 0, 0]} name={locale === 'ja' ? 'プレイ回数' : 'Plays'} />
+            </BarChart>
+          </ResponsiveContainer>
           <Text style={[styles.statDetail, { color: colors.textSecondary }]}>
             {locale === 'ja' ? '今週実施' : 'This week'}: {quizPlaysData.reduce((a, b) => a + b, 0)}{locale === 'ja' ? '回' : ' times'}
           </Text>
