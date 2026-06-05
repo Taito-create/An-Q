@@ -50,8 +50,6 @@ export default function CalendarScreen() {
   const screenType = useResponsive();
   
   const isMobile = screenType !== 'desktop';
-  const cellMargin = isMobile ? 2 : 3;
-  const cellWidth = `${(100 - (7 * cellMargin * 2)) / 7}%`;
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState('');
@@ -104,17 +102,34 @@ export default function CalendarScreen() {
     return new Date(year, month, 1).getDay();
   };
 
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
 
-  const days: Array<number | null> = [];
-  for (let i = 0; i < firstDay; i++) {
-    days.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i);
-  }
+  // 月の最初の日が何曜日か取得（0=日, 1=月... 6=土）
+  const getFirstDayOfWeek = (year: number, month: number): number => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  // カレンダー日付配列を生成（空セルを含む）
+  const generateCalendarDays = (year: number, month: number): (number | null)[] => {
+    const firstDay = getFirstDayOfWeek(year, month);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const days: (number | null)[] = [];
+    
+    // 最初の行に空セルを追加（最初の日曜日までの空白）
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    
+    // 月の日付を追加
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+    
+    return days;
+  };
+
+  const days = generateCalendarDays(year, month);
 
   const goPrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -314,7 +329,7 @@ export default function CalendarScreen() {
     return count;
   };
 
-  // カレンダー本体のレンダリング（7列グリッド）
+  // カレンダー本体のレンダリング（7列グリッド - gapを使わずpaddingで調整）
   const renderCalendar = () => (
     <>
       <View style={[styles.monthHeader, isMobile && { paddingHorizontal: 16 }]}>
@@ -330,13 +345,7 @@ export default function CalendarScreen() {
       </View>
 
       {/* 曜日ヘッダー（7列） */}
-      <View style={[
-        styles.calendarGrid,
-        {
-          marginBottom: isMobile ? 12 : 24,
-          gap: isMobile ? 4 : 8,
-        }
-      ]}>
+      <View style={[styles.calendarGrid, { marginBottom: isMobile ? 12 : 24 }]}>
         {weekDays.map((day, i) => (
           <View key={`header-${i}`} style={styles.gridCell}>
             <Text style={[
@@ -681,6 +690,7 @@ const styles = StyleSheet.create({
   monthText: { fontSize: 18, fontWeight: 'bold' },
 
   // 7列グリッド（React Native は CSS Grid 非対応のため flexWrap で代用）
+  // gap を使わず padding で調整して 7列が正しく収まるように
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -688,9 +698,9 @@ const styles = StyleSheet.create({
   },
   gridCell: {
     width: '14.28%', // 100% / 7 = 14.28%
-    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 2,
   },
 
   // 曜日ヘッダー
@@ -700,9 +710,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
-  // 日付セル
+  // 日付セル（gridCell の padding 内で full width になるように）
   dayCell: {
-    width: '90%',
+    width: '100%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',

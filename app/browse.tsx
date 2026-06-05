@@ -8,6 +8,16 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 
 // 共通の型定義
+interface ImageAnnotation {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
+}
+
 interface Question {
   id: number;
   question: string;
@@ -20,6 +30,8 @@ interface Question {
   };
   enabled: boolean;
   tags: string[];
+  image?: string | null;
+  imageAnnotations?: ImageAnnotation[];
 }
 
 export default function BrowseQuestionsScreen() {
@@ -526,13 +538,23 @@ export default function BrowseQuestionsScreen() {
                   {item.question}
                 </Text>
               </View>
-              {/* コンパクトモード時は展開アイコンを非表示 */}
-              {!isCompactMode && (
-                <Text style={[styles.expandIcon, { color: colors.primary }]}>
-                  {expandedQuestionId === item.id ? '▲' : '▼'}
-                </Text>
-              )}
-            </TouchableOpacity>
+            {/* 画像サムネイルがある場合は表示 */}
+            {item.image && (
+              <View style={[{ marginRight: 8, borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
+                <img
+                  src={item.image}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </View>
+            )}
+            {/* コンパクトモード時は展開アイコンを非表示 */}
+          {!isCompactMode && (
+            <Text style={[styles.expandIcon, { color: colors.primary }]}>
+              {expandedQuestionId === item.id ? '▲' : '▼'}
+            </Text>
+          )}
+        </TouchableOpacity>
 
             {/* 展開時のみ表示（コンパクトモードでは非表示） */}
             {!isCompactMode && expandedQuestionId === item.id && (

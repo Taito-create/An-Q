@@ -17,6 +17,16 @@ import { useTheme } from './theme';
 import { loadStats, incrementStat } from './missions';
 
 // Question interface
+interface ImageAnnotation {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
+}
+
 interface Question {
   id: number;
   question: string;
@@ -33,6 +43,8 @@ interface Question {
   createdAt: number;
   topic?: string;
   source?: string;
+  image?: string | null;
+  imageAnnotations?: ImageAnnotation[];
 }
 
 export default function CreateQuestionScreen() {
@@ -58,6 +70,26 @@ export default function CreateQuestionScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
 
+  // Image upload states
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
+  const [annotationColor, setAnnotationColor] = useState('#FFFFFF');
+  const [annotationOpacity, setAnnotationOpacity] = useState(80);
+
+  // Image selection handler
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setSelectedImage(base64);
+        SoundManager.play('decide');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Save question function
   const saveQuestion = async (newQuestionData: any) => {
     try {
@@ -82,6 +114,8 @@ export default function CreateQuestionScreen() {
         tags: tags,
         mistakeCount: 0,
         createdAt: Date.now(),
+        image: selectedImage || null,
+        imageAnnotations: imageAnnotations,
         ...newQuestionData
       };
       
@@ -143,6 +177,8 @@ export default function CreateQuestionScreen() {
         options: ['', '', '', ''],
         correctAnswer: 0
       });
+      setSelectedImage(null);
+      setImageAnnotations([]);
     }
   };
 
@@ -156,6 +192,19 @@ export default function CreateQuestionScreen() {
 
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const addAnnotation = () => {
+    const newAnnotation: ImageAnnotation = {
+      id: Date.now().toString(),
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 50,
+      color: annotationColor,
+      opacity: annotationOpacity / 100,
+    };
+    setImageAnnotations([...imageAnnotations, newAnnotation]);
   };
 
   return (
@@ -297,6 +346,129 @@ export default function CreateQuestionScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Image Upload Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>📸 画像を添付（オプション）</Text>
+
+        {!selectedImage ? (
+          <TouchableOpacity
+            style={[styles.imageUploadBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+            onPress={() => {
+              document.getElementById('image-input')?.click();
+            }}
+          >
+            <Text style={[{ fontSize: 24, marginBottom: 8 }]}>📷</Text>
+            <Text style={[styles.imageUploadText, { color: colors.primary }]}>
+              画像をアップロード
+            </Text>
+            <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+              JPG, PNG, WebP（最大 5MB）
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View>
+            {/* 画像プレビュー */}
+            <View style={[styles.imagePreview, { backgroundColor: '#f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }]}>
+              <img
+                src={selectedImage}
+                alt="preview"
+                style={{ width: '100%', height: 'auto', maxHeight: 300 }}
+              />
+
+              {/* アノテーション（テキストボックス） */}
+              {imageAnnotations.map((annotation) => (
+                <View
+                  key={annotation.id}
+                  style={{
+                    position: 'absolute',
+                    left: annotation.x,
+                    top: annotation.y,
+                    width: annotation.width,
+                    height: annotation.height,
+                    backgroundColor: annotation.color,
+                    opacity: annotation.opacity,
+                    borderWidth: 1,
+                    borderColor: 'rgba(0,0,0,0.3)',
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+            </View>
+
+            {/* 画像削除ボタン */}
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.error, marginBottom: 12 }]}
+              onPress={() => {
+                setSelectedImage(null);
+                setImageAnnotations([]);
+              }}
+            >
+              <Text style={[styles.buttonText, { color: '#fff' }]}>画像を削除</Text>
+            </TouchableOpacity>
+
+            {/* アノテーション追加UI */}
+            <View style={[{ backgroundColor: colors.card, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 10 }]}>
+                ✏️ 隠すボックスを追加
+              </Text>
+
+              <View style={[{ gap: 10 }]}>
+                {/* カラーピッカー */}
+                <View style={[{ flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
+                  <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>色</Text>
+                  <View style={[{ flexDirection: 'row', gap: 6 }]}>
+                    {['#FFFFFF', '#000000', '#FFC107', '#4CAF50', '#2196F3'].map((color) => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: color,
+                          borderWidth: 2,
+                          borderColor: annotationColor === color ? colors.primary : colors.border,
+                        }]}
+                        onPress={() => setAnnotationColor(color)}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* 透明度スライダー */}
+                <View style={[{ flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
+                  <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>透明度</Text>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={annotationOpacity}
+                    onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))}
+                    style={{ flex: 1, height: 6, borderRadius: 3, accentColor: colors.primary }}
+                  />
+                </View>
+
+                {/* ボックス追加ボタン */}
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: colors.primary }]}
+                  onPress={addAnnotation}
+                >
+                  <Text style={[styles.buttonText, { color: '#fff', fontSize: 13 }]}>＋ ボックスを追加</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* 隠しファイルインプット */}
+        <input
+          id="image-input"
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          style={{ display: 'none' }}
+        />
+      </View>
+
       {/* Tags Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.tags}</Text>
@@ -406,12 +578,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  button: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
   },
-backButton: {
+  backButton: {
     padding: 15,
     borderRadius: 12,
     alignItems: 'center',
@@ -526,5 +703,24 @@ backButton: {
   removeTagText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Image upload styles
+  imageUploadBtn: {
+    padding: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageUploadText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  imagePreview: {
+    position: 'relative',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
   },
 });

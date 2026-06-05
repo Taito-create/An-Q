@@ -14,6 +14,16 @@ import { useLocale } from './hooks/useLocale';
 // ──────────────────────────────────────────────
 // 型定義
 // ──────────────────────────────────────────────
+interface ImageAnnotation {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
+}
+
 interface Question {
   id: number;
   question: string;
@@ -31,6 +41,8 @@ interface Question {
   };
   topic?: string;
   source?: string;
+  image?: string | null;
+  imageAnnotations?: ImageAnnotation[];
 }
 
 interface QuizResult {
@@ -107,6 +119,7 @@ export default function QuizScreen() {
   // タグフィルター用 state
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [preSelectedTags, setPreSelectedTags] = useState<string[]>([]);
 
   // 長押し用 ref
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -345,6 +358,20 @@ export default function QuizScreen() {
     } else {
       setSelectedTags([...allTags]);
     }
+  };
+
+  // タグごとに問題数をカウント
+  const getQuestionsCountForTag = (tag: string): number => {
+    return allQuestions.filter(q => (q.tags || []).includes(tag)).length;
+  };
+
+  // 選択されたタグの合計問題数
+  const getMaxQuestionsForSelectedTags = (): number => {
+    if (selectedTags.length === allTags.length) return allQuestions.length;
+    const filtered = allQuestions.filter(q =>
+      (q.tags || []).some(tag => selectedTags.includes(tag))
+    );
+    return filtered.length;
   };
 
   // 回答テキストを取得（リバースモード用）
@@ -629,12 +656,13 @@ export default function QuizScreen() {
             📝 クイズ設定
           </Text>
 
-          {/* 問題数ステッパー */}
+          {/* 問題数 ステッパー + スライダー */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
               問題数
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+            {/* ステッパー（微調整用） */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
               <TouchableOpacity
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => setPreQuestionCount(prev => Math.max(1, prev - 1))}
@@ -644,7 +672,7 @@ export default function QuizScreen() {
               >
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
               </TouchableOpacity>
-              <Text style={[{ fontSize: 36, fontWeight: 'bold', color: colors.text, minWidth: 60, textAlign: 'center' }]}>
+              <Text style={[{ fontSize: 48, fontWeight: '700', color: colors.primary, minWidth: 80, textAlign: 'center' }]}>
                 {preQuestionCount}
               </Text>
               <TouchableOpacity
@@ -660,9 +688,35 @@ export default function QuizScreen() {
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[{ textAlign: 'center', color: colors.textSecondary, fontSize: 13, marginTop: 8 }]}>
-              全 {filtered.length} 問中
-            </Text>
+            {/* スライダー（ざっくり調整用） */}
+            <View style={{ marginBottom: 12 }}>
+              <input
+                type="range"
+                min="1"
+                max={filtered.length}
+                value={preQuestionCount}
+                onChange={(e) => {
+                  SoundManager.play('select');
+                  setPreQuestionCount(parseInt(e.target.value, 10));
+                }}
+                style={{
+                  width: '100%',
+                  height: 8,
+                  borderRadius: 4,
+                  outline: 'none',
+                  accentColor: colors.primary,
+                  cursor: 'pointer',
+                }}
+              />
+            </View>
+            {/* スライダー下の表示 */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>1問</Text>
+              <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text }]}>
+                {preQuestionCount} / {filtered.length}
+              </Text>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>{filtered.length}問</Text>
+            </View>
           </View>
 
           {/* リバースモードトグル */}
@@ -731,23 +785,34 @@ export default function QuizScreen() {
           {/* タグ絞り込み */}
           {allTags.length > 0 && (
             <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 24 }]}>
-              <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
-                🏷️ タグで絞り込み
-              </Text>
-              <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }]}>
-                {locale === 'ja' ? '選択なし = すべての問題' : 'No selection = All questions'}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  🏷️ タグで絞り込み
+                </Text>
+              </View>
+              
+              {/* タグ選択状況の表示 */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
+                  {selectedTags.length === 0
+                    ? `選択なし = すべての問題（全${allQuestions.length}問）`
+                    : `${selectedTags.length}個タグ選択中（最大${getFilteredQuestions().length}問）`
+                  }
+                </Text>
+              </View>
+              
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {allTags.map(tag => {
+                  const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
                   const isSelected = selectedTags.includes(tag);
                   return (
                     <TouchableOpacity
                       key={tag}
                       style={[{
                         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                        backgroundColor: isSelected ? colors.primary : colors.primary + '15',
-                        borderWidth: 1,
+                        borderWidth: 1.5,
                         borderColor: colors.primary,
+                        backgroundColor: isSelected ? colors.primary : 'transparent',
                       }]}
                       onPress={() => {
                         SoundManager.play('select');
@@ -756,8 +821,15 @@ export default function QuizScreen() {
                         );
                       }}
                     >
-                      <Text style={[{ color: isSelected ? '#fff' : colors.primary, fontWeight: '600', fontSize: 14 }]}>
+                      <Text style={[{
+                        color: isSelected ? '#fff' : colors.primary,
+                        fontWeight: '600',
+                        fontSize: 13,
+                      }]}>
                         {tag}
+                        <Text style={[{ fontSize: 11, opacity: 0.8 }]}>
+                          {' '}({count})
+                        </Text>
                       </Text>
                     </TouchableOpacity>
                   );
@@ -886,6 +958,35 @@ export default function QuizScreen() {
       >
         <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
           {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
+          
+          {/* 画像がある場合は表示 */}
+          {currentQuestion.image && (
+            <View style={[{ position: 'relative', backgroundColor: '#f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }]}>
+              <img
+                src={currentQuestion.image}
+                alt="問題の画像"
+                style={{ width: '100%', height: 'auto', maxHeight: 300 }}
+              />
+              
+              {/* アノテーション（隠すボックス）を表示 */}
+              {currentQuestion.imageAnnotations?.map((annotation) => (
+                <View
+                  key={annotation.id}
+                  style={{
+                    position: 'absolute',
+                    left: annotation.x,
+                    top: annotation.y,
+                    width: annotation.width,
+                    height: annotation.height,
+                    backgroundColor: annotation.color,
+                    opacity: annotation.opacity,
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+            </View>
+          )}
+          
           <Text style={[styles.questionText, { color: colors.text }]}>
             {isReverseMode
               ? getAnswerDisplayText(currentQuestion)
