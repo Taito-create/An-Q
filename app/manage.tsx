@@ -1,11 +1,11 @@
-import { StyleSheet, ScrollView, Text, View, TextInput, TouchableOpacity, Alert, Button, Platform } from 'react-native';
+import { StyleSheet, ScrollView, Text, View, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
-
-// Shadow style removed to fix TypeScript warnings
+import { useLocale } from './hooks/useLocale';
+import { translations } from './translations';
 
 interface CustomTimer {
   id: string;
@@ -15,83 +15,20 @@ interface CustomTimer {
 
 export default function ManageScreen() {
   const { colors, onPrimary } = useTheme();
+  const locale = useLocale();
+  const t = translations[locale];
+  const navigate = useNavigate();
+
   const [selectedTime, setSelectedTime] = useState('10');
   const [customTimers, setCustomTimers] = useState<CustomTimer[]>([]);
   const [newTimerName, setNewTimerName] = useState('');
   const [newTimerMinutes, setNewTimerMinutes] = useState('');
-  const [locale, setLocale] = useState<'ja' | 'en'>('ja');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadTimerSetting();
     loadCustomTimers();
-    loadLanguageSetting();
   }, []);
-
-  const loadLanguageSetting = async () => {
-    try {
-      const lang = await AsyncStorage.getItem('user_language');
-      if (lang && (lang === 'ja' || lang === 'en')) {
-        setLocale(lang as 'ja' | 'en');
-      }
-    } catch (e) {
-      console.error('Failed to load language setting:', e);
-    }
-  };
-
-  // 翻訳辞書
-  const t = locale === 'ja' ? {
-    title: 'タイマー設定',
-    timer_settings: 'タイマー設定',
-    minute: '分',
-    custom: 'カスタム',
-    custom_placeholder: 'タイマー名を入力',
-    minutes_placeholder: '時間（分）を入力',
-    save_timer: 'タイマーを保存',
-    add_custom: 'カスタムタイマーを追加',
-    custom_timers: '保存したタイマー',
-    back: '戻る',
-    success: '成功',
-    timer_saved: 'タイマー設定を保存しました！',
-    custom_timer_saved: 'カスタムタイマーを保存しました！',
-    error: 'エラー',
-    save_failed: '保存に失敗しました',
-    delete_failed: '削除に失敗しました',
-    delete_custom: '削除',
-    delete_confirm_title: '削除の確認',
-    delete_confirm_message: 'このカスタムタイマーを削除してもよろしいですか？',
-    cancel: 'キャンセル',
-    // プリセットテンプレート
-    small_test: '小テスト用',
-    exam: '試験用',
-    certification: '資格用',
-  } : {
-    title: 'Timer Settings',
-    timer_settings: 'Timer Settings',
-    minute: 'min',
-    custom: 'Custom',
-    custom_placeholder: 'Enter timer name',
-    minutes_placeholder: 'Enter minutes',
-    save_timer: 'Save Timer',
-    add_custom: 'Add Custom Timer',
-    custom_timers: 'Saved Timers',
-    back: 'Back',
-    success: 'Success',
-    timer_saved: 'Timer settings saved!',
-    custom_timer_saved: 'Custom timer saved!',
-    error: 'Error',
-    save_failed: 'Save failed',
-    delete_failed: 'Delete failed',
-    delete_custom: 'Delete',
-    delete_confirm_title: 'Delete Confirmation',
-    delete_confirm_message: 'Are you sure you want to delete this custom timer?',
-    cancel: 'Cancel',
-    // プリセットテンプレート
-    small_test: 'Small Test',
-    exam: 'Exam',
-    certification: 'Certification',
-  };
 
   const loadCustomTimers = async () => {
     try {
@@ -115,16 +52,26 @@ export default function ManageScreen() {
     }
   };
 
-
   const saveTimerSetting = async (minutes: string) => {
     try {
       await AsyncStorage.setItem('APP_TIMER_SETTING', minutes);
+      await AsyncStorage.setItem('active_timer_minutes', minutes);
+      const timerLabel = customTimers.find(t => t.minutes === parseInt(minutes))?.name || `${minutes}${locale === 'ja' ? '分' : 'min'}`;
+      await AsyncStorage.setItem('active_timer_label', timerLabel);
       setSelectedTime(minutes);
-      Alert.alert(t.success, t.timer_saved);
+      Alert.alert(t.success, locale === 'ja' ? 'タイマー設定を保存しました！' : 'Timer settings saved!');
     } catch (error) {
       console.error('Error saving timer setting:', error);
-      Alert.alert(t.error, t.save_failed);
+      Alert.alert(t.error, t.failedToSave);
     }
+  };
+
+  const clearTimerSetting = async () => {
+    await AsyncStorage.removeItem('APP_TIMER_SETTING');
+    await AsyncStorage.removeItem('active_timer_minutes');
+    await AsyncStorage.removeItem('active_timer_label');
+    setSelectedTime('');
+    SoundManager.play('complete');
   };
 
   const addCustomTimer = async () => {
@@ -152,10 +99,10 @@ export default function ManageScreen() {
       
       setNewTimerName('');
       setNewTimerMinutes('');
-      Alert.alert(t.success, t.custom_timer_saved);
+      Alert.alert(t.success, locale === 'ja' ? 'カスタムタイマーを保存しました！' : 'Custom timer saved!');
     } catch (error) {
       console.error('Error saving custom timer:', error);
-      Alert.alert(t.error, t.save_failed);
+      Alert.alert(t.error, t.failedToSave);
     }
   };
 
@@ -164,11 +111,11 @@ export default function ManageScreen() {
       setPendingDeleteId(id);
     } else {
       Alert.alert(
-        t.delete_confirm_title || '削除の確認',
-        t.delete_confirm_message || 'このカスタムタイマーを削除してもよろしいですか？',
+        locale === 'ja' ? '削除の確認' : 'Delete Confirmation',
+        locale === 'ja' ? 'このカスタムタイマーを削除してもよろしいですか？' : 'Are you sure?',
         [
-          { text: t.cancel || 'キャンセル', style: 'cancel' },
-          { text: t.delete_custom || '削除', style: 'destructive', onPress: () => confirmDeleteTimer(id) },
+          { text: t.cancel, style: 'cancel' },
+          { text: locale === 'ja' ? '削除' : 'Delete', style: 'destructive', onPress: () => confirmDeleteTimer(id) },
         ]
       );
     }
@@ -186,102 +133,92 @@ export default function ManageScreen() {
     }
   };
 
-  const presetTemplates = [
-    { value: '10', label: `${t.small_test} (10${t.minute})` },
-    { value: '60', label: `${t.exam} (60${t.minute})` },
-    { value: '90', label: `${t.exam} (90${t.minute})` },
-    { value: '120', label: `${t.certification} (120${t.minute})` },
-  ];
-
   return (
     <View style={{ flex: 1 }}>
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{t.title}</Text>
-      
-      {/* プリセットテンプレート */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.timer_settings}</Text>
-        
-        {presetTemplates.map((template) => (
-          <TouchableOpacity
-            key={template.value}
-            style={[
-              styles.timerOption,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              selectedTime === template.value && { backgroundColor: colors.primary, borderColor: colors.primary }
-            ]}
-            onPress={() => saveTimerSetting(template.value)}
-          >
-            <Text style={[
-              styles.timerOptionText,
-              { color: selectedTime === template.value ? '#fff' : colors.text }
-            ]}>
-              {template.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* ヘッダー */}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          ⏱ {locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
+        </Text>
+        <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
+          <Text style={[{ color: colors.primary, fontSize: 18 }]}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       {/* カスタムタイマー追加 */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.add_custom}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {locale === 'ja' ? 'カスタムタイマーを追加' : 'Add Custom Timer'}
+        </Text>
         
         <TextInput
-          style={[styles.customInput, { borderColor: colors.border, color: colors.text }]}
+          style={[styles.customInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
           value={newTimerName}
           onChangeText={setNewTimerName}
-          placeholder={t.custom_placeholder}
+          placeholder={locale === 'ja' ? 'タイマー名（例：朝勉）' : 'Timer name (e.g., Morning)'}
+          placeholderTextColor={colors.textSecondary}
         />
         
         <TextInput
-          style={[styles.customInput, { borderColor: colors.border, color: colors.text }]}
+          style={[styles.customInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
           value={newTimerMinutes}
           onChangeText={setNewTimerMinutes}
-          placeholder={t.minutes_placeholder}
+          placeholder={locale === 'ja' ? '時間（分）' : 'Minutes'}
+          placeholderTextColor={colors.textSecondary}
           keyboardType="numeric"
         />
         
         <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={addCustomTimer}>
-          <Text style={styles.addButtonText}>{t.add_custom}</Text>
+          <Text style={styles.addButtonText}>
+            ＋ {locale === 'ja' ? 'タイマーを追加' : 'Add Timer'}
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* 保存したカスタムタイマー */}
       {customTimers.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.custom_timers}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {locale === 'ja' ? '保存したタイマー' : 'Saved Timers'}
+          </Text>
           
           {customTimers.map((timer) => (
-            <View key={timer.id} style={[styles.customTimerItem, selectedTime === timer.minutes.toString() && styles.selectedTimer]}>
-              {/* 左側：タイマー選択エリア */}
+            <View key={timer.id} style={[styles.customTimerItem, { borderColor: colors.border }, selectedTime === timer.minutes.toString() && { backgroundColor: colors.primary + '20' }]}>
               <TouchableOpacity 
                 style={styles.customTimerInfo} 
                 onPress={() => saveTimerSetting(timer.minutes.toString())}
               >
-                <Text style={[styles.customTimerName, selectedTime === timer.minutes.toString() && styles.selectedTimerText, { color: colors.text }]}>
-                  {timer.name}{selectedTime === timer.minutes.toString() ? (locale === 'ja' ? ' (選択中)' : ' (Selected)') : ''}
+                <Text style={[styles.customTimerName, { color: colors.text }]}>
+                  {timer.name}
+                  {selectedTime === timer.minutes.toString() ? ` ${locale === 'ja' ? '✓ 選択中' : '✓ Active'}` : ''}
                 </Text>
-                <Text style={[styles.customTimerMinutes, selectedTime === timer.minutes.toString() && styles.selectedTimerText, { color: colors.textSecondary }]}>
-                  {timer.minutes}{t.minute}
+                <Text style={[styles.customTimerMinutes, { color: colors.textSecondary }]}>
+                  {timer.minutes}{locale === 'ja' ? '分' : ' min'}
                 </Text>
               </TouchableOpacity>
 
-              {/* 右側：削除ボタン（独立させる） */}
               <TouchableOpacity
                 style={[styles.deleteButton, { backgroundColor: colors.error }]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  deleteCustomTimer(timer.id);
-                }}
+                onPress={() => deleteCustomTimer(timer.id)}
               >
-                <Text style={styles.deleteButtonText}>{t.delete_custom}</Text>
+                <Text style={styles.deleteButtonText}>🗑️</Text>
               </TouchableOpacity>
             </View>
           ))}
         </View>
       )}
 
-      {/* ホームへ移動ボタン */}
+      {/* なし（タイマー解除） */}
+      <TouchableOpacity
+        style={[styles.clearButton, { borderColor: colors.error }]}
+        onPress={clearTimerSetting}
+      >
+        <Text style={[{ color: colors.error, fontWeight: '700', textAlign: 'center' }]}>
+          {locale === 'ja' ? '🔄 タイマーを解除（なし）' : '🔄 Clear Timer (No Limit)'}
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity 
         style={[styles.backButton, { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); navigate('/'); }}
@@ -290,7 +227,6 @@ export default function ManageScreen() {
       </TouchableOpacity>
     </ScrollView>
     
-    {/* Delete Confirmation UI (web) */}
     {pendingDeleteId !== null && (
       <View style={styles.confirmOverlay}>
         <Text style={styles.confirmText}>
@@ -298,7 +234,7 @@ export default function ManageScreen() {
         </Text>
         <View style={styles.confirmButtons}>
           <TouchableOpacity style={styles.confirmCancelButton} onPress={() => setPendingDeleteId(null)}>
-            <Text style={styles.confirmCancelText}>{locale === 'ja' ? 'キャンセル' : 'Cancel'}</Text>
+            <Text style={styles.confirmCancelText}>{t.cancel}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.confirmDeleteButton} onPress={() => confirmDeleteTimer(pendingDeleteId)}>
             <Text style={styles.confirmDeleteText}>{locale === 'ja' ? '削除' : 'Delete'}</Text>
@@ -311,121 +247,23 @@ export default function ManageScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  headerTitle: {
-    textAlign: 'center',
-    marginBottom: 20,
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  section: {
-    backgroundColor: '#f8f8f8',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  timerOption: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  selectedTimer: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-    borderWidth: 3,
-  },
-  timerOptionText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  selectedTimerText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  customInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    fontSize: 16,
-    backgroundColor: 'white',
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  customTimerItem: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  customTimerInfo: {
-    flex: 1,
-  },
-  customTimerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  customTimerMinutes: {
-    fontSize: 14,
-    color: '#666',
-  },
-  deleteButton: {
-    backgroundColor: '#f44336',
-    padding: 8,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 5,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  backButton: {
-    backgroundColor: '#888',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 40,
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1 },
+  header: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, marginBottom: 16 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  section: { margin: 16, marginBottom: 16, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e0e0e0' },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  customInput: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10, fontSize: 16 },
+  addButton: { padding: 12, borderRadius: 8, alignItems: 'center' },
+  addButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  customTimerItem: { padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  customTimerInfo: { flex: 1 },
+  customTimerName: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  customTimerMinutes: { fontSize: 14 },
+  deleteButton: { padding: 8, borderRadius: 6, alignItems: 'center', marginLeft: 8 },
+  deleteButtonText: { fontSize: 16 },
+  clearButton: { margin: 16, padding: 12, borderRadius: 8, borderWidth: 2 },
+  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
+  backButtonText: { fontWeight: 'bold', fontSize: 16 },
   confirmOverlay: { position: 'absolute', bottom: 80, left: 20, right: 20, backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#ddd', elevation: 8 },
   confirmText: { fontSize: 14, color: '#333', marginBottom: 12, textAlign: 'center' },
   confirmButtons: { flexDirection: 'row', gap: 10 },

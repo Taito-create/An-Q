@@ -172,6 +172,21 @@ export default function AppSettingsScreen() {
           />
         </View>
 
+        {/* プロフィール */}
+        <SectionHeader title={locale === 'ja' ? 'プロフィール' : 'Profile'} />
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Row
+            label={locale === 'ja' ? 'プロフィール編集' : 'Edit Profile'}
+            right={
+              <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/profile'); }}>
+                <Text style={[styles.linkText, { color: colors.primary, fontSize: fs(14) }]}>
+                  {locale === 'ja' ? '編集' : 'Edit'}
+                </Text>
+              </TouchableOpacity>
+            }
+          />
+        </View>
+
         {/* 開発者 */}
         <SectionHeader title={t.developer} />
         <View style={[styles.section, { backgroundColor: colors.card }]}>

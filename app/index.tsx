@@ -554,17 +554,7 @@ const HomeScreen = () => {
         styles.topButtons,
         screenType === 'desktop' && { gap: 12 }
       ]}>
-        {/* 新規：プロフィール */}
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/profile'); }} label={t.profile || 'Profile'}>
-          <User size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
-
-        {/* 新規：マルチボタン */}
+        {/* マルチボタン */}
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
