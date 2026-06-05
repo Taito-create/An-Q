@@ -591,6 +591,44 @@ export default function QuizScreen() {
         tags: shuffledQuestions.find(q => q.id === r.questionId)?.tags ?? [],
       }));
       await recordQuizAnswers(answers);
+      
+      // XP & Qコイン報酬
+      const xpReward = finalScore * 5; // 正解1問につき5XP
+      const coinReward = Math.floor(finalScore * 0.5); // 正解2問につき1Qコイン
+      
+      const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
+      const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+      
+      await AsyncStorage.setItem('user_xp', (currentXP + xpReward).toString());
+      await AsyncStorage.setItem('user_coins', (currentCoins + coinReward).toString());
+      
+      // レベルアップチェック
+      const currentLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
+      const nextLevelThresh = currentLevel * 100;
+      const newXP = currentXP + xpReward;
+      
+      let levelUpMessage = '';
+      if (newXP >= nextLevelThresh) {
+        const newLevel = currentLevel + 1;
+        const remainingXP = newXP - nextLevelThresh;
+        await AsyncStorage.setItem('user_level', newLevel.toString());
+        await AsyncStorage.setItem('user_xp', remainingXP.toString());
+        // レベルアップボーナス
+        await AsyncStorage.setItem('user_coins', (currentCoins + coinReward + 50).toString());
+        levelUpMessage = locale === 'ja' 
+          ? `\n🎉 レベルアップ！ Lv.${newLevel} (50Qコインボーナス！)`
+          : `\n🎉 Level Up! Lv.${newLevel} (50 coin bonus!)`;
+      } else {
+        await AsyncStorage.setItem('user_xp', newXP.toString());
+      }
+      
+      // 報酬メッセージを表示
+      Alert.alert(
+        locale === 'ja' ? '🎉 クイズ完了！' : '🎉 Quiz Complete!',
+        locale === 'ja' 
+          ? `${finalScore}/${totalQuestions} 正解\n⚡ +${xpReward} XP\n✨ +${coinReward} Qコイン${levelUpMessage}`
+          : `${finalScore}/${totalQuestions} correct\n⚡ +${xpReward} XP\n✨ +${coinReward} Q Coins${levelUpMessage}`
+      );
     } catch (e) {
       console.error('finishQuiz error:', e);
     }

@@ -385,6 +385,24 @@ export const translations = {
     noQuestionsInFolder: 'この問題集には問題がありません',
     removeFromFolder: '除外',
     addToFolder: '問題集に追加',
+    // プロフィール・レベル・通貨
+    profile: 'プロフィール',
+    coins: 'Qコイン',
+    xp: 'XP',
+    levelLabel: 'レベル',
+    joinDate: '参加日',
+    
+    // マルチ・共有
+    multiShare: 'マルチ・共有',
+    send: '送信',
+    receive: '受信',
+    selectToShare: '共有する問題を選択',
+    pasteCode: 'シェアコードを貼り付け',
+    generateCode: 'コード生成・共有',
+    codeCopied: 'コードを送信してください',
+    noQuestionsToShare: '共有する問題がありません',
+    invalidCode: 'コードが無効です',
+    receivedQuestions: '問の質問を受信しました',
   },
   
   en: {
@@ -771,5 +789,23 @@ export const translations = {
     noQuestionsInFolder: 'No questions in this folder',
     removeFromFolder: 'Remove',
     addToFolder: 'Add to folder',
+    // プロフィール・レベル・通貨
+    profile: 'Profile',
+    coins: 'Q Coins',
+    xp: 'XP',
+    levelLabel: 'Level',
+    joinDate: 'Joined',
+    
+    // マルチ・共有
+    multiShare: 'Multi Share',
+    send: 'Send',
+    receive: 'Receive',
+    selectToShare: 'Select problems to share',
+    pasteCode: 'Paste share code',
+    generateCode: 'Generate & Share',
+    codeCopied: 'Share the code with friends',
+    noQuestionsToShare: 'No questions to share',
+    invalidCode: 'Invalid code',
+    receivedQuestions: 'questions received',
   }
 };

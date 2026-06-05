@@ -12,7 +12,7 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
-import { Play, Plus, Music, Settings, Globe, Palette } from 'lucide-react';
+import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucide-react';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 
 // レスポンシブ判定用フック
@@ -549,11 +549,31 @@ const HomeScreen = () => {
         </Text>
       </View>
 
-      {/* 右側：4つのアイコンボタン（カレンダー削除） */}
+      {/* 右側：アイコンボタン */}
       <View style={[
         styles.topButtons,
         screenType === 'desktop' && { gap: 12 }
       ]}>
+        {/* 新規：プロフィール */}
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/profile'); }} label={t.profile || 'Profile'}>
+          <User size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        </TooltipButton>
+
+        {/* 新規：マルチボタン */}
+        <TooltipButton style={[styles.iconButton, { 
+          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
+          borderColor: colors.primary 
+        }]} onPress={() => { SoundManager.play('decide'); navigate('/multi'); }} label={t.multiShare || 'Multi Share'}>
+          <Share2 size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+        </TooltipButton>
+
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
