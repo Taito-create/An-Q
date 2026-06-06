@@ -94,64 +94,90 @@ export default function MultiScreen() {
   };
 
   const receiveFromCode = async () => {
+    if (!shareCode.trim()) {
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? 'コードを入力してください' : 'Enter a code'
+      );
+      return;
+    }
+
     try {
-      const decoded = base64Decode(shareCode);
+      const decoded = base64Decode(shareCode.trim());
       const receivedData = JSON.parse(decoded);
+
+      if (!receivedData.version || receivedData.version > 1) {
+        Alert.alert(
+          locale === 'ja' ? 'エラー' : 'Error',
+          locale === 'ja' ? 'サポートされていないバージョンです' : 'Unsupported version'
+        );
+        return;
+      }
 
       if (!receivedData.type || !receivedData.data) {
         Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? 'コードが無効です' : 'Invalid code');
         return;
       }
 
-      if (receivedData.type === 'questions') {
-        const existing = JSON.parse(await AsyncStorage.getItem('quiz_questions') || '[]') as any[];
-        const merged = [...existing, ...receivedData.data.map((q: any) => ({
-          ...q,
-          id: Date.now() + Math.floor(Math.random() * 10000),
-          sharedFrom: true,
-          importedDate: Date.now(),
-        }))];
-        await AsyncStorage.setItem('quiz_questions', JSON.stringify(merged));
-      } else if (receivedData.type === 'folders') {
-        // Import folders and their questions
-        const existingQuestions = JSON.parse(await AsyncStorage.getItem('quiz_questions') || '[]') as any[];
-        let newQuestions: any[] = [];
-        const newFolders = receivedData.data.map((f: any) => {
-          const importedQuestionIds: number[] = [];
-          (f.questionData || []).forEach((q: any) => {
-            const newId = Date.now() + Math.floor(Math.random() * 10000);
-            importedQuestionIds.push(newId);
-            newQuestions.push({
-              ...q,
-              id: newId,
-              sharedFrom: true,
-              importedDate: Date.now(),
-            });
-          });
-          return {
-            id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
-            name: f.name,
-            questionIds: importedQuestionIds,
-            sharedFrom: true,
-          };
-        });
-
-        const existingFolders = JSON.parse(await AsyncStorage.getItem('question_folders') || '[]') as any[];
-        await AsyncStorage.setItem('quiz_questions', JSON.stringify([...existingQuestions, ...newQuestions]));
-        await AsyncStorage.setItem('question_folders', JSON.stringify([...existingFolders, ...newFolders]));
+      // 受信ボックスに保存
+      let inboxItems: any[] = [];
+      try {
+        const raw = await AsyncStorage.getItem('inbox_items');
+        inboxItems = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        inboxItems = [];
       }
 
-      await loadData();
+      if (receivedData.type === 'questions') {
+        receivedData.data.forEach((q: any, index: number) => {
+          inboxItems.push({
+            id: `item_${Date.now()}_${index}`,
+            type: 'question',
+            data: q,
+            receivedAt: Date.now(),
+            senderCode: shareCode.substring(0, 50),
+          });
+        });
+      } else if (receivedData.type === 'folders') {
+        receivedData.data.forEach((f: any, index: number) => {
+          inboxItems.push({
+            id: `item_${Date.now()}_${index}`,
+            type: 'folder',
+            data: f,
+            receivedAt: Date.now(),
+            senderCode: shareCode.substring(0, 50),
+          });
+        });
+      }
+
+      await AsyncStorage.setItem('inbox_items', JSON.stringify(inboxItems));
+
       Alert.alert(
-        locale === 'ja' ? '成功' : 'Success',
-        locale === 'ja'
-          ? `${shareType === 'questions' ? '問題' : '問題集'}を受信しました`
-          : `${shareType === 'questions' ? 'Questions' : 'Folders'} received`
+        locale === 'ja' ? '受信しました' : 'Received',
+        locale === 'ja' 
+          ? `${receivedData.data.length}個を受信ボックスに保存しました。受信ボックスで確認・転送してください。`
+          : `Saved ${receivedData.data.length} items to inbox. Transfer from inbox.`,
+        [
+          {
+            text: locale === 'ja' ? '受信ボックスを開く' : 'Open Inbox',
+            onPress: () => navigate('/inbox'),
+          },
+          {
+            text: locale === 'ja' ? '閉じる' : 'Close',
+            style: 'cancel',
+          }
+        ]
       );
+
       setShareCode('');
     } catch (error) {
       console.error('Failed to decode share code:', error);
-      Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? 'コードが無効です' : 'Invalid code');
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' 
+          ? 'コードが無効です。正しくコピーされているか確認してください'
+          : 'Invalid code. Check if copied correctly'
+      );
     }
   };
 

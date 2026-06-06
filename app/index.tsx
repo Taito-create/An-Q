@@ -465,17 +465,18 @@ const HomeScreen = () => {
     </View>
   );
 
-  // セカンダリボタン行：予定登録 / タイマー / ミッション（アイコンなし）
+  // セカンダリボタン行：予定登録 / タイマー / ミッション / 受信ボックス
   const renderSecondaryButtons = () => {
     const buttons = [
       { label: '予定登録', onPress: () => { SoundManager.play('decide'); navigate('/calendar'); } },
       { label: 'タイマー', onPress: () => { SoundManager.play('decide'); navigate('/manage'); } },
       { label: 'ミッション', onPress: () => { SoundManager.play('decide'); navigate('/missions'); } },
+      { label: '受信', onPress: () => { SoundManager.play('decide'); navigate('/inbox'); } },
     ];
     // 英語の場合
     const labels = currentLocale === 'en' 
-      ? ['Calendar', 'Timer', 'Missions']
-      : ['予定登録', 'タイマー', 'ミッション'];
+      ? ['Calendar', 'Timer', 'Missions', 'Inbox']
+      : ['予定登録', 'タイマー', 'ミッション', '受信'];
 
     return (
       <View style={{

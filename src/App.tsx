@@ -10,6 +10,7 @@ const BrowseQuestionsScreen = lazy(() => import('../app/browse'));
 const CalendarScreen = lazy(() => import('../app/calendar'));
 const CreateQuestionScreen = lazy(() => import('../app/create'));
 const CreditsScreen = lazy(() => import('../app/credits'));
+const InboxScreen = lazy(() => import('../app/inbox'));
 const DevModeScreen = lazy(() => import('../app/devmode'));
 const FeedbackScreen = lazy(() => import('../app/feedback'));
 const ManageTimerScreen = lazy(() => import('../app/manage'));
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/credits" element={<CreditsScreen />} />
           <Route path="/devmode" element={<DevModeScreen />} />
           <Route path="/feedback" element={<FeedbackScreen />} />
+          <Route path="/inbox" element={<InboxScreen />} />
           <Route path="/manage" element={<ManageTimerScreen />} />
           <Route path="/mission" element={<MissionScreen />} />
           <Route path="/missions" element={<MissionsScreen />} />

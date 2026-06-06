@@ -32,6 +32,7 @@ interface Question {
   tags: string[];
   image?: string | null;
   imageAnnotations?: ImageAnnotation[];
+  isShared?: boolean;
 }
 
 export default function BrowseQuestionsScreen() {
@@ -523,9 +524,16 @@ export default function BrowseQuestionsScreen() {
             >
               <View style={styles.cardHeaderLeft}>
                 {!isCompactMode && (
-                  <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
-                    {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
-                  </Text>
+                  <>
+                    <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
+                      {item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}
+                    </Text>
+                    {item.isShared && (
+                      <Text style={[{ fontSize: 10, color: colors.success, fontWeight: '700', marginLeft: 4 }]}>
+                        🔗
+                      </Text>
+                    )}
+                  </>
                 )}
                 <Text 
                   style={[
@@ -557,9 +565,14 @@ export default function BrowseQuestionsScreen() {
         </TouchableOpacity>
 
             {/* 展開時のみ表示（コンパクトモードでは非表示） */}
-            {!isCompactMode && expandedQuestionId === item.id && (
-              <View style={styles.expandedContent}>
-                <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
+                {!isCompactMode && expandedQuestionId === item.id && (
+                  <View style={styles.expandedContent}>
+                    {item.isShared && (
+                      <Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>
+                        🔗 {locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}
+                      </Text>
+                    )}
+                    <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
                 
                 {/* タグ表示 */}
                 {item.tags && item.tags.length > 0 && (
@@ -787,7 +800,7 @@ export default function BrowseQuestionsScreen() {
                 style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
                 onPress={createFolder}
               >
-                <Text style={styles.modalSaveText}>{t.createFolder}</Text>
+                <Text style={styles.modalSaveText}>{t.folderCreate}</Text>
               </TouchableOpacity>
             </View>
           </View>
