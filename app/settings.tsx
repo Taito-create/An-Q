@@ -327,32 +327,7 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      {/* Preview */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
-          {ja ? 'プレビュー' : 'Preview'}
-        </Text>
-        <View style={[styles.previewBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <TouchableOpacity style={[styles.previewButton, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.previewButtonText, { fontSize: Math.round(15 * scale) }]}>
-              {ja ? 'サンプルボタン' : 'Sample Button'}
-            </Text>
-          </TouchableOpacity>
-          <Text style={[styles.previewTitle, { color: colors.primary, fontSize: Math.round(17 * scale) }]}>
-            {ja ? 'サンプルタイトル' : 'Sample Title'}
-          </Text>
-          <View style={styles.tagRow}>
-            <View style={[styles.tag, { backgroundColor: colors.primary + '20' }]}>
-              <Text style={[styles.tagText, { color: colors.primary, fontSize: Math.round(13 * scale) }]}>Tag 1</Text>
-            </View>
-            <View style={[styles.tag, { backgroundColor: colors.secondary + '30' }]}>
-              <Text style={[styles.tagText, { color: colors.primary, fontSize: Math.round(13 * scale) }]}>Tag 2</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Back Button */}
+       {/* Back Button */}
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
         onPress={() => { SoundManager.play('decide'); navigate('/'); }}
