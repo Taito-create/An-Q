@@ -36,8 +36,8 @@ export default function SettingsScreen() {
   }, []);
 
   const handleLanguageChange = async (lang: 'ja' | 'en') => {
-    await AsyncStorage.setItem('user_language', lang);
     setCurrentLanguage(lang);
+    await AsyncStorage.setItem('user_language', lang);
     SoundManager.play('complete');
     setTimeout(() => window.location.reload(), 500);
   };

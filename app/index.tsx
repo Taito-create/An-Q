@@ -138,33 +138,27 @@ const HomeScreen = () => {
     SoundManager.initialize();
     loadExamCountdown();
     loadQuickReviewQuestions();
-    loadActiveTimer();
-    const interval = setInterval(() => { loadActiveTimer(); }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    updateTimerDisplay();
 
-  const loadActiveTimer = async () => {
+    // リアルタイム監視（500ms ごと）
+    const interval = setInterval(() => {
+      updateTimerDisplay();
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [currentLocale]);
+
+  const updateTimerDisplay = async () => {
     try {
-      const storedTimerMinutes = await AsyncStorage.getItem('active_timer_minutes');
-      const storedTimerLabel = await AsyncStorage.getItem('active_timer_label');
-      if (storedTimerMinutes === null && storedTimerLabel === null) {
+      const timerLabel = await AsyncStorage.getItem('active_timer_label');
+      
+      if (timerLabel === null) {
         setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
-        return;
-      }
-      if (storedTimerLabel) {
-        setDisplayTimer(storedTimerLabel);
-      } else if (storedTimerMinutes) {
-        const mins = parseInt(storedTimerMinutes, 10);
-        if (mins === 0) {
-          setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
-        } else {
-          setDisplayTimer(`${mins}${currentLocale === 'ja' ? '分' : 'min'}`);
-        }
       } else {
-        setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
+        setDisplayTimer(timerLabel || (currentLocale === 'ja' ? 'なし' : 'No limit'));
       }
     } catch (error) {
-      console.error('Failed to load active timer:', error);
+      console.error('Failed to update timer:', error);
     }
   };
 
