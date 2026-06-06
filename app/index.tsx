@@ -125,6 +125,7 @@ const HomeScreen = () => {
 
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [timerMinutes, setTimerMinutes] = useState(5);
+  const [displayTimer, setDisplayTimer] = useState<string | null>(null);
   const [todayQuestion, setTodayQuestion] = useState<any | null>(null);
   const [weakQuestionCount, setWeakQuestionCount] = useState(0);
   const [motivationalMessage, setMotivationalMessage] = useState('');
@@ -137,7 +138,35 @@ const HomeScreen = () => {
     SoundManager.initialize();
     loadExamCountdown();
     loadQuickReviewQuestions();
+    loadActiveTimer();
+    const interval = setInterval(() => { loadActiveTimer(); }, 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadActiveTimer = async () => {
+    try {
+      const storedTimerMinutes = await AsyncStorage.getItem('active_timer_minutes');
+      const storedTimerLabel = await AsyncStorage.getItem('active_timer_label');
+      if (storedTimerMinutes === null && storedTimerLabel === null) {
+        setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
+        return;
+      }
+      if (storedTimerLabel) {
+        setDisplayTimer(storedTimerLabel);
+      } else if (storedTimerMinutes) {
+        const mins = parseInt(storedTimerMinutes, 10);
+        if (mins === 0) {
+          setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
+        } else {
+          setDisplayTimer(`${mins}${currentLocale === 'ja' ? '分' : 'min'}`);
+        }
+      } else {
+        setDisplayTimer(currentLocale === 'ja' ? 'なし' : 'No limit');
+      }
+    } catch (error) {
+      console.error('Failed to load active timer:', error);
+    }
+  };
 
   const loadQuickReviewQuestions = async () => {
     try {
@@ -359,7 +388,7 @@ const HomeScreen = () => {
         <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
       </View>
       <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{timerMinutes}{t.minutes}</Text>
+        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{displayTimer || `${timerMinutes}${t.minutes}`}</Text>
         <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.timer}</Text>
       </View>
     </View>

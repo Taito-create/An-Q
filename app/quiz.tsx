@@ -388,7 +388,7 @@ export default function QuizScreen() {
   // カウントダウンタイマー
   // ──────────────────────────────────────────────
   useEffect(() => {
-    if (!isTimerActive) return;
+    if (!isTimerActive || !quizStarted) return;
     if (timeLeft <= 0) {
       setIsTimerActive(false);
       handleTimeUp();
@@ -396,7 +396,7 @@ export default function QuizScreen() {
     }
     const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
     return () => clearInterval(id);
-  }, [isTimerActive, timeLeft]);
+  }, [isTimerActive, timeLeft, quizStarted]);
 
   const handleTimeUp = () => {
     setIsTimerActive(false);
@@ -443,10 +443,21 @@ export default function QuizScreen() {
     setUserAnswers([]);
     setShowFeedback(false);
     setAnswered(false);
-    setTimeLeft(timerLimit);
+
+    if (preTimerMinutes === null) {
+      // 「なし」を選択した場合
+      setTimerLimit(Number.MAX_VALUE);
+      setTimeLeft(Number.MAX_VALUE);
+      setIsTimerActive(false);
+    } else {
+      const seconds = preTimerMinutes * 60;
+      setTimerLimit(seconds);
+      setTimeLeft(seconds);
+      setIsTimerActive(true);
+    }
+
     setShowPreSettings(false);
     setQuizStarted(true);
-    setIsTimerActive(true);
     setShowReview(false);
     questionStartTime.current = Date.now();
   };
@@ -961,7 +972,9 @@ export default function QuizScreen() {
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {/* スクロールしないヘッダー部分 */}
       <View style={styles.topBar}>
-        <Text style={[styles.timer, { color: timerColor }]}>{timeMin}:{String(timeSec).padStart(2, '0')}</Text>
+        <Text style={[styles.timer, { color: timerColor }]}>
+          {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
+        </Text>
         <TouchableOpacity 
           style={[
             styles.pauseBtn, 

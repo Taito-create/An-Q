@@ -20,12 +20,10 @@ export default function AppSettingsScreen() {
 
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [seEnabled, setSeEnabled] = useState(true);
-  const [homeNavMode, setHomeNavMode] = useState<'compact' | 'bigGrid'>('compact');
 
   useEffect(() => {
     AsyncStorage.getItem('dev_mode_enabled').then(v => setDevModeEnabled(v === 'true'));
     AsyncStorage.getItem('se_enabled').then(v => setSeEnabled(v !== 'false'));
-    AsyncStorage.getItem('home_nav_mode').then(v => { if (v === 'bigGrid') setHomeNavMode('bigGrid'); });
   }, []);
 
   const handleLanguage = async (lang: 'ja' | 'en') => {
@@ -42,12 +40,6 @@ export default function AppSettingsScreen() {
   const handleSE = async (val: boolean) => {
     setSeEnabled(val);
     await AsyncStorage.setItem('se_enabled', val ? 'true' : 'false');
-    SoundManager.play('decide');
-  };
-
-  const handleHomeNavMode = async (mode: 'compact' | 'bigGrid') => {
-    setHomeNavMode(mode);
-    await AsyncStorage.setItem('home_nav_mode', mode);
     SoundManager.play('decide');
   };
 
@@ -145,29 +137,6 @@ export default function AppSettingsScreen() {
                   {t.details}
                 </Text>
               </TouchableOpacity>
-            }
-          />
-          <Row
-            label={t.homeUiMode}
-            right={
-              <View style={styles.segmented}>
-                <TouchableOpacity
-                  style={[styles.segBtn, { backgroundColor: homeNavMode === 'compact' ? colors.primary : colors.background, borderColor: colors.border }]}
-                  onPress={() => handleHomeNavMode('compact')}
-                >
-                  <Text style={[styles.segBtnText, { color: homeNavMode === 'compact' ? onPrimary : colors.text, fontSize: fs(12) }]}>
-                    {t.compactMode}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segBtn, { backgroundColor: homeNavMode === 'bigGrid' ? colors.primary : colors.background, borderColor: colors.border }]}
-                  onPress={() => handleHomeNavMode('bigGrid')}
-                >
-                  <Text style={[styles.segBtnText, { color: homeNavMode === 'bigGrid' ? onPrimary : colors.text, fontSize: fs(12) }]}>
-                    {t.bigGridMode}
-                  </Text>
-                </TouchableOpacity>
-              </View>
             }
           />
         </View>

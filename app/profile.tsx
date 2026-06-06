@@ -278,26 +278,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ミッション */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/missions'); }}
-        >
-          <Text style={[styles.buttonText, { color: onPrimary }]}>
-            🎖️ {locale === 'ja' ? 'ミッション' : 'Missions'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* ショップ */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/shop'); }}
-        >
-          <Text style={[styles.buttonText, { color: onPrimary }]}>
-            🛍️ {locale === 'ja' ? 'ショップ' : 'Shop'}
-          </Text>
-        </TouchableOpacity>
-
         <View style={{ height: 20 }} />
       </ScrollView>
 

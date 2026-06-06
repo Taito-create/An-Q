@@ -7,11 +7,17 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 
 function base64Encode(str: string): string {
-  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))));
+  // UTF-8 エンコード → Base64
+  const utf8bytes = new TextEncoder().encode(str);
+  const binaryString = String.fromCharCode(...Array.from(utf8bytes));
+  return btoa(binaryString);
 }
 
 function base64Decode(str: string): string {
-  return decodeURIComponent(Array.from(atob(str), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  // Base64 → UTF-8 デコード
+  const binaryString = atob(str);
+  const utf8bytes = Uint8Array.from([...binaryString].map(c => c.charCodeAt(0)));
+  return new TextDecoder().decode(utf8bytes);
 }
 
 export default function MultiScreen() {

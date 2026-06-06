@@ -150,14 +150,24 @@ export default function MissionScreen() {
         })}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
-          {ja ? '戻る' : 'Back'}
-        </Text>
-      </TouchableOpacity>
+      <View style={{ marginBottom: 40, paddingHorizontal: 16 }}>
+        <TouchableOpacity
+          style={[{ backgroundColor: colors.primary, padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/shop'); }}
+        >
+          <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: fs(16) }]}>
+            🛍️ {ja ? 'ショップを見る' : 'View Shop'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
+            {ja ? '戻る' : 'Back'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

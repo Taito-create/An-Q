@@ -23,9 +23,10 @@ const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
 export default function SettingsScreen() {
   const navigate = useNavigate();
-  const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern } = useTheme();
+  const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern, onPrimary } = useTheme();
   const locale = useLocale();
   const ja = locale === 'ja';
+  const [currentLanguage, setCurrentLanguage] = useState<'ja' | 'en'>(locale);
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -33,6 +34,13 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadAnimationSetting();
   }, []);
+
+  const handleLanguageChange = async (lang: 'ja' | 'en') => {
+    await AsyncStorage.setItem('user_language', lang);
+    setCurrentLanguage(lang);
+    SoundManager.play('complete');
+    setTimeout(() => window.location.reload(), 500);
+  };
 
   const loadAnimationSetting = async () => {
     try {
@@ -201,6 +209,62 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* 表示言語 */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+          {ja ? '表示言語' : 'Display Language'}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {/* 日本語ボタン */}
+          <TouchableOpacity
+            style={[
+              styles.languageButton,
+              {
+                backgroundColor: currentLanguage === 'ja' ? colors.primary : colors.card,
+                borderWidth: 2,
+                borderColor: currentLanguage === 'ja' ? colors.primary : colors.border,
+              }
+            ]}
+            onPress={() => handleLanguageChange('ja')}
+          >
+            <Text style={[styles.languageFlagIcon, { fontSize: 24 }]}>🇯🇵</Text>
+            <Text style={[
+              styles.languageLabel,
+              { color: currentLanguage === 'ja' ? onPrimary : colors.text, fontWeight: '700' }
+            ]}>
+              日本語
+            </Text>
+            {currentLanguage === 'ja' && (
+              <Text style={[{ color: onPrimary, marginTop: 4, fontSize: 12 }]}>✓ 現在</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* 英語ボタン */}
+          <TouchableOpacity
+            style={[
+              styles.languageButton,
+              {
+                backgroundColor: currentLanguage === 'en' ? colors.primary : colors.card,
+                borderWidth: 2,
+                borderColor: currentLanguage === 'en' ? colors.primary : colors.border,
+              }
+            ]}
+            onPress={() => handleLanguageChange('en')}
+          >
+            <Text style={[styles.languageFlagIcon, { fontSize: 24 }]}>🇺🇸</Text>
+            <Text style={[
+              styles.languageLabel,
+              { color: currentLanguage === 'en' ? onPrimary : colors.text, fontWeight: '700' }
+            ]}>
+              English
+            </Text>
+            {currentLanguage === 'en' && (
+              <Text style={[{ color: onPrimary, marginTop: 4, fontSize: 12 }]}>✓ Current</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* エフェクト：アニメーション設定 */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
@@ -360,4 +424,18 @@ const styles = StyleSheet.create({
   },
   backButton: { margin: 20, padding: 16, borderRadius: 12, alignItems: 'center' },
   backButtonText: { color: 'white', fontWeight: 'bold' },
+  languageButton: {
+    flex: 1,
+    paddingVertical: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageFlagIcon: {
+    marginBottom: 8,
+  },
+  languageLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
