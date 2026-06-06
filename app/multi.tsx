@@ -170,12 +170,30 @@ export default function MultiScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>
+    <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <Text style={[styles.title, { color: colors.text, flex: 1 }]}>
           🔗 {locale === 'ja' ? 'マルチ・共有' : 'Multi Share'}
         </Text>
-        <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={[{ color: colors.primary, fontSize: 18 }]}>✕</Text>
+        <TouchableOpacity
+          style={[
+            {
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              backgroundColor: colors.primary,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 70,
+            }
+          ]}
+          onPress={() => {
+            SoundManager.play('decide');
+            navigate('/');
+          }}
+        >
+          <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: 14 }]}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
         </TouchableOpacity>
       </View>
 
