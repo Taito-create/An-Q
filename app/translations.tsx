@@ -105,6 +105,8 @@ export const translations = {
     batchAddTags: 'まとめてタグを追加',
     noFolders: '問題集がありません',
     noQuestionsInFolder: 'この問題集に問題がありません',
+    developerMode: '開発者モード',
+    musicCredits: '音楽クレジット',
   },
 
   en: {
@@ -213,5 +215,7 @@ export const translations = {
     batchAddTags: 'Batch Add Tags',
     noFolders: 'No folders',
     noQuestionsInFolder: 'No questions in this folder',
+    developerMode: 'Developer Mode',
+    musicCredits: 'Music Credits',
   }
 };
