@@ -7,14 +7,12 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 
 function base64Encode(str: string): string {
-  // UTF-8 エンコード → Base64
   const utf8bytes = new TextEncoder().encode(str);
   const binaryString = String.fromCharCode(...Array.from(utf8bytes));
   return btoa(binaryString);
 }
 
 function base64Decode(str: string): string {
-  // Base64 → UTF-8 デコード
   const binaryString = atob(str);
   const utf8bytes = Uint8Array.from([...binaryString].map(c => c.charCodeAt(0)));
   return new TextDecoder().decode(utf8bytes);
@@ -29,7 +27,8 @@ export default function MultiScreen() {
   const [shareType, setShareType] = useState<'questions' | 'folders'>('questions');
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
-  const [shareCode, setShareCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState('');  // 送信用コード
+  const [receiveCode, setReceiveCode] = useState('');      // 受信用入力
   const [questions, setQuestions] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
 
@@ -53,7 +52,6 @@ export default function MultiScreen() {
         return;
       }
 
-      // 完全なデータ構造で問題をエクスポート
       const questionsToShare = questions
         .filter(q => selectedQuestions.includes(q.id))
         .map(q => ({
@@ -82,7 +80,6 @@ export default function MultiScreen() {
         return;
       }
 
-      // 問題集 + 含まれるすべての問題（questionIdsは不要。受信側で再生成）
       const foldersToShare = selectedFolders.map(folderId => {
         const folder = folders.find(f => f.id === folderId);
         if (!folder) return null;
@@ -118,28 +115,50 @@ export default function MultiScreen() {
 
     if (!dataToShare) return;
 
-    const code = base64Encode(JSON.stringify(dataToShare));
-    setShareCode(code);
-
     try {
-      await Share.share({
-        message: locale === 'ja'
-          ? `[An-Q] ${shareType === 'questions' ? '問題' : '問題集'}シェアコード: ${code.substring(0, 50)}...`
-          : `[An-Q] ${shareType === 'questions' ? 'Question' : 'Folder'} share code: ${code.substring(0, 50)}...`,
-      });
-    } catch (e) {
-      try {
-        await navigator.clipboard.writeText(code);
-        Alert.alert(
-          locale === 'ja' ? 'コピーしました' : 'Copied',
-          locale === 'ja' ? 'コードを送信してください' : 'Share the code'
-        );
-      } catch {}
+      // JSON → UTF-8 → Base64（改行除去）
+      const jsonString = JSON.stringify(dataToShare);
+      const utf8bytes = new TextEncoder().encode(jsonString);
+      const binaryString = String.fromCharCode(...Array.from(utf8bytes));
+      let code = btoa(binaryString);
+      code = code.replace(/\n/g, '');
+
+      setGeneratedCode(code);
+
+      Alert.alert(
+        locale === 'ja' ? 'コード生成完了' : 'Code Generated',
+        locale === 'ja'
+          ? '以下のコードをコピーして送信してください'
+          : 'Copy and share the code below',
+        [
+          {
+            text: locale === 'ja' ? 'コピー' : 'Copy',
+            onPress: async () => {
+              try {
+                await navigator.clipboard.writeText(code);
+                Alert.alert(
+                  locale === 'ja' ? 'コピーしました' : 'Copied',
+                  locale === 'ja' ? 'コードを送信してください' : 'Share the code'
+                );
+              } catch (error) {
+                console.error('Failed to copy:', error);
+              }
+            }
+          },
+          {
+            text: locale === 'ja' ? 'キャンセル' : 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to generate share code:', error);
+      Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? 'コード生成に失敗しました' : 'Failed to generate code');
     }
   };
 
   const receiveFromCode = async () => {
-    if (!shareCode.trim()) {
+    if (!receiveCode.trim()) {
       Alert.alert(
         locale === 'ja' ? 'エラー' : 'Error',
         locale === 'ja' ? 'コードを入力してください' : 'Enter a code'
@@ -148,8 +167,12 @@ export default function MultiScreen() {
     }
 
     try {
-      const decoded = base64Decode(shareCode.trim());
-      const receivedData = JSON.parse(decoded);
+      // 改行を除去してデコード
+      const cleanCode = receiveCode.trim().replace(/\n/g, '');
+      const binaryString = atob(cleanCode);
+      const utf8bytes = Uint8Array.from([...binaryString].map(c => c.charCodeAt(0)));
+      const jsonString = new TextDecoder().decode(utf8bytes);
+      const receivedData = JSON.parse(jsonString);
 
       if (!receivedData.version || receivedData.version > 1) {
         Alert.alert(
@@ -180,7 +203,7 @@ export default function MultiScreen() {
             type: 'question',
             data: q,
             receivedAt: Date.now(),
-            senderCode: shareCode.substring(0, 50),
+            senderCode: receiveCode.substring(0, 50),
           });
         });
       } else if (receivedData.type === 'folders') {
@@ -190,7 +213,7 @@ export default function MultiScreen() {
             type: 'folder',
             data: f,
             receivedAt: Date.now(),
-            senderCode: shareCode.substring(0, 50),
+            senderCode: receiveCode.substring(0, 50),
           });
         });
       }
@@ -199,9 +222,9 @@ export default function MultiScreen() {
 
       Alert.alert(
         locale === 'ja' ? '受信しました' : 'Received',
-        locale === 'ja' 
-          ? `${receivedData.data.length}個を受信ボックスに保存しました。受信ボックスで確認・転送してください。`
-          : `Saved ${receivedData.data.length} items to inbox. Transfer from inbox.`,
+        locale === 'ja'
+          ? `${receivedData.data.length}個を受信ボックスに保存しました`
+          : `Saved ${receivedData.data.length} items to inbox`,
         [
           {
             text: locale === 'ja' ? '受信ボックスを開く' : 'Open Inbox',
@@ -214,55 +237,31 @@ export default function MultiScreen() {
         ]
       );
 
-      setShareCode('');
+      setReceiveCode('');
     } catch (error) {
       console.error('Failed to decode share code:', error);
       Alert.alert(
         locale === 'ja' ? 'エラー' : 'Error',
-        locale === 'ja' 
+        locale === 'ja'
           ? 'コードが無効です。正しくコピーされているか確認してください'
           : 'Invalid code. Check if copied correctly'
       );
     }
   };
 
-  const copyCodeToClipboard = async () => {
-    if (!shareCode) return;
-    try {
-      await navigator.clipboard.writeText(shareCode);
-      Alert.alert(
-        locale === 'ja' ? 'コピーしました' : 'Copied',
-        locale === 'ja' ? 'コードを送信してください' : 'Share the code'
-      );
-    } catch {}
-  };
-
   const canGenerate = shareType === 'questions' ? selectedQuestions.length > 0 : selectedFolders.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-    <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.title, { color: colors.text, flex: 1 }]}>
           🔗 {locale === 'ja' ? 'マルチ・共有' : 'Multi Share'}
         </Text>
         <TouchableOpacity
-          style={[
-            {
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              backgroundColor: colors.primary,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: 70,
-            }
-          ]}
-          onPress={() => {
-            SoundManager.play('decide');
-            navigate('/');
-          }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: 14 }]}>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
@@ -287,139 +286,166 @@ export default function MultiScreen() {
         </TouchableOpacity>
       </View>
 
-      {shareMode === 'send' ? (
-        <ScrollView style={styles.content}>
-          {/* 問題 / 問題集 切り替え */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-            <TouchableOpacity
-              style={[{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: shareType === 'questions' ? colors.primary : colors.card, borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => { setShareType('questions'); setSelectedFolders([]); }}
-            >
-              <Text style={[{ textAlign: 'center', color: shareType === 'questions' ? '#fff' : colors.text, fontWeight: '700' }]}>
-                {locale === 'ja' ? '問題' : 'Questions'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: shareType === 'folders' ? colors.primary : colors.card, borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => { setShareType('folders'); setSelectedQuestions([]); }}
-            >
-              <Text style={[{ textAlign: 'center', color: shareType === 'folders' ? '#fff' : colors.text, fontWeight: '700' }]}>
-                {locale === 'ja' ? '問題集' : 'Folders'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <ScrollView style={styles.content}>
+        {shareMode === 'send' ? (
+          <>
+            {/* 問題 / 問題集 切り替え */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: shareType === 'questions' ? colors.primary : colors.card, borderWidth: 1, borderColor: colors.border }}
+                onPress={() => { setShareType('questions'); setSelectedFolders([]); }}
+              >
+                <Text style={{ textAlign: 'center', color: shareType === 'questions' ? '#fff' : colors.text, fontWeight: '700' }}>
+                  {locale === 'ja' ? '問題' : 'Questions'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: shareType === 'folders' ? colors.primary : colors.card, borderWidth: 1, borderColor: colors.border }}
+                onPress={() => { setShareType('folders'); setSelectedQuestions([]); }}
+              >
+                <Text style={{ textAlign: 'center', color: shareType === 'folders' ? '#fff' : colors.text, fontWeight: '700' }}>
+                  {locale === 'ja' ? '問題集' : 'Folders'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-          {shareType === 'questions' ? (
-            <>
-              {questions.length === 0 && (
-                <Text style={[{ color: colors.textSecondary, textAlign: 'center', padding: 20 }]}>
-                  {locale === 'ja' ? '問題がありません' : 'No questions'}
-                </Text>
-              )}
-              {questions.map((q) => (
-                <TouchableOpacity
-                  key={q.id}
-                  style={[styles.questionItem, {
-                    borderColor: selectedQuestions.includes(q.id) ? colors.primary : colors.border,
-                    backgroundColor: selectedQuestions.includes(q.id) ? colors.primary + '20' : colors.card
-                  }]}
-                  onPress={() => {
-                    if (selectedQuestions.includes(q.id)) {
-                      setSelectedQuestions(selectedQuestions.filter(id => id !== q.id));
-                    } else {
-                      setSelectedQuestions([...selectedQuestions, q.id]);
-                    }
-                  }}
-                >
-                  <Text style={[{ fontSize: 16, color: selectedQuestions.includes(q.id) ? colors.primary : colors.textSecondary }]}>
-                    {selectedQuestions.includes(q.id) ? '☑️' : '☐'}
+            {/* 問題一覧 */}
+            {shareType === 'questions' ? (
+              <>
+                {questions.length === 0 && (
+                  <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
+                    {locale === 'ja' ? '問題がありません' : 'No questions'}
                   </Text>
-                  <Text style={[{ flex: 1, color: colors.text, fontSize: 13 }]}>{q.question?.substring(0, 50)}...</Text>
-                </TouchableOpacity>
-              ))}
-            </>
-          ) : (
-            <>
-              {folders.length === 0 && (
-                <Text style={[{ color: colors.textSecondary, textAlign: 'center', padding: 20 }]}>
-                  {locale === 'ja' ? '問題集がありません' : 'No folders'}
-                </Text>
-              )}
-              {folders.map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[styles.questionItem, {
-                    borderColor: selectedFolders.includes(f.id) ? colors.primary : colors.border,
-                    backgroundColor: selectedFolders.includes(f.id) ? colors.primary + '20' : colors.card
-                  }]}
-                  onPress={() => {
-                    if (selectedFolders.includes(f.id)) {
-                      setSelectedFolders(selectedFolders.filter(id => id !== f.id));
-                    } else {
-                      setSelectedFolders([...selectedFolders, f.id]);
-                    }
-                  }}
-                >
-                  <Text style={[{ fontSize: 16, color: selectedFolders.includes(f.id) ? colors.primary : colors.textSecondary }]}>
-                    {selectedFolders.includes(f.id) ? '☑️' : '☐'}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[{ color: colors.text, fontSize: 13 }]}>{f.name}</Text>
-                    <Text style={[{ color: colors.textSecondary, fontSize: 11 }]}>
-                      {(f.questionIds || []).length}{locale === 'ja' ? '問' : ' questions'}
+                )}
+                {questions.map((q) => (
+                  <TouchableOpacity
+                    key={q.id}
+                    style={[styles.questionItem, {
+                      borderColor: selectedQuestions.includes(q.id) ? colors.primary : colors.border,
+                      backgroundColor: selectedQuestions.includes(q.id) ? colors.primary + '20' : colors.card
+                    }]}
+                    onPress={() => {
+                      if (selectedQuestions.includes(q.id)) {
+                        setSelectedQuestions(selectedQuestions.filter(id => id !== q.id));
+                      } else {
+                        setSelectedQuestions([...selectedQuestions, q.id]);
+                      }
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, color: selectedQuestions.includes(q.id) ? colors.primary : colors.textSecondary }}>
+                      {selectedQuestions.includes(q.id) ? '☑️' : '☐'}
                     </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
+                    <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{q.question?.substring(0, 50)}...</Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : (
+              <>
+                {folders.length === 0 && (
+                  <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
+                    {locale === 'ja' ? '問題集がありません' : 'No folders'}
+                  </Text>
+                )}
+                {folders.map((f) => (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[styles.questionItem, {
+                      borderColor: selectedFolders.includes(f.id) ? colors.primary : colors.border,
+                      backgroundColor: selectedFolders.includes(f.id) ? colors.primary + '20' : colors.card
+                    }]}
+                    onPress={() => {
+                      if (selectedFolders.includes(f.id)) {
+                        setSelectedFolders(selectedFolders.filter(id => id !== f.id));
+                      } else {
+                        setSelectedFolders([...selectedFolders, f.id]);
+                      }
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, color: selectedFolders.includes(f.id) ? colors.primary : colors.textSecondary }}>
+                      {selectedFolders.includes(f.id) ? '☑️' : '☐'}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontSize: 13 }}>{f.name}</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                        {(f.questionIds || []).length}{locale === 'ja' ? '問' : ' questions'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary, opacity: canGenerate ? 1 : 0.5 }]}
-            onPress={generateShareCode}
-            disabled={!canGenerate}
-          >
-            <Text style={[styles.buttonText, { color: onPrimary }]}>
-              🔗 {locale === 'ja' ? 'コード生成・共有' : 'Generate & Share'}
-            </Text>
-          </TouchableOpacity>
-
-          {shareCode ? (
-            <TouchableOpacity style={[styles.codeBox, { backgroundColor: colors.card, borderColor: colors.primary }]} onPress={copyCodeToClipboard}>
-              <Text style={[{ fontSize: 11, color: colors.textSecondary, marginBottom: 4 }]}>
-                {locale === 'ja' ? 'コード（タップでコピー）' : 'Code (tap to copy)'}
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.primary, opacity: canGenerate ? 1 : 0.5 }]}
+              onPress={generateShareCode}
+              disabled={!canGenerate}
+            >
+              <Text style={[styles.buttonText, { color: onPrimary }]}>
+                🔗 {locale === 'ja' ? 'コード生成' : 'Generate Code'}
               </Text>
-              <Text style={[{ fontSize: 12, color: colors.text, fontFamily: 'monospace' }]}>{shareCode.substring(0, 100)}</Text>
             </TouchableOpacity>
-          ) : null}
-        </ScrollView>
-      ) : (
-        <ScrollView style={styles.content}>
-          <Text style={[{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }]}>
-            {locale === 'ja' ? 'シェアコードを貼り付け' : 'Paste share code'}
-          </Text>
 
-          <TextInput
-            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-            placeholder={locale === 'ja' ? 'コードを入力' : 'Enter code'}
-            placeholderTextColor={colors.textSecondary}
-            value={shareCode}
-            onChangeText={setShareCode}
-            multiline
-            numberOfLines={6}
-          />
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary, opacity: !shareCode ? 0.5 : 1 }]}
-            onPress={receiveFromCode}
-            disabled={!shareCode}
-          >
-            <Text style={[styles.buttonText, { color: onPrimary }]}>
-              📥 {locale === 'ja' ? '受信' : 'Receive'}
+            {/* 生成されたコード表示 */}
+            {generatedCode && (
+              <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginVertical: 12 }}>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
+                  {locale === 'ja' ? '生成されたコード:' : 'Generated Code:'}
+                </Text>
+                <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.text, fontSize: 11, lineHeight: 16, fontFamily: 'monospace' }}>
+                    {generatedCode}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={{ marginTop: 8 }}
+                  onPress={async () => {
+                    try {
+                      await navigator.clipboard.writeText(generatedCode);
+                      Alert.alert(
+                        locale === 'ja' ? 'コピーしました' : 'Copied',
+                        locale === 'ja' ? 'クリップボードにコピーされました' : 'Copied to clipboard'
+                      );
+                    } catch (error) {
+                      console.error('Failed to copy:', error);
+                    }
+                  }}
+                >
+                  <Text style={{ color: colors.primary, fontWeight: '700', textAlign: 'center' }}>
+                    📋 {locale === 'ja' ? 'コピー' : 'Copy Code'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 受信モード */}
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>
+              {locale === 'ja' ? 'シェアコードを貼り付け' : 'Paste share code'}
             </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
+              placeholder={locale === 'ja' ? 'コードを貼り付け' : 'Paste code here'}
+              placeholderTextColor={colors.textSecondary}
+              value={receiveCode}
+              onChangeText={setReceiveCode}
+              multiline
+              numberOfLines={6}
+            />
+
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.primary, opacity: !receiveCode ? 0.5 : 1 }]}
+              onPress={receiveFromCode}
+              disabled={!receiveCode}
+            >
+              <Text style={[styles.buttonText, { color: onPrimary }]}>
+                📥 {locale === 'ja' ? '受け取る' : 'Receive'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </ScrollView>
 
       <TouchableOpacity
         style={[styles.backButton, { backgroundColor: colors.primary }]}
@@ -442,7 +468,6 @@ const styles = StyleSheet.create({
   questionItem: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1 },
   button: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 16 },
   buttonText: { fontWeight: '700', fontSize: 15 },
-  codeBox: { padding: 12, borderRadius: 8, borderWidth: 1, marginTop: 12 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, marginBottom: 12, minHeight: 100, textAlignVertical: 'top' },
   backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
   backButtonText: { fontWeight: '700', fontSize: 16 },
