@@ -52,26 +52,71 @@ export default function MultiScreen() {
         Alert.alert(locale === 'ja' ? '選択してください' : 'Select items');
         return;
       }
+
+      // 完全なデータ構造で問題をエクスポート
+      const questionsToShare = questions
+        .filter(q => selectedQuestions.includes(q.id))
+        .map(q => ({
+          question: q.question,
+          answerType: q.answerType,
+          descriptiveAnswer: q.descriptiveAnswer || '',
+          trueFalseAnswer: q.trueFalseAnswer || false,
+          multipleChoice: q.multipleChoice || [],
+          tags: q.tags || [],
+          image: q.image || null,
+          imageAnnotations: q.imageAnnotations || [],
+          enabled: true,
+          mistakeCount: 0,
+          createdAt: q.createdAt || Date.now(),
+        }));
+
       dataToShare = {
         type: 'questions',
-        data: questions.filter(q => selectedQuestions.includes(q.id))
+        version: 1,
+        data: questionsToShare,
+        sharedAt: Date.now(),
       };
     } else {
       if (selectedFolders.length === 0) {
         Alert.alert(locale === 'ja' ? '選択してください' : 'Select items');
         return;
       }
-      const selectedFolderData = folders.filter(f => selectedFolders.includes(f.id));
-      // Include the actual questions for each folder
-      const folderDataWithQuestions = selectedFolderData.map((f: any) => ({
-        ...f,
-        questionData: (f.questionIds || []).map((qId: number) => questions.find(q => q.id === qId)).filter(Boolean),
-      }));
+
+      // 問題集 + 含まれるすべての問題（questionIdsは不要。受信側で再生成）
+      const foldersToShare = selectedFolders.map(folderId => {
+        const folder = folders.find(f => f.id === folderId);
+        if (!folder) return null;
+
+        const folderQuestions = questions.filter(q =>
+          folder.questionIds && folder.questionIds.includes(q.id)
+        );
+
+        return {
+          name: folder.name,
+          description: folder.description || '',
+          questions: folderQuestions.map(q => ({
+            question: q.question,
+            answerType: q.answerType,
+            descriptiveAnswer: q.descriptiveAnswer || '',
+            trueFalseAnswer: q.trueFalseAnswer || false,
+            multipleChoice: q.multipleChoice || [],
+            tags: q.tags || [],
+            image: q.image || null,
+            imageAnnotations: q.imageAnnotations || [],
+          })),
+          createdAt: folder.createdAt || Date.now(),
+        };
+      }).filter((f): f is NonNullable<typeof f> => f !== null);
+
       dataToShare = {
         type: 'folders',
-        data: folderDataWithQuestions
+        version: 1,
+        data: foldersToShare,
+        sharedAt: Date.now(),
       };
     }
+
+    if (!dataToShare) return;
 
     const code = base64Encode(JSON.stringify(dataToShare));
     setShareCode(code);

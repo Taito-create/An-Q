@@ -42,43 +42,99 @@ export default function InboxScreen() {
     if (selectedItems.length === 0) {
       Alert.alert(
         locale === 'ja' ? '選択なし' : 'No selection',
-        locale === 'ja' ? '転送する問題を選択してください' : 'Select items to transfer'
+        locale === 'ja' ? '転送する項目を選択してください' : 'Select items to transfer'
       );
       return;
     }
 
     try {
       const itemsToTransfer = receivedItems.filter(item => selectedItems.includes(item.id));
-      
-      if (itemsToTransfer.some(item => item.type === 'question')) {
-        const questions = itemsToTransfer
-          .filter(item => item.type === 'question')
-          .map(item => ({
-            ...item.data,
-            id: Date.now() + Math.random(),
-            isShared: true,
-            sharedMark: '🔗',
-            originalId: item.id,
-          }));
+      let totalAdded = 0;
 
-        const existing = JSON.parse(await AsyncStorage.getItem('quiz_questions') || '[]');
-        await AsyncStorage.setItem('quiz_questions', JSON.stringify([...existing, ...questions]));
+      // 1. 問題（question）を転送
+      const questionsToAdd = itemsToTransfer
+        .filter(item => item.type === 'question')
+        .map(item => ({
+          ...item.data,
+          id: Date.now() + Math.random(),
+          isShared: true,
+          sharedMark: '🔗',
+          originalInboxId: item.id,
+        }));
+
+      if (questionsToAdd.length > 0) {
+        const existingQuestions = JSON.parse(
+          await AsyncStorage.getItem('quiz_questions') || '[]'
+        );
+        await AsyncStorage.setItem(
+          'quiz_questions',
+          JSON.stringify([...existingQuestions, ...questionsToAdd])
+        );
+        totalAdded += questionsToAdd.length;
       }
 
-      if (itemsToTransfer.some(item => item.type === 'folder')) {
-        const folders = itemsToTransfer
-          .filter(item => item.type === 'folder')
-          .map(item => ({
-            ...item.data,
-            id: Date.now() + Math.random(),
-            isShared: true,
-            sharedMark: '🔗',
-          }));
+      // 2. 問題集（folder）を転送
+      const foldersToAdd = itemsToTransfer
+        .filter(item => item.type === 'folder')
+        .map(item => {
+          const folderData = item.data; // multi.tsxから送られてきたデータ
+          const newFolderId = Date.now() + Math.random();
 
-        const existing = JSON.parse(await AsyncStorage.getItem('question_folders') || '[]');
-        await AsyncStorage.setItem('question_folders', JSON.stringify([...existing, ...folders]));
+          // フォルダに含まれる問題を個別に新しいIDで生成
+          const newQuestionIds: number[] = [];
+          const newQuestions: any[] = [];
+
+          (folderData.questions || []).forEach((q: any) => {
+            const newQuestionId = Date.now() + Math.random();
+            newQuestions.push({
+              ...q,
+              id: newQuestionId,
+              isShared: true,
+              sharedMark: '🔗',
+              originalFolderId: newFolderId,
+            });
+            newQuestionIds.push(newQuestionId);
+          });
+
+          return {
+            name: folderData.name,
+            description: folderData.description || '',
+            id: newFolderId,
+            questionIds: newQuestionIds,
+            questions: newQuestions, // 一時的に保持（後で削除して保存）
+            isShared: true,
+            originalInboxId: item.id,
+          };
+        });
+
+      if (foldersToAdd.length > 0) {
+        // フォルダに含まれる全問題を抽出
+        const allNewQuestions = foldersToAdd.flatMap(f => f.questions || []);
+
+        // 既存の問題を取得してマージ
+        const existingQuestions = JSON.parse(
+          await AsyncStorage.getItem('quiz_questions') || '[]'
+        );
+        await AsyncStorage.setItem(
+          'quiz_questions',
+          JSON.stringify([...existingQuestions, ...allNewQuestions])
+        );
+
+        // フォルダデータから questions プロパティを削除して保存
+        const foldersToSave = foldersToAdd.map(({ questions, ...folder }) => folder);
+
+        // 既存のフォルダを取得してマージ
+        const existingFolders = JSON.parse(
+          await AsyncStorage.getItem('question_folders') || '[]'
+        );
+        await AsyncStorage.setItem(
+          'question_folders',
+          JSON.stringify([...existingFolders, ...foldersToSave])
+        );
+        totalAdded += foldersToAdd.length;
       }
 
+      // 3. 転送済みアイテムを受信ボックスから削除
       const remaining = receivedItems.filter(item => !selectedItems.includes(item.id));
       await AsyncStorage.setItem('inbox_items', JSON.stringify(remaining));
 
@@ -88,7 +144,9 @@ export default function InboxScreen() {
       SoundManager.play('complete');
       Alert.alert(
         locale === 'ja' ? '転送完了' : 'Transfer Complete',
-        locale === 'ja' ? `${selectedItems.length}個のアイテムを転送しました` : `Transferred ${selectedItems.length} items`
+        locale === 'ja' 
+          ? `${totalAdded}個のアイテムを転送しました`
+          : `Transferred ${totalAdded} items`
       );
     } catch (error) {
       console.error('Failed to transfer:', error);

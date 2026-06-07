@@ -39,7 +39,6 @@ export default function SettingsScreen() {
     setCurrentLanguage(lang);
     await AsyncStorage.setItem('user_language', lang);
     SoundManager.play('complete');
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const loadAnimationSetting = async () => {
