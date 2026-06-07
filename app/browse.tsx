@@ -58,6 +58,10 @@ export default function BrowseQuestionsScreen() {
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
+  // 問題削除確認モーダル用 state（Web では Alert が動作しないため独自モーダルを使用）
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [showQuestionDeleteModal, setShowQuestionDeleteModal] = useState(false);
+
   // 問題追加用モーダルの state
   const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
   const [selectedFolderForAdd, setSelectedFolderForAdd] = useState<Folder | null>(null);
@@ -150,14 +154,8 @@ export default function BrowseQuestionsScreen() {
   };
 
   const requestDeleteQuestion = (id: number) => {
-    Alert.alert(
-      locale === 'ja' ? '削除確認' : 'Delete Confirmation',
-      locale === 'ja' ? '本当にこの問題を削除しますか？この操作は取り消せません。' : 'Are you sure you want to delete this question? This action cannot be undone.',
-      [
-        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-        { text: locale === 'ja' ? '削除' : 'Delete', style: 'destructive', onPress: () => confirmDelete(id) }
-      ]
-    );
+    setDeleteTargetId(id);
+    setShowQuestionDeleteModal(true);
   };
 
   const confirmDelete = async (id: number) => {
@@ -314,8 +312,12 @@ export default function BrowseQuestionsScreen() {
                 <Text style={styles.checkboxText}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]} onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}>
-              <View style={styles.cardHeaderLeft}>
+            <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
+              <TouchableOpacity
+                style={styles.cardHeaderLeft}
+                onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}
+                activeOpacity={isCompactMode ? 1 : 0.7}
+              >
                 {!isCompactMode && (
                   <>
                     <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
@@ -323,14 +325,27 @@ export default function BrowseQuestionsScreen() {
                   </>
                 )}
                 <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
+              </TouchableOpacity>
+              <View style={styles.cardHeaderRight}>
+                {item.image && (
+                  <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
+                    <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </View>
+                )}
+                <TouchableOpacity
+                  onPress={() => requestDeleteQuestion(item.id)}
+                  style={styles.headerDeleteBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
+                </TouchableOpacity>
+                {!isCompactMode && (
+                  <TouchableOpacity onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
+                    <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              {item.image && (
-                <View style={[{ marginRight: 8, borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
-                  <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </View>
-              )}
-              {!isCompactMode && <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>}
-            </TouchableOpacity>
+            </View>
 
             {!isCompactMode && expandedQuestionId === item.id && (
               <View style={styles.expandedContent}>
@@ -351,7 +366,6 @@ export default function BrowseQuestionsScreen() {
                     <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => requestDeleteQuestion(item.id)}><Text style={[styles.deleteText, { color: colors.error }]}>{t.deleteAction}</Text></TouchableOpacity>
                 </View>
                 {showAnswerId === item.id && (
                   <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
@@ -526,6 +540,49 @@ export default function BrowseQuestionsScreen() {
         </View>
       </Modal>
 
+      {/* 問題削除確認モーダル（Web では Alert が動作しないため） */}
+      <Modal visible={showQuestionDeleteModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? '問題を削除' : 'Delete Question'}
+            </Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              {locale === 'ja'
+                ? 'この問題を削除してもよろしいですか？この操作は取り消せません。'
+                : 'Are you sure you want to delete this question? This action cannot be undone.'}
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowQuestionDeleteModal(false);
+                  setDeleteTargetId(null);
+                }}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={() => {
+                  if (deleteTargetId !== null) {
+                    confirmDelete(deleteTargetId);
+                  }
+                  setShowQuestionDeleteModal(false);
+                  setDeleteTargetId(null);
+                }}
+              >
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 問題集削除確認モーダル */}
       <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -681,6 +738,9 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerDeleteBtn: { padding: 6, borderRadius: 20 },
+  headerDeleteBtnText: { fontSize: 18 },
   questionPreview: { fontSize: 14, fontWeight: '500', flex: 1 },
   expandIcon: { fontSize: 16, fontWeight: 'bold', paddingHorizontal: 8 },
   expandedContent: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee', gap: 10 },
@@ -699,6 +759,14 @@ const styles = StyleSheet.create({
   answerLabel: { fontSize: 12, fontWeight: 'bold', marginBottom: 4 },
   answerText: { fontSize: 15 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
+  confirmModalContainer: { width: '80%', maxWidth: 300, padding: 24, borderRadius: 16, alignItems: 'center' },
+  confirmModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
+  confirmModalMessage: { fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  confirmModalButtons: { flexDirection: 'row', gap: 12, width: '100%' },
+  confirmModalCancel: { flex: 1, paddingVertical: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  confirmModalCancelText: { fontWeight: 'bold' },
+  confirmModalConfirm: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  confirmModalConfirmText: { color: '#fff', fontWeight: 'bold' },
   modalContainer: { width: '85%', maxWidth: 400, padding: 24, borderRadius: 16 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
   modalInput: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 20 },
