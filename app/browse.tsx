@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Platform, TextInput, Modal } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -42,7 +42,6 @@ export default function BrowseQuestionsScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   // タグ編集用 state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -246,27 +245,35 @@ export default function BrowseQuestionsScreen() {
     );
   };
 
-  const handleDeleteRequest = (id: number) => {
-    if (Platform.OS === 'web') {
-      setPendingDeleteId(id);
-    } else {
-      Alert.alert(
-        t.deleteConfirmTitle,
-        t.deleteConfirmMsg,
-        [
-          { text: t.cancel, style: 'cancel' },
-          { text: t.deleteAction, style: 'destructive', onPress: () => confirmDelete(id) }
-        ]
-      );
-    }
+  const requestDeleteQuestion = (id: number) => {
+    Alert.alert(
+      locale === 'ja' ? '削除確認' : 'Delete Confirmation',
+      locale === 'ja' ? '本当にこの問題を削除しますか？この操作は取り消せません。' : 'Are you sure you want to delete this question? This action cannot be undone.',
+      [
+        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+        { text: locale === 'ja' ? '削除' : 'Delete', style: 'destructive', onPress: () => confirmDelete(id) }
+      ]
+    );
   };
 
   const confirmDelete = async (id: number) => {
     try {
-      const updatedList = questions.filter(q => q.id !== id);
+      const updatedList = questions.filter(q => String(q.id) !== String(id));
+      if (updatedList.length === questions.length) {
+        Alert.alert(
+          locale === 'ja' ? 'エラー' : 'Error',
+          locale === 'ja' ? '問題が見つかりませんでした' : 'Question not found'
+        );
+        return;
+      }
       setQuestions(updatedList);
-      setPendingDeleteId(null);
+      setSelectedQuestionIds(prev => prev.filter(qid => String(qid) !== String(id)));
       await AsyncStorage.setItem('quiz_questions', JSON.stringify(updatedList));
+      SoundManager.play('complete');
+      Alert.alert(
+        locale === 'ja' ? '削除完了' : 'Deleted',
+        locale === 'ja' ? `問題を削除しました（残り ${updatedList.length} 問）` : `Question deleted (${updatedList.length} remaining)`
+      );
     } catch (e) {
       console.error("削除エラー:", e);
       loadQuestions();
@@ -600,7 +607,7 @@ export default function BrowseQuestionsScreen() {
                   <TouchableOpacity onPress={() => startEditTags(item)}>
                     <Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDeleteRequest(item.id)}>
+                  <TouchableOpacity onPress={() => requestDeleteQuestion(item.id)}>
                     <Text style={[styles.deleteText, { color: colors.error }]}>{t.deleteAction}</Text>
                   </TouchableOpacity>
                 </View>
@@ -620,21 +627,6 @@ export default function BrowseQuestionsScreen() {
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>
         )}
       </ScrollView>
-
-      {/* 削除確認 */}
-      {pendingDeleteId !== null && (
-        <View style={styles.confirmOverlay}>
-          <Text style={styles.confirmText}>{t.deleteConfirmMsg}</Text>
-          <View style={styles.confirmButtons}>
-            <TouchableOpacity style={styles.confirmCancelButton} onPress={() => setPendingDeleteId(null)}>
-              <Text style={styles.confirmCancelText}>{t.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmDeleteButton} onPress={() => confirmDelete(pendingDeleteId)}>
-              <Text style={styles.confirmDeleteText}>{t.deleteAction}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
       {/* 問題文・回答 編集モーダル */}
       <Modal visible={showEditModal} transparent animationType="fade">
