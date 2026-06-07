@@ -10,41 +10,14 @@ import { useTheme } from './theme';
 import { incrementStat, recordQuizAnswers } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { useQuestions } from './hooks/useQuestions';
+import { getAnswerText } from './utils/answerUtils';
+import { STORAGE_KEYS } from './constants/storageKeys';
+import { Question } from './types/question';
 
 // ──────────────────────────────────────────────
 // 型定義
 // ──────────────────────────────────────────────
-interface ImageAnnotation {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  opacity: number;
-}
-
-interface Question {
-  id: number;
-  question: string;
-  answer: boolean;
-  enabled: boolean;
-  tags: string[];
-  mistakeCount: number;
-  createdAt: number;
-  answerType: 'descriptive' | 'truefalse' | 'multiple';
-  descriptiveAnswer?: string;
-  trueFalseAnswer?: boolean;
-  multipleChoice?: {
-    options: string[];
-    correctAnswer: number;
-  };
-  topic?: string;
-  source?: string;
-  image?: string | null;
-  imageAnnotations?: ImageAnnotation[];
-}
-
 interface QuizResult {
   questionId: number;
   question: string;
@@ -71,6 +44,7 @@ export default function QuizScreen() {
   const t = translations[locale];
   const isSmallScreen = Dimensions.get('window').width < 380;
   const isJapanese = locale === 'ja';
+  const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
 
   // 正解の文字数に応じてフォントサイズを調整
   const getAnswerFontSize = (answer: string) => {
@@ -98,8 +72,7 @@ export default function QuizScreen() {
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
   const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -166,20 +139,32 @@ export default function QuizScreen() {
   };
 
   useEffect(() => {
-    loadQuestions();
     loadTimerSetting();
     loadTimerPresets();
     SoundManager.initialize();
   }, []);
 
+  // useQuestions フックのデータをローカル state に反映
+  useEffect(() => {
+    if (allQuestionsFromHook.length === 0) return;
+    const enabled = allQuestionsFromHook.filter(q => q.enabled !== false);
+    setAllQuestions(enabled);
+    setEnabledQuestions(enabled);
+
+    const tagSet = new Set<string>();
+    enabled.forEach(q => (q.tags || []).forEach(tag => tagSet.add(tag)));
+    const sortedTags = Array.from(tagSet).sort();
+    setAllTags(sortedTags);
+    setSelectedTags(sortedTags);
+    setPreQuestionCount(Math.min(enabled.length, 50));
+  }, [allQuestionsFromHook]);
+
   const loadTimerPresets = async () => {
     try {
-      // デフォルトタイマー設定を読み込む
-      const timerVal = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
       const defaultMinutes = timerVal ? parseInt(timerVal, 10) : 10;
       setPreTimerMinutes(defaultMinutes);
 
-      // カスタムタイマーを読み込む
       const customRaw = await AsyncStorage.getItem('CUSTOM_TIMERS');
       const customTimers = customRaw ? JSON.parse(customRaw) : [];
       const presets: { label: string; value: number | null }[] = [
@@ -199,120 +184,16 @@ export default function QuizScreen() {
     }
   };
 
-  const loadQuestions = async () => {
-    try {
-      const raw = await AsyncStorage.getItem('quiz_questions');
-      if (raw) {
-        const all: any[] = JSON.parse(raw);
-        // CreateQuestionScreenで保存されたデータ構造に対応
-        const processedQuestions = all
-          .filter((q: any) => {
-            // Filter out old format questions
-            if (!q.answerType) {
-              return false;
-            }
-            return true;
-          })
-          .map((q: any) => {
-            let answer: boolean;
-            if (q.answerType === 'truefalse') {
-              answer = q.trueFalseAnswer;
-            } else if (q.answerType === 'multiple') {
-              answer = q.multipleChoice?.correctAnswer === 0;
-            } else {
-              answer = true; // descriptive case
-            }
-            return { 
-              ...q, 
-              answer,
-              tags: q.tags || [],
-              mistakeCount: q.mistakeCount || 0,
-              createdAt: q.createdAt || Date.now(),
-              source: q.source,
-              topic: q.topic,
-              answerType: q.answerType,
-              descriptiveAnswer: q.descriptiveAnswer,
-              trueFalseAnswer: q.trueFalseAnswer,
-              multipleChoice: q.multipleChoice
-            };
-          });
-        const enabled = processedQuestions.filter(q => q.enabled !== false);
-        setAllQuestions(enabled);
-        setEnabledQuestions(enabled);
-
-        // 全タグを収集
-        const tagSet = new Set<string>();
-        enabled.forEach((q: Question) => {
-          (q.tags || []).forEach((tag: string) => tagSet.add(tag));
-        });
-        const sortedTags = Array.from(tagSet).sort();
-        setAllTags(sortedTags);
-        setSelectedTags(sortedTags); // デフォルトですべて選択
-
-        // デフォルト問題数
-        setPreQuestionCount(Math.min(enabled.length, 50));
-      } else {
-        // Initial sample questions
-        const samples: Question[] = [
-          { 
-            id: 1, 
-            question: 'Earth orbits around the Sun.', 
-            answer: true, 
-            enabled: true,
-            tags: ['Science', 'Basic'],
-            mistakeCount: 0,
-            createdAt: Date.now(),
-            answerType: 'truefalse',
-            trueFalseAnswer: true
-          },
-          { 
-            id: 2, 
-            question: 'Sound travels through vacuum.', 
-            answer: false, 
-            enabled: true,
-            tags: ['Science', 'Physics'],
-            mistakeCount: 0,
-            createdAt: Date.now(),
-            answerType: 'truefalse',
-            trueFalseAnswer: false
-          },
-          { 
-            id: 3, 
-            question: 'JavaScript is a programming language.', 
-            answer: true, 
-            enabled: true,
-            tags: ['Programming', 'Basic'],
-            mistakeCount: 0,
-            createdAt: Date.now(),
-            answerType: 'truefalse',
-            trueFalseAnswer: true
-          },
-        ];
-        setAllQuestions(samples);
-        setEnabledQuestions(samples);
-        const tagSet = new Set<string>();
-        samples.forEach(q => (q.tags || []).forEach(tag => tagSet.add(tag)));
-        const sortedTags = Array.from(tagSet).sort();
-        setAllTags(sortedTags);
-        setSelectedTags(sortedTags);
-        setPreQuestionCount(Math.min(samples.length, 50));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const loadTimerSetting = async () => {
     try {
-      // ホーム画面と同じロジックでタイマー値を読み込む
-      let timerValue = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      let timerValue = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
       let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
 
       if (storedMinutes === null) {
         const oldTimerValue = await AsyncStorage.getItem('timerSetting');
         if (oldTimerValue !== null) {
           storedMinutes = parseInt(oldTimerValue, 10);
-          await AsyncStorage.setItem('APP_TIMER_SETTING', storedMinutes.toString());
+          await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, storedMinutes.toString());
           await AsyncStorage.removeItem('timerSetting');
           console.log(`Migrated timer setting in Quiz screen: ${storedMinutes}`);
         }
@@ -324,7 +205,7 @@ export default function QuizScreen() {
       setTimeLeft(seconds);
     } catch (error) {
       console.error('Failed to load timer setting:', error);
-      setTimerLimit(300); // デフォルト5分(300秒)
+      setTimerLimit(300);
       setTimeLeft(300);
     }
   };
@@ -372,16 +253,6 @@ export default function QuizScreen() {
       (q.tags || []).some(tag => selectedTags.includes(tag))
     );
     return filtered.length;
-  };
-
-  // 回答テキストを取得（リバースモード用）
-  const getAnswerDisplayText = (q: Question): string => {
-    switch (q.answerType) {
-      case 'truefalse': return q.trueFalseAnswer ? '○ (正しい)' : '× (誤り)';
-      case 'multiple': return q.multipleChoice?.options[q.multipleChoice.correctAnswer] || '';
-      case 'descriptive': return q.descriptiveAnswer || '';
-      default: return q.question;
-    }
   };
 
   // ──────────────────────────────────────────────
@@ -432,7 +303,6 @@ export default function QuizScreen() {
     } else {
       await AsyncStorage.removeItem('quiz_active_timer');
     }
-
     // 問題数制限
     const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, preQuestionCount);
 
@@ -588,7 +458,7 @@ export default function QuizScreen() {
     const finalScore = finalResults.filter(r => r.isCorrect).length;
 
     // 結果を保存
-    await AsyncStorage.setItem('quizResults', JSON.stringify({
+    await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify({
       results: finalResults,
       total: totalQuestions,
       score: finalScore,
@@ -603,9 +473,8 @@ export default function QuizScreen() {
       }));
       await recordQuizAnswers(answers);
       
-      // XP & Qコイン報酬
-      const xpReward = finalScore * 5; // 正解1問につき5XP
-      const coinReward = Math.floor(finalScore * 0.5); // 正解2問につき1Qコイン
+      const xpReward = finalScore * 5;
+      const coinReward = Math.floor(finalScore * 0.5);
       
       const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
@@ -613,7 +482,6 @@ export default function QuizScreen() {
       await AsyncStorage.setItem('user_xp', (currentXP + xpReward).toString());
       await AsyncStorage.setItem('user_coins', (currentCoins + coinReward).toString());
       
-      // レベルアップチェック
       const currentLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
       const nextLevelThresh = currentLevel * 100;
       const newXP = currentXP + xpReward;
@@ -624,7 +492,6 @@ export default function QuizScreen() {
         const remainingXP = newXP - nextLevelThresh;
         await AsyncStorage.setItem('user_level', newLevel.toString());
         await AsyncStorage.setItem('user_xp', remainingXP.toString());
-        // レベルアップボーナス
         await AsyncStorage.setItem('user_coins', (currentCoins + coinReward + 50).toString());
         levelUpMessage = locale === 'ja' 
           ? `\n🎉 レベルアップ！ Lv.${newLevel} (50Qコインボーナス！)`
@@ -678,10 +545,6 @@ export default function QuizScreen() {
       console.error('updateStreak error:', e);
     }
   };
-
-  // ──────────────────────────────────────────────
-  // UIパーツ
-  // ──────────────────────────────────────────────// UI parts
   const timerColor = timeLeft > timerLimit * 0.4 ? '#4CAF50' : timeLeft > timerLimit * 0.2 ? '#FF9800' : '#F44336';
   const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);
@@ -1040,7 +903,7 @@ export default function QuizScreen() {
           
           <Text style={[styles.questionText, { color: colors.text }]}>
             {isReverseMode
-              ? getAnswerDisplayText(currentQuestion)
+              ? getAnswerText(currentQuestion)
               : currentQuestion.question
             }
           </Text>

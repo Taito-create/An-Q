@@ -1,9 +1,7 @@
-module.exports = function (api) {
-  api.cache(true);
-  return {
-    // プリセットの中に既にルーティング機能が含まれているので、
-    // ここだけで大丈夫です
-    presets: ['babel-preset-expo'],
-    plugins: [], // ここを空にする、またはpluginsの行ごと消してもOK
-  };
+module.exports = {
+  presets: [
+    ['@babel/preset-env', { targets: { node: 'current' } }],
+    '@babel/preset-typescript',
+    ['@babel/preset-react', { runtime: 'automatic' }],
+  ],
 };

@@ -9,49 +9,20 @@ import {
   View,
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useTheme } from './theme';
 import { loadStats, incrementStat } from './missions';
-
-// Question interface
-interface ImageAnnotation {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  opacity: number;
-}
-
-interface Question {
-  id: number;
-  question: string;
-  answerType: 'descriptive' | 'truefalse' | 'multiple';
-  descriptiveAnswer?: string;
-  trueFalseAnswer?: boolean;
-  multipleChoice?: {
-    options: string[];
-    correctAnswer: number;
-  };
-  enabled: boolean;
-  tags: string[];
-  mistakeCount: number;
-  createdAt: number;
-  topic?: string;
-  source?: string;
-  image?: string | null;
-  imageAnnotations?: ImageAnnotation[];
-}
+import { useQuestions } from './hooks/useQuestions';
+import { Question, ImageAnnotation } from './types/question';
 
 export default function CreateQuestionScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  const { questions, saveQuestions } = useQuestions();
 
   // Load language from AsyncStorage on mount
   useEffect(() => {
@@ -91,11 +62,8 @@ export default function CreateQuestionScreen() {
   };
 
   // Save question function
-  const saveQuestion = async (newQuestionData: any) => {
+  const saveQuestion = async (newQuestionData: Partial<Question>): Promise<boolean> => {
     try {
-      const existingQuestions = await AsyncStorage.getItem('quiz_questions');
-      const questions = existingQuestions ? JSON.parse(existingQuestions) : [];
-
       // 上限チェック
       const stats = await loadStats();
       const limit = stats.questionSlots ?? 20;
@@ -107,8 +75,8 @@ export default function CreateQuestionScreen() {
         return false;
       }
 
-      const newQuestion: Question = { 
-        id: Date.now(), 
+      const newQuestion: Question = {
+        id: Date.now(),
         enabled: true,
         answerType: answerType,
         tags: tags,
@@ -116,11 +84,11 @@ export default function CreateQuestionScreen() {
         createdAt: Date.now(),
         image: selectedImage || null,
         imageAnnotations: imageAnnotations,
-        ...newQuestionData
+        isShared: false,
+        ...newQuestionData,
       };
-      
-      questions.push(newQuestion);
-      await AsyncStorage.setItem('quiz_questions', JSON.stringify(questions));
+
+      await saveQuestions([...questions, newQuestion]);
       // ミッション統計を更新
       await incrementStat('questionsCreated', 1);
       return true;

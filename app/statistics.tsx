@@ -6,6 +6,8 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
+import { STORAGE_KEYS } from './constants/storageKeys';
+import { useQuestions } from './hooks/useQuestions';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -16,6 +18,7 @@ export default function StatisticsScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  const { questions: allQuestions } = useQuestions();
 
   const [stats, setStats] = useState({
     screenTime: 0,
@@ -61,19 +64,17 @@ export default function StatisticsScreen() {
 
   const loadWeeklyStats = async () => {
     try {
-      const screenTimeRaw = await AsyncStorage.getItem('weekly_screen_time_minutes');
+      const screenTimeRaw = await AsyncStorage.getItem(STORAGE_KEYS.WEEKLY_SCREEN_TIME);
       const screenTime = screenTimeRaw ? parseInt(screenTimeRaw, 10) : 0;
 
-      const questionsRaw = await AsyncStorage.getItem('quiz_questions');
-      const allQuestions = questionsRaw ? JSON.parse(questionsRaw) : [];
       const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      const questionsCreated = allQuestions.filter((q: any) => q.createdAt > weekAgo).length;
+      const questionsCreated = allQuestions.filter(q => (q.createdAt ?? 0) > weekAgo).length;
 
-      const historyRaw = await AsyncStorage.getItem('quizHistory');
+      const historyRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY);
       const history = historyRaw ? JSON.parse(historyRaw) : [];
       const quizPlayed = history.filter((h: any) => new Date(h.date).getTime() > weekAgo).length;
 
-      const resultsRaw = await AsyncStorage.getItem('quizResults');
+      const resultsRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_RESULTS);
       const allResults = resultsRaw ? JSON.parse(resultsRaw) : [];
       const weekResults = allResults.filter((r: any) => new Date(r.date || Date.now()).getTime() > weekAgo);
       const correctCount = weekResults.filter((r: any) => r.isCorrect).length;
@@ -106,13 +107,12 @@ export default function StatisticsScreen() {
     try {
       const days: number[] = [];
       const now = new Date();
-      const allQuestions = JSON.parse(await AsyncStorage.getItem('quiz_questions') || '[]');
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
         const dateStart = date.getTime();
         const dateEnd = dateStart + 86400000;
-        const count = allQuestions.filter((q: any) => q.createdAt >= dateStart && q.createdAt < dateEnd).length;
+        const count = allQuestions.filter(q => (q.createdAt ?? 0) >= dateStart && (q.createdAt ?? 0) < dateEnd).length;
         days.push(count);
       }
       setQuestionsCreatedData(days);
@@ -125,7 +125,7 @@ export default function StatisticsScreen() {
     try {
       const days: number[] = [];
       const now = new Date();
-      const history = JSON.parse(await AsyncStorage.getItem('quizHistory') || '[]');
+      const history = JSON.parse(await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY) || '[]');
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);

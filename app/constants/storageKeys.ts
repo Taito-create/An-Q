@@ -13,6 +13,11 @@ export const STORAGE_KEYS = {
   // クイズ設定
   APP_TIMER_SETTING: 'APP_TIMER_SETTING',
   QUIZ_QUESTIONS: 'quiz_questions',
+  QUESTION_FOLDERS: 'question_folders',
+  INBOX_ITEMS: 'inbox_items',
+  TIMER: 'APP_TIMER_SETTING',
+  STATS: 'quiz_stats',
+  LANGUAGE: 'user_language',
   
   // 音楽設定
   BGM_PRESET: 'bgm_preset',
@@ -42,6 +47,28 @@ export const STORAGE_KEYS = {
   // 称号
   USER_TITLES: 'user_titles',
   CURRENT_TITLE: 'current_title',
+
+  // クイズ結果・履歴
+  QUIZ_RESULTS: 'quizResults',
+  QUIZ_HISTORY: 'quizHistory',
+
+  // ユーザー進捗
+  USER_XP: 'user_xp',
+  USER_COINS: 'user_coins',
+  USER_LEVEL: 'user_level',
+  STREAK_COUNT: 'streakCount',
+  LAST_STUDY_DATE: 'lastStudyDate',
+
+  // アプリ設定
+  DEV_MODE_ENABLED: 'dev_mode_enabled',
+  SE_ENABLED: 'se_enabled',
+
+  // スクリーンタイム
+  WEEKLY_SCREEN_TIME: 'weekly_screen_time_minutes',
+  CUSTOM_TIMERS: 'CUSTOM_TIMERS',
+
+  // マイグレーション
+  DB_VERSION: 'db_version',
 } as const;
 
 /**

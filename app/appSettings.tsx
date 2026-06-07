@@ -7,6 +7,7 @@ import { SoundManager } from './sound';
 import { useBGM } from './bgmContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { STORAGE_KEYS } from './constants/storageKeys';
 
 const APP_VERSION = '1.0.0';
 
@@ -22,24 +23,24 @@ export default function AppSettingsScreen() {
   const [seEnabled, setSeEnabled] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem('dev_mode_enabled').then(v => setDevModeEnabled(v === 'true'));
-    AsyncStorage.getItem('se_enabled').then(v => setSeEnabled(v !== 'false'));
+    AsyncStorage.getItem(STORAGE_KEYS.DEV_MODE_ENABLED).then(v => setDevModeEnabled(v === 'true'));
+    AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED).then(v => setSeEnabled(v !== 'false'));
   }, []);
 
   const handleLanguage = async (lang: 'ja' | 'en') => {
-    await AsyncStorage.setItem('user_language', lang);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_LANGUAGE, lang);
     SoundManager.play('decide');
   };
 
   const handleDevMode = async (val: boolean) => {
     setDevModeEnabled(val);
-    await AsyncStorage.setItem('dev_mode_enabled', val ? 'true' : 'false');
+    await AsyncStorage.setItem(STORAGE_KEYS.DEV_MODE_ENABLED, val ? 'true' : 'false');
     SoundManager.play('decide');
   };
 
   const handleSE = async (val: boolean) => {
     setSeEnabled(val);
-    await AsyncStorage.setItem('se_enabled', val ? 'true' : 'false');
+    await AsyncStorage.setItem(STORAGE_KEYS.SE_ENABLED, val ? 'true' : 'false');
     SoundManager.play('decide');
   };
 

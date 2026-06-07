@@ -6,6 +6,7 @@ import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { STORAGE_KEYS } from './constants/storageKeys';
 
 interface ReceivedItem {
   id: string;
@@ -30,7 +31,7 @@ export default function InboxScreen() {
 
   const loadReceivedItems = async () => {
     try {
-      const raw = await AsyncStorage.getItem('inbox_items');
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
       const items = raw ? JSON.parse(raw) : [];
       setReceivedItems(items);
     } catch (error) {
@@ -64,10 +65,10 @@ export default function InboxScreen() {
 
       if (questionsToAdd.length > 0) {
         const existingQuestions = JSON.parse(
-          await AsyncStorage.getItem('quiz_questions') || '[]'
+          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'
         );
         await AsyncStorage.setItem(
-          'quiz_questions',
+          STORAGE_KEYS.QUIZ_QUESTIONS,
           JSON.stringify([...existingQuestions, ...questionsToAdd])
         );
         totalAdded += questionsToAdd.length;
@@ -113,10 +114,10 @@ export default function InboxScreen() {
 
         // 既存の問題を取得してマージ
         const existingQuestions = JSON.parse(
-          await AsyncStorage.getItem('quiz_questions') || '[]'
+          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'
         );
         await AsyncStorage.setItem(
-          'quiz_questions',
+          STORAGE_KEYS.QUIZ_QUESTIONS,
           JSON.stringify([...existingQuestions, ...allNewQuestions])
         );
 
@@ -125,10 +126,10 @@ export default function InboxScreen() {
 
         // 既存のフォルダを取得してマージ
         const existingFolders = JSON.parse(
-          await AsyncStorage.getItem('question_folders') || '[]'
+          await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS) || '[]'
         );
         await AsyncStorage.setItem(
-          'question_folders',
+          STORAGE_KEYS.QUESTION_FOLDERS,
           JSON.stringify([...existingFolders, ...foldersToSave])
         );
         totalAdded += foldersToAdd.length;
@@ -136,7 +137,7 @@ export default function InboxScreen() {
 
       // 3. 転送済みアイテムを受信ボックスから削除
       const remaining = receivedItems.filter(item => !selectedItems.includes(item.id));
-      await AsyncStorage.setItem('inbox_items', JSON.stringify(remaining));
+      await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));
 
       setReceivedItems(remaining);
       setSelectedItems([]);
@@ -166,7 +167,7 @@ export default function InboxScreen() {
           onPress: async () => {
             try {
               const remaining = receivedItems.filter(item => item.id !== itemId);
-              await AsyncStorage.setItem('inbox_items', JSON.stringify(remaining));
+              await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));
               setReceivedItems(remaining);
               setSelectedItems(selectedItems.filter(id => id !== itemId));
               SoundManager.play('complete');

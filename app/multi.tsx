@@ -2,21 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, StyleSheet, Share } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import pako from 'pako';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
+import { STORAGE_KEYS } from './constants/storageKeys';
 
-function base64Encode(str: string): string {
-  const utf8bytes = new TextEncoder().encode(str);
-  const binaryString = String.fromCharCode(...Array.from(utf8bytes));
-  return btoa(binaryString);
-}
+/**
+ * データを圧縮して Base64URL エンコードする（+ / = を排除してコピペ安全に）
+ */
+const compressAndEncode = (data: any): string => {
+  const jsonString = JSON.stringify(data);
+  const compressed = pako.deflate(jsonString, { level: 9 });
+  const base64 = btoa(String.fromCharCode(...Array.from(compressed)));
+  // Base64URL: + → - / → _ 末尾の = を除去
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
 
-function base64Decode(str: string): string {
-  const binaryString = atob(str);
-  const utf8bytes = Uint8Array.from([...binaryString].map(c => c.charCodeAt(0)));
-  return new TextDecoder().decode(utf8bytes);
-}
+/**
+ * Base64URL デコードして解凍する（旧形式の通常 Base64 にも対応）
+ */
+const decodeAndDecompress = (code: string): any => {
+  // Base64URL → 通常 Base64 に戻す
+  const base64 = code.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64);
+  const bytes = Uint8Array.from([...binary].map(c => c.charCodeAt(0)));
+
+  // pako で解凍を試みる。失敗した場合は旧形式（非圧縮）として扱う
+  try {
+    const decompressed = pako.inflate(bytes, { to: 'string' });
+    return JSON.parse(decompressed);
+  } catch {
+    // 旧形式: UTF-8 バイト列をそのまま文字列にデコード
+    const jsonString = new TextDecoder().decode(bytes);
+    return JSON.parse(jsonString);
+  }
+};
 
 export default function MultiScreen() {
   const navigate = useNavigate();
@@ -37,8 +58,8 @@ export default function MultiScreen() {
   }, []);
 
   const loadData = async () => {
-    const questionsRaw = await AsyncStorage.getItem('quiz_questions');
-    const foldersRaw = await AsyncStorage.getItem('question_folders');
+    const questionsRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
+    const foldersRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
     setQuestions(questionsRaw ? JSON.parse(questionsRaw) : []);
     setFolders(foldersRaw ? JSON.parse(foldersRaw) : []);
   };
@@ -116,13 +137,7 @@ export default function MultiScreen() {
     if (!dataToShare) return;
 
     try {
-      // JSON → UTF-8 → Base64（改行除去）
-      const jsonString = JSON.stringify(dataToShare);
-      const utf8bytes = new TextEncoder().encode(jsonString);
-      const binaryString = String.fromCharCode(...Array.from(utf8bytes));
-      let code = btoa(binaryString);
-      code = code.replace(/\n/g, '');
-
+      const code = compressAndEncode(dataToShare);
       setGeneratedCode(code);
 
       Alert.alert(
@@ -167,12 +182,9 @@ export default function MultiScreen() {
     }
 
     try {
-      // 改行を除去してデコード
-      const cleanCode = receiveCode.trim().replace(/\n/g, '');
-      const binaryString = atob(cleanCode);
-      const utf8bytes = Uint8Array.from([...binaryString].map(c => c.charCodeAt(0)));
-      const jsonString = new TextDecoder().decode(utf8bytes);
-      const receivedData = JSON.parse(jsonString);
+      // 空白・改行を除去してからデコード＆解凍
+      const cleanCode = receiveCode.trim().replace(/[\s\n\r]/g, '');
+      const receivedData = decodeAndDecompress(cleanCode);
 
       if (!receivedData.version || receivedData.version > 1) {
         Alert.alert(
@@ -190,7 +202,7 @@ export default function MultiScreen() {
       // 受信ボックスに保存
       let inboxItems: any[] = [];
       try {
-        const raw = await AsyncStorage.getItem('inbox_items');
+        const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
         inboxItems = raw ? JSON.parse(raw) : [];
       } catch (e) {
         inboxItems = [];
@@ -218,7 +230,7 @@ export default function MultiScreen() {
         });
       }
 
-      await AsyncStorage.setItem('inbox_items', JSON.stringify(inboxItems));
+      await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(inboxItems));
 
       Alert.alert(
         locale === 'ja' ? '受信しました' : 'Received',
