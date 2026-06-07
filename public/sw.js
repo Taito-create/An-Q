@@ -1,9 +1,5 @@
-const CACHE_NAME = 'an-q-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
+const CACHE_NAME = 'an-q-v2';
+const urlsToCache = ['/manifest.json'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -15,13 +11,24 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // chrome-extension などのプロトコルはキャッシュ対象外
   if (!event.request.url.startsWith('http')) return;
 
+  const url = new URL(event.request.url);
+
+  // HTML / JS は network-first（デプロイ後のハッシュ不一致で MIME エラーになるのを防ぐ）
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.startsWith('/assets/')
+  ) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-      .catch(() => fetch(event.request))
+    caches.match(event.request).then(response => response || fetch(event.request))
   );
 });
 

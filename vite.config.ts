@@ -11,6 +11,7 @@ export default defineConfig({
       ],
     }),
   ],
+  base: '/',
   resolve: {
     alias: {
       'react-native': 'react-native-web',
@@ -21,7 +22,18 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['react-native-calendars'],
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: './index.html',
+      },
+    },
+  },
   server: {
-    port: 5173,
+    port: 3000,
+    open: true,
   },
 });
