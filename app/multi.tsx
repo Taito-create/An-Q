@@ -200,12 +200,36 @@ export default function MultiScreen() {
       }
 
       // 受信ボックスに保存
+      const senderId = receiveCode.substring(0, 50);
       let inboxItems: any[] = [];
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
         inboxItems = raw ? JSON.parse(raw) : [];
       } catch (e) {
         inboxItems = [];
+      }
+
+      // 重複チェック: 同じ送信者から同じ内容のアイテムを既に受信していないか
+      const itemsToCheck = receivedData.type === 'questions' ? receivedData.data : receivedData.data;
+      const duplicateItems = itemsToCheck.filter((item: any) => {
+        return inboxItems.some(existing =>
+          existing.senderCode === senderId &&
+          existing.type === (receivedData.type === 'questions' ? 'question' : 'folder') &&
+          (receivedData.type === 'questions'
+            ? existing.data.question === item.question
+            : existing.data.name === item.name)
+        );
+      });
+
+      if (duplicateItems.length > 0) {
+        Alert.alert(
+          locale === 'ja' ? '重複受信' : 'Duplicate Received',
+          locale === 'ja'
+            ? `送信者「${receiveCode.substring(0, 8)}...」からは既に同じ内容を受信しています。\n受信ボックスで確認してください。`
+            : `Already received from user "${receiveCode.substring(0, 8)}...". Check your inbox.`,
+          [{ text: 'OK' }]
+        );
+        return;
       }
 
       if (receivedData.type === 'questions') {
@@ -215,7 +239,7 @@ export default function MultiScreen() {
             type: 'question',
             data: q,
             receivedAt: Date.now(),
-            senderCode: receiveCode.substring(0, 50),
+            senderCode: senderId,
           });
         });
       } else if (receivedData.type === 'folders') {
@@ -225,7 +249,7 @@ export default function MultiScreen() {
             type: 'folder',
             data: f,
             receivedAt: Date.now(),
-            senderCode: receiveCode.substring(0, 50),
+            senderCode: senderId,
           });
         });
       }
@@ -324,66 +348,68 @@ export default function MultiScreen() {
             {/* 問題一覧 */}
             {shareType === 'questions' ? (
               <>
-                {questions.length === 0 && (
+                {questions.filter(q => !q.isShared).length === 0 ? (
                   <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
-                    {locale === 'ja' ? '問題がありません' : 'No questions'}
+                    {locale === 'ja' ? '共有可能な問題がありません' : 'No questions to share'}
                   </Text>
+                ) : (
+                  questions.filter(q => !q.isShared).map((q) => (
+                    <TouchableOpacity
+                      key={q.id}
+                      style={[styles.questionItem, {
+                        borderColor: selectedQuestions.includes(q.id) ? colors.primary : colors.border,
+                        backgroundColor: selectedQuestions.includes(q.id) ? colors.primary + '20' : colors.card
+                      }]}
+                      onPress={() => {
+                        if (selectedQuestions.includes(q.id)) {
+                          setSelectedQuestions(selectedQuestions.filter(id => id !== q.id));
+                        } else {
+                          setSelectedQuestions([...selectedQuestions, q.id]);
+                        }
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, color: selectedQuestions.includes(q.id) ? colors.primary : colors.textSecondary }}>
+                        {selectedQuestions.includes(q.id) ? '☑️' : '☐'}
+                      </Text>
+                      <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{q.question?.substring(0, 50)}...</Text>
+                    </TouchableOpacity>
+                  ))
                 )}
-                {questions.map((q) => (
-                  <TouchableOpacity
-                    key={q.id}
-                    style={[styles.questionItem, {
-                      borderColor: selectedQuestions.includes(q.id) ? colors.primary : colors.border,
-                      backgroundColor: selectedQuestions.includes(q.id) ? colors.primary + '20' : colors.card
-                    }]}
-                    onPress={() => {
-                      if (selectedQuestions.includes(q.id)) {
-                        setSelectedQuestions(selectedQuestions.filter(id => id !== q.id));
-                      } else {
-                        setSelectedQuestions([...selectedQuestions, q.id]);
-                      }
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, color: selectedQuestions.includes(q.id) ? colors.primary : colors.textSecondary }}>
-                      {selectedQuestions.includes(q.id) ? '☑️' : '☐'}
-                    </Text>
-                    <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{q.question?.substring(0, 50)}...</Text>
-                  </TouchableOpacity>
-                ))}
               </>
             ) : (
               <>
-                {folders.length === 0 && (
+                {folders.filter(f => !f.isShared).length === 0 ? (
                   <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
-                    {locale === 'ja' ? '問題集がありません' : 'No folders'}
+                    {locale === 'ja' ? '共有可能な問題集がありません' : 'No folders to share'}
                   </Text>
-                )}
-                {folders.map((f) => (
-                  <TouchableOpacity
-                    key={f.id}
-                    style={[styles.questionItem, {
-                      borderColor: selectedFolders.includes(f.id) ? colors.primary : colors.border,
-                      backgroundColor: selectedFolders.includes(f.id) ? colors.primary + '20' : colors.card
-                    }]}
-                    onPress={() => {
-                      if (selectedFolders.includes(f.id)) {
-                        setSelectedFolders(selectedFolders.filter(id => id !== f.id));
-                      } else {
-                        setSelectedFolders([...selectedFolders, f.id]);
-                      }
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, color: selectedFolders.includes(f.id) ? colors.primary : colors.textSecondary }}>
-                      {selectedFolders.includes(f.id) ? '☑️' : '☐'}
-                    </Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontSize: 13 }}>{f.name}</Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                        {(f.questionIds || []).length}{locale === 'ja' ? '問' : ' questions'}
+                ) : (
+                  folders.filter(f => !f.isShared).map((f) => (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={[styles.questionItem, {
+                        borderColor: selectedFolders.includes(f.id) ? colors.primary : colors.border,
+                        backgroundColor: selectedFolders.includes(f.id) ? colors.primary + '20' : colors.card
+                      }]}
+                      onPress={() => {
+                        if (selectedFolders.includes(f.id)) {
+                          setSelectedFolders(selectedFolders.filter(id => id !== f.id));
+                        } else {
+                          setSelectedFolders([...selectedFolders, f.id]);
+                        }
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, color: selectedFolders.includes(f.id) ? colors.primary : colors.textSecondary }}>
+                        {selectedFolders.includes(f.id) ? '☑️' : '☐'}
                       </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontSize: 13 }}>{f.name}</Text>
+                        <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                          {(f.questionIds || []).length}{locale === 'ja' ? '問' : ' questions'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
               </>
             )}
 

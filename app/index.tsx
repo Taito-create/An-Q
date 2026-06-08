@@ -12,6 +12,7 @@ import PatternBackground from './patternBackground';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { STORAGE_KEYS } from './constants/storageKeys';
 import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucide-react';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 
@@ -44,6 +45,27 @@ const HomeScreen = () => {
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
+
+  // 言語変更の即時反映
+  useEffect(() => {
+    const checkLanguage = async () => {
+      const saved = await AsyncStorage.getItem(STORAGE_KEYS.USER_LANGUAGE);
+      if (saved === 'ja' || saved === 'en') {
+        setCurrentLocale(saved);
+      }
+    };
+    checkLanguage();
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEYS.USER_LANGUAGE) {
+        if (e.newValue === 'ja' || e.newValue === 'en') {
+          setCurrentLocale(e.newValue);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     const loadAnimationLevel = async () => {
@@ -525,15 +547,15 @@ const HomeScreen = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.success + '10', borderColor: colors.border }]}
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border }]}
         onPress={() => { SoundManager.play('decide'); navigate('/statistics'); }}
       >
         <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📊</Text>
-        <Text style={[styles.featureCardTitle, { color: colors.success }]}>
+        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
           {locale === 'ja' ? '週間目標' : 'Weekly Goal'}
         </Text>
         <View style={[styles.progressBarSmall, { backgroundColor: colors.border }]}>
-          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.success }]} />
+          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.primary }]} />
         </View>
         <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary, marginTop: 4 }]}>
           68% {locale === 'ja' ? '達成中' : 'completed'}

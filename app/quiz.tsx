@@ -34,6 +34,22 @@ interface UserAnswer {
   isCorrect: boolean;
 }
 
+// デバイスに応じたフォントサイズ調整
+const getAnswerModalFontSize = (answer: string, screenWidth: number) => {
+  const length = answer.length;
+  if (screenWidth < 480) {
+    if (length <= 30) return 20;
+    if (length <= 60) return 18;
+    if (length <= 100) return 16;
+    return 14;
+  } else {
+    if (length <= 30) return 28;
+    if (length <= 60) return 24;
+    if (length <= 100) return 20;
+    return 18;
+  }
+};
+
 // ──────────────────────────────────────────────
 // メイン
 // ──────────────────────────────────────────────
@@ -45,6 +61,7 @@ export default function QuizScreen() {
   const isSmallScreen = Dimensions.get('window').width < 380;
   const isJapanese = locale === 'ja';
   const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
+  const screenWidth = Dimensions.get('window').width;
 
   // 正解の文字数に応じてフォントサイズを調整
   const getAnswerFontSize = (answer: string) => {
@@ -78,7 +95,7 @@ export default function QuizScreen() {
   const [score, setScore] = useState(0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [answered, setAnswered] = useState(false); // 二度押し防止
+  const [answered, setAnswered] = useState(false);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showReview, setShowReview] = useState(false);
@@ -108,7 +125,7 @@ export default function QuizScreen() {
   const [presetTimers, setPresetTimers] = useState<{ label: string; value: number | null }[]>([]);
 
   // タイマー
-  const [timerLimit, setTimerLimit] = useState(180); // 秒
+  const [timerLimit, setTimerLimit] = useState(180);
   const [timeLeft, setTimeLeft] = useState(180);
   const [isTimerActive, setIsTimerActive] = useState(false);
 
@@ -161,9 +178,16 @@ export default function QuizScreen() {
 
   const loadTimerPresets = async () => {
     try {
-      const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
-      const defaultMinutes = timerVal ? parseInt(timerVal, 10) : 10;
-      setPreTimerMinutes(defaultMinutes);
+      // 保存されたアクティブタイマーを読み込む（実適用値）
+      const savedTimer = await AsyncStorage.getItem('quiz_active_timer');
+      if (savedTimer !== null) {
+        const parsed = parseInt(savedTimer, 10);
+        setPreTimerMinutes(isNaN(parsed) ? null : parsed);
+      } else {
+        // デフォルトは APP_TIMER_SETTING から
+        const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
+        setPreTimerMinutes(timerVal ? parseInt(timerVal, 10) : 10);
+      }
 
       const customRaw = await AsyncStorage.getItem('CUSTOM_TIMERS');
       const customTimers = customRaw ? JSON.parse(customRaw) : [];
@@ -297,7 +321,7 @@ export default function QuizScreen() {
     }
     SoundManager.play('decide');
 
-    // 選択タイマーを保存
+    // 選択タイマーを保存（ホーム画面表示用）
     if (preTimerMinutes !== null) {
       await AsyncStorage.setItem('quiz_active_timer', preTimerMinutes.toString());
     } else {
@@ -315,7 +339,6 @@ export default function QuizScreen() {
     setAnswered(false);
 
     if (preTimerMinutes === null) {
-      // 「なし」を選択した場合
       setTimerLimit(Number.MAX_VALUE);
       setTimeLeft(Number.MAX_VALUE);
       setIsTimerActive(false);
@@ -348,7 +371,6 @@ export default function QuizScreen() {
       case 'truefalse':
         correct = answer === currentQuestion.trueFalseAnswer;
         actualCorrectAnswer = currentQuestion.trueFalseAnswer ?? false;
-        // 誤答時に正解を設定
         if (!correct) {
           setFeedbackMessage(actualCorrectAnswer ? '○' : '✕');
         } else {
@@ -360,7 +382,6 @@ export default function QuizScreen() {
         const correctIndex = currentQuestion.multipleChoice?.correctAnswer ?? 0;
         correct = selectedIndex === correctIndex;
         actualCorrectAnswer = currentQuestion.multipleChoice?.options[correctIndex] || '';
-        // 誤答時に正解を設定
         if (!correct) {
           setFeedbackMessage(actualCorrectAnswer);
         } else {
@@ -383,10 +404,8 @@ export default function QuizScreen() {
         break;
     }
 
-    // フィードバック表示後に消去
     setTimeout(() => setFeedbackMessage(''), 3000);
 
-    // Play sound effect based on answer
     SoundManager.play(correct ? 'correct' : 'wrong');
 
     const newResult: QuizResult = {
@@ -401,7 +420,6 @@ export default function QuizScreen() {
     const updatedResults = [...results, newResult];
     setResults(updatedResults);
     
-    // Add to user answers for review
     const answerData: UserAnswer = {
       question: currentQuestion.question,
       yourAnswer: answer,
@@ -410,7 +428,6 @@ export default function QuizScreen() {
     };
     setUserAnswers(prev => [...prev, answerData]);
     
-    // Clear descriptive input after answering
     if (currentQuestion.answerType === 'descriptive') {
       setUserDescriptiveAnswer('');
     }
@@ -422,21 +439,18 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-    const delay = correct ? 1000 : 2500; // 不正解時は復習のために長く
+    const delay = correct ? 1000 : 2500;
 
     setTimeout(async () => {
-      // 最新の結果を確定（stateが非同期更新される前にローカルで生成）
       const finalResults = [...results, newResult];
       setResults(finalResults);
 
       if (currentIndex + 1 >= shuffledQuestions.length) {
-        // 最終問題の場合
         setIsTimerActive(false);
         setAnswered(false);
         setShowFeedback(false);
         await finishQuizWithResults(finalResults);
       } else {
-        // 次の問題へ
         setCurrentIndex(prev => prev + 1);
         setShowFeedback(false);
         setAnswered(false);
@@ -457,7 +471,7 @@ export default function QuizScreen() {
     const totalQuestions = shuffledQuestions.length;
     const finalScore = finalResults.filter(r => r.isCorrect).length;
 
-    // 結果を保存
+    // 結果を保存（STORAGE_KEYS.STATS = 'quiz_stats' に保存）
     await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify({
       results: finalResults,
       total: totalQuestions,
@@ -500,7 +514,6 @@ export default function QuizScreen() {
         await AsyncStorage.setItem('user_xp', newXP.toString());
       }
       
-      // 報酬メッセージを表示
       Alert.alert(
         locale === 'ja' ? '🎉 クイズ完了！' : '🎉 Quiz Complete!',
         locale === 'ja' 
@@ -511,7 +524,6 @@ export default function QuizScreen() {
       console.error('finishQuiz error:', e);
     }
 
-    // 結果画面へ遷移
     navigate('/results', {
       state: {
         total: totalQuestions,
@@ -573,7 +585,7 @@ export default function QuizScreen() {
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
               問題数
             </Text>
-            {/* ステッパー（微調整用） */}
+            {/* ステッパー */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
               <TouchableOpacity
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
@@ -600,7 +612,7 @@ export default function QuizScreen() {
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
               </TouchableOpacity>
             </View>
-            {/* スライダー（ざっくり調整用） */}
+            {/* スライダー */}
             <View style={{ marginBottom: 12 }}>
               <input
                 type="range"
@@ -621,7 +633,7 @@ export default function QuizScreen() {
                 }}
               />
             </View>
-            {/* スライダー下の表示 */}
+            {/* スライダー下の表示: filtered.length を使う（タグ絞り込み反映） */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>1問</Text>
               <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text }]}>
@@ -629,6 +641,13 @@ export default function QuizScreen() {
               </Text>
               <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>{filtered.length}問</Text>
             </View>
+            {/* タグ選択情報も併記 */}
+            <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+              {selectedTags.length === 0
+                ? `すべての問題（全${allQuestions.length}問）`
+                : `「${selectedTags.join(', ')}」から ${filtered.length}問`
+              }
+            </Text>
           </View>
 
           {/* リバースモードトグル */}
@@ -703,12 +722,12 @@ export default function QuizScreen() {
                 </Text>
               </View>
               
-              {/* タグ選択状況の表示 */}
+              {/* タグ選択状況の表示（filtered.length で分子が変化） */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
                   {selectedTags.length === 0
                     ? `選択なし = すべての問題（全${allQuestions.length}問）`
-                    : `${selectedTags.length}個タグ選択中（最大${getFilteredQuestions().length}問）`
+                    : `${selectedTags.length}個タグ選択中（最大${filtered.length}問）`
                   }
                 </Text>
               </View>
@@ -873,7 +892,6 @@ export default function QuizScreen() {
         <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
           {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
           
-          {/* 画像がある場合は表示 */}
           {currentQuestion.image && (
             <View style={[{ position: 'relative', backgroundColor: '#f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }]}>
               <img
@@ -882,7 +900,6 @@ export default function QuizScreen() {
                 style={{ width: '100%', height: 'auto', maxHeight: 300 }}
               />
               
-              {/* アノテーション（隠すボックス）を表示 */}
               {currentQuestion.imageAnnotations?.map((annotation) => (
                 <View
                   key={annotation.id}
@@ -909,7 +926,6 @@ export default function QuizScreen() {
           </Text>
         </View>
 
-        {/* 正解時の表示（小さく簡潔に） */}
         {showFeedback && isCorrect && (
           <Animated.View style={[styles.feedbackContainer, { opacity: fadeAnim, marginVertical: 16 }]}>
             <View style={[styles.feedbackBox, { backgroundColor: colors.success + '20', padding: 16, borderRadius: 12 }]}>
@@ -920,7 +936,6 @@ export default function QuizScreen() {
           </Animated.View>
         )}
         <View style={styles.answerRow}>
-          {/* ○×問題 */}
           {currentQuestion.answerType === 'truefalse' && (
             <View style={styles.trueFalseContainer}>
               <TouchableOpacity
@@ -940,7 +955,6 @@ export default function QuizScreen() {
             </View>
           )}
 
-          {/* 四択問題 */}
           {currentQuestion.answerType === 'multiple' && (
             <View style={styles.multipleContainer}>
               {currentQuestion.multipleChoice?.options.map((option, i) => (
@@ -957,7 +971,6 @@ export default function QuizScreen() {
             </View>
           )}
 
-          {/* 記述式問題 */}
           {currentQuestion.answerType === 'descriptive' && (
             <View style={styles.descriptiveContainer}>
               <TextInput
@@ -1033,37 +1046,48 @@ export default function QuizScreen() {
         </View>
       </Modal>
 
-      {/* 中断確認モーダル */}
+      {/* 中断確認モーダル（フルスクリーン改善） */}
       {showConfirmModal && (
-        <View style={styles.confirmModalOverlay}>
+        <View style={styles.fullScreenOverlay}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>確認</Text>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz?'}
+            </Text>
             <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
-              ホーム画面に戻ります。本当にいいですか？
+              {locale === 'ja'
+                ? 'クイズを中断すると、現在の進捗は失われます。よろしいですか？'
+                : 'Your progress will be lost. Are you sure?'}
             </Text>
             <View style={styles.confirmModalButtons}>
               <TouchableOpacity 
                 style={[styles.confirmModalCancel, { borderColor: colors.border }]}
-                onPress={() => setShowConfirmModal(false)}
+                onPress={() => {
+                  setShowConfirmModal(false);
+                  setIsTimerActive(true);  // タイマー再開
+                }}
               >
-                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>いいえ</Text>
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? '続ける' : 'Continue'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
                 onPress={() => {
                   setShowConfirmModal(false);
-                  setIsTimerActive(false);
+                  setIsTimerActive(false);  // タイマー停止
                   navigate('/');
                 }}
               >
-                <Text style={styles.confirmModalConfirmText}>はい</Text>
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '中断する' : 'Quit'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
 
-      {/* 誤答時のフルスクリーンモーダル */}
+      {/* 誤答時のフルスクリーンモーダル（長文対応） */}
       <Modal visible={showFeedback && !isCorrect && !!feedbackMessage} transparent animationType="fade">
         <View style={styles.fullScreenFeedback}>
           <View style={[styles.fullScreenCard, { backgroundColor: colors.card }]}>
@@ -1072,13 +1096,15 @@ export default function QuizScreen() {
               {locale === 'ja' ? '不正解' : 'Incorrect'}
             </Text>
             
-            <View style={[styles.fullScreenAnswerBox, { backgroundColor: colors.primary + '15', borderRadius: 16, padding: 24, minWidth: 200, maxWidth: '90%' }]}>
+            <View style={[styles.fullScreenAnswerBox, { backgroundColor: colors.primary + '15', borderRadius: 16, padding: 24, minWidth: 200, maxWidth: '90%', maxHeight: '60%' }]}>
               <Text style={[styles.fullScreenAnswerLabel, { color: colors.textSecondary }]}>
                 {locale === 'ja' ? '正解はこちら' : 'Correct Answer'}
               </Text>
-              <Text style={[styles.fullScreenAnswerText, { color: colors.primary, fontSize: 24, fontWeight: 'bold', textAlign: 'center' }]}>
-                {feedbackMessage}
-              </Text>
+              <ScrollView style={{ maxHeight: 200 }}>
+                <Text style={[styles.fullScreenAnswerText, { color: colors.primary, fontSize: getAnswerModalFontSize(feedbackMessage, screenWidth), fontWeight: 'bold', textAlign: 'center' }]}>
+                  {feedbackMessage}
+                </Text>
+              </ScrollView>
             </View>
             
             <Text style={[styles.fullScreenTimer, { color: colors.textSecondary }]}>
@@ -1271,19 +1297,31 @@ const styles = StyleSheet.create({
   fullScreenAnswerBox: {
     alignItems: 'center',
     marginBottom: 24,
-    width: 'auto',  // 自動調整
+    width: '90%',
+    maxHeight: '60%',
   },
   fullScreenAnswerLabel: {
     marginBottom: 8,
   },
   fullScreenAnswerText: {
-    fontSize: 28,
     fontWeight: 'bold',
     flexWrap: 'wrap',
     textAlign: 'center',
   },
   fullScreenTimer: {
     marginTop: 8,
+  },
+  // 中断確認モーダル（フルスクリーン改善）
+  fullScreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
   },
   confirmModalOverlay: {
     position: 'absolute',
@@ -1370,7 +1408,6 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   descriptiveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  // Multiple choice styles
   multipleContainer: {
     gap: 12,
     width: '100%',
@@ -1393,7 +1430,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A1A1A',
   },
-  // タグフィルタースタイル
   tagFilterSection: {
     width: '100%',
     borderRadius: 14,

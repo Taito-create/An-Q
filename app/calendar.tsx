@@ -102,7 +102,9 @@ export default function CalendarScreen() {
     return new Date(year, month, 1).getDay();
   };
 
-  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+  const weekDays = locale === 'ja' 
+    ? ['日', '月', '火', '水', '木', '金', '土']
+    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // 月の最初の日が何曜日か取得（0=日, 1=月... 6=土）
   const getFirstDayOfWeek = (year: number, month: number): number => {
@@ -598,7 +600,7 @@ export default function CalendarScreen() {
             navigate('/');
           }}
         >
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>戻る</Text>
+          <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
         </TouchableOpacity>
       </View>
 

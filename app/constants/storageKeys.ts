@@ -49,8 +49,8 @@ export const STORAGE_KEYS = {
   CURRENT_TITLE: 'current_title',
 
   // クイズ結果・履歴
-  QUIZ_RESULTS: 'quizResults',
-  QUIZ_HISTORY: 'quizHistory',
+  QUIZ_RESULTS: 'quiz_results',
+  QUIZ_HISTORY: 'quiz_history',
 
   // ユーザー進捗
   USER_XP: 'user_xp',

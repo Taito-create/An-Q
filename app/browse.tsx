@@ -293,7 +293,7 @@ export default function BrowseQuestionsScreen() {
         </TouchableOpacity>
         {availableTags.length > 0 && (
           <TouchableOpacity style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: selectedFilterTag ? colors.primary + '20' : 'transparent' }]} onPress={() => setShowTagFilterModal(true)}>
-            <Text style={[styles.headerBtnText, { color: colors.primary }]}>🏷️ {selectedFilterTag ? selectedFilterTag : '全問'}</Text>
+                  <Text style={[styles.headerBtnText, { color: colors.primary }]}>🏷️ {selectedFilterTag ? selectedFilterTag : (locale === 'ja' ? '全問' : 'All')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -497,7 +497,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.foldersModalContainer, { backgroundColor: colors.card }]}>
             <View style={styles.foldersModalHeader}>
-              <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders}</Text>
+              <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders || (locale === 'ja' ? '問題集' : 'Folders')}</Text>
               <View style={styles.foldersModalActions}>
                 <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: colors.primary }]} onPress={() => { setNewFolderName(''); setShowFoldersView(false); setShowFolderModal(true); }}><Text style={styles.folderHeaderActionBtnText}>＋ 作成</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: isFolderDeleteMode ? colors.error : colors.error + '20', borderWidth: 1, borderColor: colors.error }]} onPress={() => { setIsFolderDeleteMode(!isFolderDeleteMode); if (isFolderDeleteMode) setSelectedFolderIds([]); }}>

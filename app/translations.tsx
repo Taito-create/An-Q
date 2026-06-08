@@ -107,6 +107,11 @@ export const translations = {
     noQuestionsInFolder: 'この問題集に問題がありません',
     developerMode: '開発者モード',
     musicCredits: '音楽クレジット',
+    questionPlaceholder: '問題を入力',
+    answerPlaceholder: '回答を入力',
+    noTimeLimit: 'なし',
+    allQ: '全問',
+    questionsCount: '問題数',
   },
 
   en: {
@@ -217,5 +222,10 @@ export const translations = {
     noQuestionsInFolder: 'No questions in this folder',
     developerMode: 'Developer Mode',
     musicCredits: 'Music Credits',
+    questionPlaceholder: 'Enter question',
+    answerPlaceholder: 'Enter answer',
+    noTimeLimit: 'No limit',
+    allQ: 'All',
+    questionsCount: 'Questions',
   }
 };

@@ -18,7 +18,6 @@ const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: s
   { key: 'dark',   labelJa: 'ダーク',   labelEn: 'Dark',   emoji: '⚫' },
 ];
 
-// HEXカラーコードのバリデーション
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
 export default function SettingsScreen() {
@@ -26,7 +25,6 @@ export default function SettingsScreen() {
   const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern, onPrimary } = useTheme();
   const locale = useLocale();
   const ja = locale === 'ja';
-  const [currentLanguage, setCurrentLanguage] = useState<'ja' | 'en'>(locale);
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -34,12 +32,6 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadAnimationSetting();
   }, []);
-
-  const handleLanguageChange = async (lang: 'ja' | 'en') => {
-    setCurrentLanguage(lang);
-    await AsyncStorage.setItem('user_language', lang);
-    SoundManager.play('complete');
-  };
 
   const loadAnimationSetting = async () => {
     try {
@@ -78,11 +70,17 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+      {/* Header with close button */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale) }]}>
           {ja ? 'テーマカラー設定' : 'Theme Settings'}
         </Text>
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Preset Themes */}
@@ -126,7 +124,6 @@ export default function SettingsScreen() {
           {ja ? 'HEXカラーコードで自由に設定できます' : 'Set any color using a HEX code'}
         </Text>
 
-        {/* Color Preview */}
         <View style={styles.customRow}>
           <View style={[styles.colorPreviewBox, {
             backgroundColor: isValidHex(hexInput.startsWith('#') ? hexInput : '#' + hexInput)
@@ -165,7 +162,6 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* Color suggestions */}
         <Text style={[styles.suggestLabel, { color: colors.textSecondary, fontSize: Math.round(12 * scale) }]}>
           {ja ? 'カラー例' : 'Examples'}
         </Text>
@@ -208,63 +204,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* 表示言語 */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
-          {ja ? '表示言語' : 'Display Language'}
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          {/* 日本語ボタン */}
-          <TouchableOpacity
-            style={[
-              styles.languageButton,
-              {
-                backgroundColor: currentLanguage === 'ja' ? colors.primary : colors.card,
-                borderWidth: 2,
-                borderColor: currentLanguage === 'ja' ? colors.primary : colors.border,
-              }
-            ]}
-            onPress={() => handleLanguageChange('ja')}
-          >
-            <Text style={[styles.languageFlagIcon, { fontSize: 24 }]}>🇯🇵</Text>
-            <Text style={[
-              styles.languageLabel,
-              { color: currentLanguage === 'ja' ? onPrimary : colors.text, fontWeight: '700' }
-            ]}>
-              日本語
-            </Text>
-            {currentLanguage === 'ja' && (
-              <Text style={[{ color: onPrimary, marginTop: 4, fontSize: 12 }]}>✓ 現在</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* 英語ボタン */}
-          <TouchableOpacity
-            style={[
-              styles.languageButton,
-              {
-                backgroundColor: currentLanguage === 'en' ? colors.primary : colors.card,
-                borderWidth: 2,
-                borderColor: currentLanguage === 'en' ? colors.primary : colors.border,
-              }
-            ]}
-            onPress={() => handleLanguageChange('en')}
-          >
-            <Text style={[styles.languageFlagIcon, { fontSize: 24 }]}>🇺🇸</Text>
-            <Text style={[
-              styles.languageLabel,
-              { color: currentLanguage === 'en' ? onPrimary : colors.text, fontWeight: '700' }
-            ]}>
-              English
-            </Text>
-            {currentLanguage === 'en' && (
-              <Text style={[{ color: onPrimary, marginTop: 4, fontSize: 12 }]}>✓ Current</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* エフェクト：アニメーション設定 */}
+      {/* Effects */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
           {ja ? 'エフェクト' : 'Effects'}
@@ -281,7 +221,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* アニメーションレベル選択（ON の時のみ表示） */}
         {animationLevel !== 'none' && (
           <View style={{ marginTop: 12, gap: 8 }}>
             <Text style={[styles.sectionLabel, { color: colors.text, fontSize: 12 }]}>
@@ -325,24 +264,16 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
-
-       {/* Back Button */}
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { fontSize: Math.round(16 * scale) }]}>
-          {ja ? '戻る' : 'Back'}
-        </Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 20, borderBottomWidth: 1 },
+  header: { padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },
+  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 60 },
+  closeButtonText: { fontSize: 14, fontWeight: 'bold' },
   section: { padding: 20, marginBottom: 12 },
   sectionTitle: { fontWeight: 'bold', marginBottom: 6 },
   sectionDesc: { marginBottom: 16 },
@@ -377,13 +308,6 @@ const styles = StyleSheet.create({
   optionDesc: { marginTop: 2 },
   featureBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   featureBadgeText: { fontWeight: '500' },
-  previewBox: { padding: 16, borderRadius: 12, borderWidth: 1, gap: 10 },
-  previewButton: { padding: 12, borderRadius: 20, alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 20 },
-  previewButtonText: { color: 'white', fontWeight: 'bold' },
-  previewTitle: { fontWeight: 'bold' },
-  tagRow: { flexDirection: 'row', gap: 8 },
-  tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  tagText: { fontWeight: '500' },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -395,21 +319,5 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '500',
-  },
-  backButton: { margin: 20, padding: 16, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { color: 'white', fontWeight: 'bold' },
-  languageButton: {
-    flex: 1,
-    paddingVertical: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageFlagIcon: {
-    marginBottom: 8,
-  },
-  languageLabel: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

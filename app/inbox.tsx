@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
@@ -25,6 +25,10 @@ export default function InboxScreen() {
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
+  // 削除確認モーダル用 state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   useEffect(() => {
     loadReceivedItems();
   }, []);
@@ -37,6 +41,20 @@ export default function InboxScreen() {
     } catch (error) {
       console.error('Failed to load inbox:', error);
     }
+  };
+
+  /**
+   * 重複チェック: 同じ送信者から同じ内容のアイテムが既に存在するか
+   */
+  const isDuplicate = (item: ReceivedItem): boolean => {
+    return receivedItems.some(existing =>
+      existing.id !== item.id &&
+      existing.senderCode === item.senderCode &&
+      existing.type === item.type &&
+      (item.type === 'question'
+        ? existing.data.question === item.data.question
+        : existing.data.name === item.data.name)
+    );
   };
 
   const transferToManagement = async () => {
@@ -78,10 +96,9 @@ export default function InboxScreen() {
       const foldersToAdd = itemsToTransfer
         .filter(item => item.type === 'folder')
         .map(item => {
-          const folderData = item.data; // multi.tsxから送られてきたデータ
+          const folderData = item.data;
           const newFolderId = Date.now() + Math.random();
 
-          // フォルダに含まれる問題を個別に新しいIDで生成
           const newQuestionIds: number[] = [];
           const newQuestions: any[] = [];
 
@@ -102,17 +119,15 @@ export default function InboxScreen() {
             description: folderData.description || '',
             id: newFolderId,
             questionIds: newQuestionIds,
-            questions: newQuestions, // 一時的に保持（後で削除して保存）
+            questions: newQuestions,
             isShared: true,
             originalInboxId: item.id,
           };
         });
 
       if (foldersToAdd.length > 0) {
-        // フォルダに含まれる全問題を抽出
         const allNewQuestions = foldersToAdd.flatMap(f => f.questions || []);
 
-        // 既存の問題を取得してマージ
         const existingQuestions = JSON.parse(
           await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'
         );
@@ -121,10 +136,8 @@ export default function InboxScreen() {
           JSON.stringify([...existingQuestions, ...allNewQuestions])
         );
 
-        // フォルダデータから questions プロパティを削除して保存
         const foldersToSave = foldersToAdd.map(({ questions, ...folder }) => folder);
 
-        // 既存のフォルダを取得してマージ
         const existingFolders = JSON.parse(
           await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS) || '[]'
         );
@@ -155,29 +168,26 @@ export default function InboxScreen() {
     }
   };
 
-  const deleteItem = async (itemId: string) => {
-    Alert.alert(
-      locale === 'ja' ? '削除確認' : 'Delete',
-      locale === 'ja' ? 'このアイテムを削除しますか？' : 'Delete this item?',
-      [
-        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-        {
-          text: locale === 'ja' ? '削除' : 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const remaining = receivedItems.filter(item => item.id !== itemId);
-              await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));
-              setReceivedItems(remaining);
-              setSelectedItems(selectedItems.filter(id => id !== itemId));
-              SoundManager.play('complete');
-            } catch (error) {
-              console.error('Failed to delete:', error);
-            }
-          }
-        }
-      ]
-    );
+  const deleteItem = (itemId: string) => {
+    setPendingDeleteId(itemId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!pendingDeleteId) return;
+
+    try {
+      const remaining = receivedItems.filter(item => item.id !== pendingDeleteId);
+      await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));
+      setReceivedItems(remaining);
+      setSelectedItems(selectedItems.filter(id => id !== pendingDeleteId));
+      SoundManager.play('complete');
+    } catch (error) {
+      console.error('Failed to delete:', error);
+    } finally {
+      setShowDeleteConfirm(false);
+      setPendingDeleteId(null);
+    }
   };
 
   const toggleItemSelection = (itemId: string) => {
@@ -320,14 +330,24 @@ export default function InboxScreen() {
                     : `Received: ${new Date(item.receivedAt).toLocaleString('en-US')}`
                   }
                 </Text>
+
+                {/* 重複警告 */}
+                {isDuplicate(item) && (
+                  <View style={[styles.duplicateWarning, { backgroundColor: colors.warning + '20' }]}>
+                    <Text style={[styles.duplicateWarningText, { color: colors.warning }]}>
+                      ⚠️ {locale === 'ja' ? 'このユーザーから既に受信済みです' : 'Already received from this user'}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* 削除ボタン */}
               <TouchableOpacity
                 onPress={() => deleteItem(item.id)}
                 style={[{ justifyContent: 'center', alignItems: 'center', padding: 4 }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={[{ color: colors.error, fontSize: 16 }]}>🗑️</Text>
+                <Text style={[styles.deleteIcon, { color: colors.error }]}>🗑️</Text>
               </TouchableOpacity>
             </View>
           ))
@@ -373,10 +393,108 @@ export default function InboxScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* 削除確認モーダル */}
+      <Modal visible={showDeleteConfirm} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? '削除確認' : 'Delete Confirmation'}
+            </Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              {locale === 'ja' 
+                ? 'このアイテムを削除してもよろしいですか？'
+                : 'Are you sure you want to delete this item?'}
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setPendingDeleteId(null);
+                }}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={confirmDeleteItem}
+              >
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  duplicateWarning: {
+    marginTop: 8,
+    padding: 6,
+    borderRadius: 6,
+  },
+  duplicateWarningText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  deleteIcon: {
+    fontSize: 18,
+    padding: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  confirmModalContainer: {
+    width: '80%',
+    maxWidth: 300,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  confirmModalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmModalCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  confirmModalCancelText: {
+    fontWeight: 'bold',
+  },
+  confirmModalConfirm: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });

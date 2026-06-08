@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { STORAGE_KEYS } from './constants/storageKeys';
 
 // ──────────────────────────────────────────────
 // 型定義

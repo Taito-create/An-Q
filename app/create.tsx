@@ -51,11 +51,26 @@ export default function CreateQuestionScreen() {
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // ファイルサイズチェック（5MB = 5 * 1024 * 1024）
+      if (file.size > 5 * 1024 * 1024) {
+        Alert.alert('エラー', locale === 'ja' ? '画像は5MB以下にしてください' : 'Image must be less than 5MB');
+        return;
+      }
+      
+      // ファイル形式チェック
+      if (!file.type.startsWith('image/')) {
+        Alert.alert('エラー', locale === 'ja' ? '画像ファイルを選択してください' : 'Please select an image file');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         setSelectedImage(base64);
         SoundManager.play('decide');
+      };
+      reader.onerror = () => {
+        Alert.alert('エラー', locale === 'ja' ? '画像の読み込みに失敗しました' : 'Failed to load image');
       };
       reader.readAsDataURL(file);
     }
@@ -72,6 +87,13 @@ export default function CreateQuestionScreen() {
           t.limitReached,
           `${t.limitReachedMsg} (${limit})`
         );
+        return false;
+      }
+
+      // 画像データが正しいか確認
+      if (selectedImage && !selectedImage.startsWith('data:image')) {
+        console.error('[DEBUG] 画像形式が不正:', selectedImage.substring(0, 50));
+        Alert.alert('エラー', locale === 'ja' ? '画像データが正しくありません' : 'Invalid image data');
         return false;
       }
 
