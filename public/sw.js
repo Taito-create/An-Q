@@ -1,46 +1,56 @@
-const CACHE_NAME = 'an-q-v2';
-const urlsToCache = ['/manifest.json'];
+const CACHE_NAME = 'an-q-v4';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
+];
 
 self.addEventListener('install', event => {
+  console.log('[SW] Install');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .catch(err => console.warn('[An-Q SW] Cache addAll failed:', err))
+      .then(cache => {
+        console.log('[SW] Caching app shell');
+        return cache.addAll(urlsToCache);
+      })
+      .catch(err => console.error('[SW] Cache error:', err))
   );
   self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
-  if (!event.request.url.startsWith('http')) return;
-
-  const url = new URL(event.request.url);
-
-  // HTML / JS は network-first（デプロイ後のハッシュ不一致で MIME エラーになるのを防ぐ）
-  if (
-    event.request.mode === 'navigate' ||
-    url.pathname.endsWith('.js') ||
-    url.pathname.startsWith('/assets/')
-  ) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
-  );
-});
-
 self.addEventListener('activate', event => {
+  console.log('[SW] Activate');
   event.waitUntil(
-    caches.keys().then(cacheNames =>
-      Promise.all(
-        cacheNames
-          .filter(name => name !== CACHE_NAME)
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.filter(name => name !== CACHE_NAME)
           .map(name => caches.delete(name))
-      )
-    )
+      );
+    })
   );
   self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request)
+          .then(response => {
+            if (response && response.status === 200) {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME)
+                .then(cache => {
+                  cache.put(event.request, responseToCache);
+                });
+            }
+            return response;
+          });
+      })
+  );
 });
