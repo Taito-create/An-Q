@@ -575,15 +575,25 @@ export default function QuizScreen() {
     const filtered = getFilteredQuestions();
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 60, paddingBottom: 40 }}>
-          <Text style={[{ fontSize: 24, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: 32 }]}>
-            📝 クイズ設定
+        {/* ヘッダー（戻るボタン付き） */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            📝 {locale === 'ja' ? 'クイズ設定' : 'Quiz Settings'}
           </Text>
-
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: colors.primary }]}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 20, paddingBottom: 40 }}>
           {/* 問題数 ステッパー + スライダー */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
-              問題数
+              {locale === 'ja' ? '問題数' : 'Number of Questions'}
             </Text>
             {/* ステッパー */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
@@ -1463,5 +1473,32 @@ const styles = StyleSheet.create({
   tagFilterChipText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });

@@ -220,25 +220,14 @@ export default function InboxScreen() {
         </Text>
 
         <TouchableOpacity
-          style={[
-            {
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              backgroundColor: '#FFFFFF',
-              borderWidth: 2,
-              borderColor: colors.text || '#000000',
-              borderRadius: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }
-          ]}
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/');
           }}
         >
-          <Text style={[{ color: colors.text || '#000000', fontWeight: '700', fontSize: 13 }]}>
-            {t.back}
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+            {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -436,6 +425,18 @@ export default function InboxScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  closeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   duplicateWarning: {
     marginTop: 8,
     padding: 6,

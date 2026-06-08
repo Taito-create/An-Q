@@ -112,6 +112,15 @@ export const translations = {
     noTimeLimit: 'なし',
     allQ: '全問',
     questionsCount: '問題数',
+    quizSettings: 'クイズ設定',
+    results: '結果',
+    themeSettingsTitle: 'テーマ設定',
+    addEvent: '予定を登録',
+    editEvent: '予定を編集',
+    dateRange: '期間指定',
+    deleteEvent: 'この予定を削除',
+    addBox: 'ボックスを追加',
+    imageMaxSize: '最大 5MB',
   },
 
   en: {
@@ -227,5 +236,14 @@ export const translations = {
     noTimeLimit: 'No limit',
     allQ: 'All',
     questionsCount: 'Questions',
+    quizSettings: 'Quiz Settings',
+    results: 'Results',
+    themeSettingsTitle: 'Theme Settings',
+    addEvent: 'Add Event',
+    editEvent: 'Edit Event',
+    dateRange: 'Date Range',
+    deleteEvent: 'Delete Event',
+    addBox: 'Add Box',
+    imageMaxSize: 'Max 5MB',
   }
 };

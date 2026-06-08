@@ -591,16 +591,20 @@ export default function CalendarScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
     >
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>カレンダー</Text>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {locale === 'ja' ? 'カレンダー' : 'Calendar'}
+        </Text>
         <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/');
           }}
         >
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -768,4 +772,17 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontWeight: 'bold', marginBottom: 12 },
   noEventsText: { fontSize: 14, textAlign: 'center', marginTop: 20 },
+  closeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
 });
