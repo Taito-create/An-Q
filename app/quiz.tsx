@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, TouchableOpacity, Alert,
-  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal
+  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -119,6 +119,16 @@ export default function QuizScreen() {
   const [showPreSettings, setShowPreSettings] = useState(true);
   const [preQuestionCount, setPreQuestionCount] = useState<number>(10);
   const [isReverseMode, setIsReverseMode] = useState(false);
+
+  // ゲーム機能用 state
+  const [challengeMode, setChallengeMode] = useState(false);
+  const [suddenDeathMode, setSuddenDeathMode] = useState(false);
+  const [suddenDeathLives, setSuddenDeathLives] = useState(3);
+  const [timeAttackMode, setTimeAttackMode] = useState(false);
+  const [timeAttackLimit, setTimeAttackLimit] = useState(5);
+  const [currentLives, setCurrentLives] = useState(3);
+  const [comboCount, setComboCount] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
 
   // タイマー選択用 state
   const [preTimerMinutes, setPreTimerMinutes] = useState<number | null>(null);
@@ -321,14 +331,32 @@ export default function QuizScreen() {
     }
     SoundManager.play('decide');
 
+    // チャレンジモードのコインチェック
+    if (challengeMode) {
+      const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+      if (coins < 10) {
+        Alert.alert(
+          locale === 'ja' ? 'コイン不足' : 'Insufficient Coins',
+          locale === 'ja' ? 'チャレンジモードには10コイン必要です。' : 'Challenge mode requires 10 coins.'
+        );
+        return;
+      }
+      await AsyncStorage.setItem('user_coins', (coins - 10).toString());
+    }
+
     // 選択タイマーを保存（ホーム画面表示用）
     if (preTimerMinutes !== null) {
       await AsyncStorage.setItem('quiz_active_timer', preTimerMinutes.toString());
     } else {
       await AsyncStorage.removeItem('quiz_active_timer');
     }
-    // 問題数制限
-    const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, preQuestionCount);
+    // 問題数制限（サドンデスモード時は無制限）
+    let shuffled = [...filtered].sort(() => Math.random() - 0.5);
+    if (!suddenDeathMode) {
+      shuffled = shuffled.slice(0, preQuestionCount);
+    } else {
+      setPreQuestionCount(shuffled.length);
+    }
 
     setShuffledQuestions(shuffled);
     setCurrentIndex(0);
@@ -338,7 +366,19 @@ export default function QuizScreen() {
     setShowFeedback(false);
     setAnswered(false);
 
-    if (preTimerMinutes === null) {
+    // サドンデス用の初期化
+    if (suddenDeathMode) {
+      setCurrentLives(suddenDeathLives);
+      setComboCount(0);
+      setMaxCombo(0);
+    }
+
+    // タイマー設定（タイムアタック優先）
+    if (timeAttackMode) {
+      setTimerLimit(timeAttackLimit);
+      setTimeLeft(timeAttackLimit);
+      setIsTimerActive(true);
+    } else if (preTimerMinutes === null) {
       setTimerLimit(Number.MAX_VALUE);
       setTimeLeft(Number.MAX_VALUE);
       setIsTimerActive(false);
@@ -408,6 +448,31 @@ export default function QuizScreen() {
 
     SoundManager.play(correct ? 'correct' : 'wrong');
 
+    // サドンデス処理
+    if (suddenDeathMode && !correct) {
+      const newLives = currentLives - 1;
+      setCurrentLives(newLives);
+      if (newLives <= 0) {
+        setIsTimerActive(false);
+        Alert.alert(
+          locale === 'ja' ? '💀 ゲームオーバー！' : '💀 Game Over!',
+          locale === 'ja'
+            ? `連続正解数: ${comboCount}問`
+            : `Max Combo: ${comboCount}`,
+          [{ text: locale === 'ja' ? '結果を見る' : 'View Results', onPress: () => finishQuizWithResults([...results, newResult]) }]
+        );
+        setAnswered(false);
+        return;
+      }
+      setComboCount(0);
+    } else if (correct) {
+      setComboCount(prev => {
+        const newCombo = prev + 1;
+        if (newCombo > maxCombo) setMaxCombo(newCombo);
+        return newCombo;
+      });
+    }
+
     const newResult: QuizResult = {
       questionId: currentQuestion.id,
       question: currentQuestion.question,
@@ -439,6 +504,11 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
+    // タイムアタックモードのタイマー停止
+    if (timeAttackMode) {
+      setIsTimerActive(false);
+    }
+
     const delay = correct ? 1000 : 2500;
 
     setTimeout(async () => {
@@ -456,6 +526,10 @@ export default function QuizScreen() {
         setAnswered(false);
         setUserDescriptiveAnswer('');
         questionStartTime.current = Date.now();
+        // タイムアタックモードの場合、タイマーを再開
+        if (timeAttackMode) {
+          setIsTimerActive(true);
+        }
         SoundManager.play('question');
       }
     }, delay);
@@ -487,9 +561,30 @@ export default function QuizScreen() {
       }));
       await recordQuizAnswers(answers);
       
-      const xpReward = finalScore * 5;
-      const coinReward = Math.floor(finalScore * 0.5);
-      
+      let xpReward = finalScore * 5;
+      let coinReward = Math.floor(finalScore * 0.5);
+
+      // チャレンジモード: 全問正解で報酬2倍
+      const isPerfect = finalScore === totalQuestions;
+      if (challengeMode && isPerfect) {
+        xpReward *= 2;
+        coinReward *= 2;
+      }
+
+      // ボス討伐モード（weak）: +50% XP
+      const quizMode = await AsyncStorage.getItem('quiz_mode');
+      const isBossMode = quizMode === 'weak';
+      if (isBossMode) {
+        xpReward = Math.floor(xpReward * 1.5);
+        await AsyncStorage.removeItem('quiz_mode');
+      }
+
+      // サドンデス: 連続正解ボーナス
+      if (suddenDeathMode && maxCombo > 0) {
+        xpReward += maxCombo * 2;
+        coinReward += Math.floor(maxCombo / 2);
+      }
+
       const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
       
@@ -514,11 +609,30 @@ export default function QuizScreen() {
         await AsyncStorage.setItem('user_xp', newXP.toString());
       }
       
+      // 報酬メッセージを表示
+      let rewardMessage = locale === 'ja' 
+        ? `${finalScore}/${totalQuestions} 正解\n⚡ +${xpReward} XP\n✨ +${coinReward} Qコイン${levelUpMessage}`
+        : `${finalScore}/${totalQuestions} correct\n⚡ +${xpReward} XP\n✨ +${coinReward} Q Coins${levelUpMessage}`;
+      
+      if (challengeMode && isPerfect) {
+        rewardMessage = locale === 'ja'
+          ? `${rewardMessage}\n🏆 チャレンジ成功！報酬2倍！`
+          : `${rewardMessage}\n🏆 Challenge Success! Double Rewards!`;
+      } else if (challengeMode && !isPerfect) {
+        rewardMessage = locale === 'ja'
+          ? `${rewardMessage}\n💔 チャレンジ失敗... 参加費10コイン消失`
+          : `${rewardMessage}\n💔 Challenge Failed... 10 coins lost`;
+      }
+      
+      if (suddenDeathMode) {
+        rewardMessage += locale === 'ja'
+          ? `\n🔥 最大連続正解: ${maxCombo}問`
+          : `\n🔥 Max Combo: ${maxCombo}`;
+      }
+      
       Alert.alert(
         locale === 'ja' ? '🎉 クイズ完了！' : '🎉 Quiz Complete!',
-        locale === 'ja' 
-          ? `${finalScore}/${totalQuestions} 正解\n⚡ +${xpReward} XP\n✨ +${coinReward} Qコイン${levelUpMessage}`
-          : `${finalScore}/${totalQuestions} correct\n⚡ +${xpReward} XP\n✨ +${coinReward} Q Coins${levelUpMessage}`
+        rewardMessage
       );
     } catch (e) {
       console.error('finishQuiz error:', e);
@@ -721,6 +835,92 @@ export default function QuizScreen() {
                 })}
               </View>
             </ScrollView>
+          </View>
+
+          {/* チャレンジモード */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  🪙 {locale === 'ja' ? 'チャレンジモード' : 'Challenge Mode'}
+                </Text>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                  {locale === 'ja' ? '全問正解で報酬2倍！（参加費: 10コイン）' : 'Double rewards for perfect score! (Entry: 10 coins)'}
+                </Text>
+              </View>
+              <Switch
+                value={challengeMode}
+                onValueChange={setChallengeMode}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
+              />
+            </View>
+          </View>
+
+          {/* サドンデスモード */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  🤍 {locale === 'ja' ? 'サドンデスモード' : 'Sudden Death'}
+                </Text>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                  {locale === 'ja' ? '間違えるとライフ減少。0で即終了！' : 'Lose life on mistake. Game over at 0!'}
+                </Text>
+              </View>
+              <Switch
+                value={suddenDeathMode}
+                onValueChange={(val) => { setSuddenDeathMode(val); if (val) setPreQuestionCount(999); }}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
+              />
+            </View>
+            {suddenDeathMode && (
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                {[3, 2, 1].map(lives => (
+                  <TouchableOpacity
+                    key={lives}
+                    style={[{ flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, backgroundColor: suddenDeathLives === lives ? colors.primary : 'transparent' }]}
+                    onPress={() => setSuddenDeathLives(lives)}
+                  >
+                    <Text style={[{ color: suddenDeathLives === lives ? '#fff' : colors.primary, fontWeight: 'bold', fontSize: 14 }]}>🤍 x {lives}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* タイムアタックモード */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  ⚡ {locale === 'ja' ? 'タイムアタック' : 'Time Attack'}
+                </Text>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                  {locale === 'ja' ? '1問あたりの制限時間内に回答！' : 'Answer within time limit per question!'}
+                </Text>
+              </View>
+              <Switch
+                value={timeAttackMode}
+                onValueChange={setTimeAttackMode}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
+              />
+            </View>
+            {timeAttackMode && (
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                {[3, 5, 10].map(seconds => (
+                  <TouchableOpacity
+                    key={seconds}
+                    style={[{ flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, backgroundColor: timeAttackLimit === seconds ? colors.primary : 'transparent' }]}
+                    onPress={() => setTimeAttackLimit(seconds)}
+                  >
+                    <Text style={[{ color: timeAttackLimit === seconds ? '#fff' : colors.primary, fontWeight: 'bold', fontSize: 14 }]}>{seconds}{locale === 'ja' ? '秒' : 'sec'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* タグ絞り込み */}
