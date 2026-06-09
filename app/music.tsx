@@ -121,7 +121,20 @@ export default function MusicScreen() {
   const activePlaylist = playlists.find(p => p.id === activePlaylistId);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+          {/* ヘッダー: タイトル + 戻るボタン */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {locale === 'ja' ? '音楽設定' : 'Music Settings'}
+        </Text>
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>
+        </TouchableOpacity>
+      </View>
+
+<View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 重複警告バナー */}
       {duplicateWarning && duplicateWarning.length > 0 && (
         <View style={[styles.warningBanner, { backgroundColor: colors.warning }]}>
@@ -381,16 +394,16 @@ export default function MusicScreen() {
         )}
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
-      </View>
+      
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold' },
+  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   scrollContent: { flex: 1 },
   scrollContainer: { padding: 16, paddingBottom: 90 },

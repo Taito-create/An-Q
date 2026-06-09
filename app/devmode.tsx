@@ -121,7 +121,14 @@ export default function DevModeScreen() {
       <View style={[styles.header, { backgroundColor: '#1A1A1A', borderBottomColor: '#333' }]}>
         <Text style={styles.headerTitle}>🛠️ Developer Mode</Text>
         <Text style={styles.headerSub}>開発者モード - 本番環境では使用しないこと</Text>
-      </View>
+      
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
+        </TouchableOpacity>
+</View>
 
       <ScrollView style={styles.content}>
         {/* Buttons */}
@@ -149,18 +156,13 @@ export default function DevModeScreen() {
           )}
         </View>
       </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>戻る / Back</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { padding: 16, borderBottomWidth: 1 },
   headerTitle: { color: '#00FF41', fontSize: 18, fontWeight: 'bold', fontFamily: 'monospace' },

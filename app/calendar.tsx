@@ -339,7 +339,9 @@ export default function CalendarScreen() {
           <Text style={[styles.monthArrow, { color: colors.primary }]}>＜</Text>
         </TouchableOpacity>
         <Text style={[styles.monthText, { color: colors.text, fontSize: isMobile ? 18 : 22 }]}>
-          {year}年 {month + 1}月
+          {locale === 'ja'
+            ? `${year}年 ${month + 1}月`
+            : `${new Date(year, month).toLocaleString('en-US', { month: 'long' })} ${year}`}
         </Text>
         <TouchableOpacity onPress={goNextMonth}>
           <Text style={[styles.monthArrow, { color: colors.primary }]}>＞</Text>
@@ -439,10 +441,12 @@ export default function CalendarScreen() {
     return (
       <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.formTitle, { color: colors.text }]}>
-          {editingEventId ? '予定を編集' : '予定を登録'}
+          {editingEventId
+            ? (locale === 'ja' ? '予定を編集' : 'Edit Event')
+            : (locale === 'ja' ? '予定を登録' : 'Add Event')}
         </Text>
         <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>
-          開始日: {selectedDate}
+          {locale === 'ja' ? '開始日: ' : 'Start Date: '}{selectedDate}
         </Text>
 
         <TouchableOpacity
@@ -450,7 +454,9 @@ export default function CalendarScreen() {
           onPress={() => setIsRange(!isRange)}
         >
           <Text style={[styles.toggleButtonText, { color: colors.primary }]}>
-            {isRange ? '✓ 期間指定' : '○ 期間指定'}
+            {isRange
+              ? (locale === 'ja' ? '✓ 期間指定' : '✓ Date Range')
+              : (locale === 'ja' ? '○ 期間指定' : '○ Date Range')}
           </Text>
         </TouchableOpacity>
 
@@ -459,7 +465,7 @@ export default function CalendarScreen() {
             style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
             value={endDate}
             onChangeText={setEndDate}
-            placeholder="終了日 (YYYY-MM-DD)"
+            placeholder={locale === 'ja' ? '終了日 (YYYY-MM-DD)' : 'End Date (YYYY-MM-DD)'}
             placeholderTextColor={colors.textSecondary}
           />
         )}
@@ -468,7 +474,7 @@ export default function CalendarScreen() {
           style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text }]}
           value={eventName}
           onChangeText={setEventName}
-          placeholder="予定名 (例: 中間試験)"
+          placeholder={locale === 'ja' ? '予定名 (例: 中間試験)' : 'Event Name (e.g., Midterm Exam)'}
           placeholderTextColor={colors.textSecondary}
         />
 
@@ -481,14 +487,14 @@ export default function CalendarScreen() {
                   style={[styles.subjectInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, flex: 1 }]}
                   value={input.subject}
                   onChangeText={(text) => updateSubject(idx, 'subject', text)}
-                  placeholder="教科名"
+                  placeholder={locale === 'ja' ? '教科名' : 'Subject'}
                   placeholderTextColor={colors.textSecondary}
                 />
                 <TextInput
                   style={[styles.subjectDateInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.text, width: 110 }]}
                   value={input.date}
                   onChangeText={(text) => updateSubject(idx, 'date', text)}
-                  placeholder="日付"
+                  placeholder={locale === 'ja' ? '日付' : 'Date'}
                   placeholderTextColor={colors.textSecondary}
                 />
                 <TouchableOpacity onPress={() => removeSubject(idx)} style={styles.removeSubjectBtn}>
@@ -497,17 +503,17 @@ export default function CalendarScreen() {
               </View>
             ))}
             <TouchableOpacity style={[styles.addSubjectBtn, { borderColor: colors.primary }]} onPress={addSubjectInput}>
-              <Text style={[styles.addSubjectText, { color: colors.primary }]}>+ 教科を追加</Text>
+              <Text style={[styles.addSubjectText, { color: colors.primary }]}>+ {locale === 'ja' ? '教科を追加' : 'Add Subject'}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         <View style={styles.formButtons}>
           <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={saveEvent}>
-            <Text style={[styles.saveButtonText, { color: onPrimary }]}>保存</Text>
+            <Text style={[styles.saveButtonText, { color: onPrimary }]}>{locale === 'ja' ? '保存' : 'Save'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.cancelButton, { borderColor: colors.border }]} onPress={resetForm}>
-            <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
+            <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>{locale === 'ja' ? 'キャンセル' : 'Cancel'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -521,7 +527,7 @@ export default function CalendarScreen() {
               }
             }}
           >
-            <Text style={styles.deleteEventButtonText}>この予定を削除</Text>
+            <Text style={styles.deleteEventButtonText}>{locale === 'ja' ? 'この予定を削除' : 'Delete Event'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -533,7 +539,7 @@ export default function CalendarScreen() {
     if (events.length === 0) return null;
     return (
       <View style={styles.eventListContainer}>
-        <Text style={[styles.eventListTitle, { color: colors.text, fontSize: isMobile ? 16 : 18 }]}>予定一覧</Text>
+        <Text style={[styles.eventListTitle, { color: colors.text, fontSize: isMobile ? 16 : 18 }]}>{locale === 'ja' ? '予定一覧' : 'Events'}</Text>
         {events.map(event => (
           <View
             key={event.id}
@@ -619,7 +625,7 @@ export default function CalendarScreen() {
 
           {/* 右：予定一覧 */}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, marginBottom: 12 }]}>予定一覧</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, marginBottom: 12 }]}>{locale === 'ja' ? '予定一覧' : 'Events'}</Text>
             <ScrollView>
               {events.length > 0 ? (
                 events.map(event => (

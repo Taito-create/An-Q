@@ -87,10 +87,14 @@ export default function CreateQuestionScreen() {
         tags: tags,
         mistakeCount: 0,
         createdAt: Date.now(),
-        image: selectedImage || null,
-        imageAnnotations: imageAnnotations,
         isShared: false,
+        // 🔧 先にスプレッドして、後から selectedImage / imageAnnotations を上書き
         ...newQuestionData,
+        // 🔧 selectedImage を必ず優先（newQuestionData に undefined が入っていても画像が消えないように）
+        image: selectedImage || newQuestionData.image || null,
+        imageAnnotations: imageAnnotations && imageAnnotations.length > 0
+          ? imageAnnotations
+          : (newQuestionData.imageAnnotations || []),
       };
       await saveQuestions([...questions, newQuestion]);
       await incrementStat('questionsCreated', 1);

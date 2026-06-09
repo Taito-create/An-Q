@@ -54,7 +54,14 @@ export default function TitleScreen() {
             </Text>
           </View>
         )}
-      </View>
+      
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
+        </TouchableOpacity>
+</View>
 
       <ScrollView style={styles.list}>
         {/* Stats summary */}
@@ -128,20 +135,13 @@ export default function TitleScreen() {
           );
         })}
       </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
-          {t.back}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },

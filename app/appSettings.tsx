@@ -62,7 +62,14 @@ export default function AppSettingsScreen() {
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           ⚙️ {t.appSettings}
         </Text>
-      </View>
+      
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
+        </TouchableOpacity>
+</View>
 
       <ScrollView style={styles.list}>
 
@@ -209,20 +216,13 @@ export default function AppSettingsScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
-          {t.back}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },
