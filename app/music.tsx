@@ -121,7 +121,8 @@ export default function MusicScreen() {
   const activePlaylist = playlists.find(p => p.id === activePlaylistId);
 
   return (
-          {/* ヘッダー: タイトル + 戻るボタン */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* ヘッダー: タイトル + 戻るボタン */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {locale === 'ja' ? '音楽設定' : 'Music Settings'}
@@ -133,8 +134,6 @@ export default function MusicScreen() {
           <Text style={[styles.closeButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
-
-<View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* 重複警告バナー */}
       {duplicateWarning && duplicateWarning.length > 0 && (
         <View style={[styles.warningBanner, { backgroundColor: colors.warning }]}>
