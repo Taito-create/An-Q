@@ -167,13 +167,14 @@ export default function ShopScreen() {
           <CustomBGMSection colors={colors} onPrimary={onPrimary} fs={fs} t={t} />
         )}
       </ScrollView>
-
-
+    </View>
+  );
 }
 
 // ─────────────────────────────────────────────
 // カスタムBGMコンポーネント（ウェブ専用）
 // ─────────────────────────────────────────────
+
 function CustomBGMSection({ colors, onPrimary, fs, t }: any) {
   const [fileName, setFileName] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
