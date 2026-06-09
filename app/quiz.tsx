@@ -649,7 +649,7 @@ export default function QuizScreen() {
               <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text }]}>
                 {preQuestionCount} / {filtered.length}
               </Text>
-              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>{filtered.length}問</Text>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>{filtered.length}{locale === 'ja' ? '問' : 'Q'}</Text>
             </View>
             {/* タグ選択情報も併記 */}
             <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
@@ -665,10 +665,10 @@ export default function QuizScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: 16 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🔄 リバースモード
+                  🔄 {locale === 'ja' ? 'リバースモード' : 'Reverse Mode'}
                 </Text>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-                  回答を問題文として表示し、問題文を答えます
+                  {locale === 'ja' ? '回答を問題文として表示し、問題文を答えます' : 'Show the answer as the question, and answer the original question'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -728,7 +728,7 @@ export default function QuizScreen() {
             <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 24 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🏷️ タグで絞り込み
+                  🏷️ {locale === 'ja' ? 'タグで絞り込み' : 'Filter by Tag'}
                 </Text>
               </View>
               

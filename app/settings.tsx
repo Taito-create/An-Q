@@ -79,7 +79,7 @@ export default function SettingsScreen() {
           style={[styles.closeButton, { backgroundColor: colors.primary }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>✕</Text>
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 

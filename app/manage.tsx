@@ -141,8 +141,13 @@ export default function ManageScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ⏱ {locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
         </Text>
-        <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={[{ color: colors.primary, fontSize: 18 }]}>✕</Text>
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -219,12 +224,6 @@ export default function ManageScreen() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
-      </TouchableOpacity>
     </ScrollView>
     
     {pendingDeleteId !== null && (
@@ -262,8 +261,8 @@ const styles = StyleSheet.create({
   deleteButton: { padding: 8, borderRadius: 6, alignItems: 'center', marginLeft: 8 },
   deleteButtonText: { fontSize: 16 },
   clearButton: { margin: 16, padding: 12, borderRadius: 8, borderWidth: 2 },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold', fontSize: 16 },
+  closeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
+  closeButtonText: { fontSize: 14, fontWeight: 'bold', color: '#fff' },
   confirmOverlay: { position: 'absolute', bottom: 80, left: 20, right: 20, backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#ddd', elevation: 8 },
   confirmText: { fontSize: 14, color: '#333', marginBottom: 12, textAlign: 'center' },
   confirmButtons: { flexDirection: 'row', gap: 10 },

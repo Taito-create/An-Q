@@ -672,7 +672,7 @@ export default function CalendarScreen() {
                   </View>
                 ))
               ) : (
-                <Text style={[styles.noEventsText, { color: colors.textSecondary }]}>登録された予定はありません</Text>
+                <Text style={[styles.noEventsText, { color: colors.textSecondary }]}>{locale === 'ja' ? '登録された予定はありません' : 'No events scheduled'}</Text>
               )}
             </ScrollView>
           </View>

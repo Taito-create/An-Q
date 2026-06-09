@@ -280,7 +280,7 @@ export default function BrowseQuestionsScreen() {
           style={[styles.topBackBtn, { backgroundColor: colors.primary }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={styles.topBackBtnText}>✕</Text>
+          <Text style={styles.topBackBtnText}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 
