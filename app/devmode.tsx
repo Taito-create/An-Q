@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
+import { useLocale } from './hooks/useLocale';
+import { translations } from './translations';
 import { SoundManager } from './sound';
 import { loadStats, saveStats, loadProgress, saveProgress, DEFAULT_STATS, MISSIONS } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function DevModeScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary } = useTheme();
+  const locale = useLocale();
+  const t = translations[locale];
   const [log, setLog] = useState<string[]>([]);
 
   const addLog = (msg: string) => setLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 19)]);
@@ -161,8 +165,8 @@ export default function DevModeScreen() {
 }
 
 const styles = StyleSheet.create({
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  closeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
+  closeButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { padding: 16, borderBottomWidth: 1 },
   headerTitle: { color: '#00FF41', fontSize: 18, fontWeight: 'bold', fontFamily: 'monospace' },
