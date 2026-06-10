@@ -29,6 +29,7 @@ const ShopScreen = lazy(() => import('../app/shop'));
 const TitleScreen = lazy(() => import('../app/title'));
 const TitleListScreen = lazy(() => import('../app/titleScreen'));
 const AppSettingsScreen = lazy(() => import('../app/appSettings'));
+const GachaScreen = lazy(() => import('../app/gacha'));
 
 const Loading = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/title" element={<TitleScreen />} />
           <Route path="/titleScreen" element={<TitleListScreen />} />
           <Route path="/appSettings" element={<AppSettingsScreen />} />
+          <Route path="/gacha" element={<GachaScreen />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

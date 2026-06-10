@@ -296,12 +296,17 @@ export default function QuizScreen() {
     if (!isTimerActive || !quizStarted) return;
     if (timeLeft <= 0) {
       setIsTimerActive(false);
-      handleTimeUp();
+      if (timeAttackMode) {
+        // タイムアタックモード: 時間切れ = 不正解として処理
+        handleAnswer('');
+      } else {
+        handleTimeUp();
+      }
       return;
     }
     const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
     return () => clearInterval(id);
-  }, [isTimerActive, timeLeft, quizStarted]);
+  }, [isTimerActive, timeLeft, quizStarted, timeAttackMode]);
 
   const handleTimeUp = () => {
     setIsTimerActive(false);
@@ -331,17 +336,22 @@ export default function QuizScreen() {
     }
     SoundManager.play('decide');
 
-    // チャレンジモードのコインチェック
+    // チャレンジモードのコインチェック（賭け金：50コイン）
     if (challengeMode) {
+      const betAmount = 50;
       const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
-      if (coins < 10) {
+      if (coins < betAmount) {
         Alert.alert(
           locale === 'ja' ? 'コイン不足' : 'Insufficient Coins',
-          locale === 'ja' ? 'チャレンジモードには10コイン必要です。' : 'Challenge mode requires 10 coins.'
+          locale === 'ja' 
+            ? `チャレンジモードには${betAmount}コイン必要です。\nクイズを解いてコインを稼ぎましょう！`
+            : `Challenge mode requires ${betAmount} coins.\nPlay quizzes to earn coins!`
         );
         return;
       }
-      await AsyncStorage.setItem('user_coins', (coins - 10).toString());
+      // 賭け金を預かり
+      await AsyncStorage.setItem('user_coins', (coins - betAmount).toString());
+      await AsyncStorage.setItem('challenge_bet', betAmount.toString());
     }
 
     // 選択タイマーを保存（ホーム画面表示用）
@@ -355,7 +365,10 @@ export default function QuizScreen() {
     if (!suddenDeathMode) {
       shuffled = shuffled.slice(0, preQuestionCount);
     } else {
-      setPreQuestionCount(shuffled.length);
+      // サドンデスモード: 問題数は全件
+      setPreQuestionCount(filtered.length);
+      // シャッフルは全件
+      shuffled = [...filtered].sort(() => Math.random() - 0.5);
     }
 
     setShuffledQuestions(shuffled);
@@ -448,20 +461,24 @@ export default function QuizScreen() {
 
     SoundManager.play(correct ? 'correct' : 'wrong');
 
+    const newResult: QuizResult = {
+      questionId: currentQuestion.id,
+      question: currentQuestion.question,
+      yourAnswer: answer,
+      correctAnswer: actualCorrectAnswer,
+      isCorrect: correct,
+      timeSpent: elapsed,
+    };
+
     // サドンデス処理
     if (suddenDeathMode && !correct) {
       const newLives = currentLives - 1;
       setCurrentLives(newLives);
       if (newLives <= 0) {
         setIsTimerActive(false);
-        Alert.alert(
-          locale === 'ja' ? '💀 ゲームオーバー！' : '💀 Game Over!',
-          locale === 'ja'
-            ? `連続正解数: ${comboCount}問`
-            : `Max Combo: ${comboCount}`,
-          [{ text: locale === 'ja' ? '結果を見る' : 'View Results', onPress: () => finishQuizWithResults([...results, newResult]) }]
-        );
         setAnswered(false);
+        setShowFeedback(false);
+        await finishQuizWithResults([...results, newResult]);
         return;
       }
       setComboCount(0);
@@ -472,15 +489,6 @@ export default function QuizScreen() {
         return newCombo;
       });
     }
-
-    const newResult: QuizResult = {
-      questionId: currentQuestion.id,
-      question: currentQuestion.question,
-      yourAnswer: answer,
-      correctAnswer: actualCorrectAnswer,
-      isCorrect: correct,
-      timeSpent: elapsed,
-    };
 
     const updatedResults = [...results, newResult];
     setResults(updatedResults);
@@ -562,10 +570,16 @@ export default function QuizScreen() {
       await recordQuizAnswers(answers);
       
       let xpReward = finalScore * 5;
-      let coinReward = Math.floor(finalScore * 0.5);
+      let coinReward = finalScore;  // 1問正解 = 1コイン
+      let bookReward = 0;
+
+      // 全問正解ボーナス
+      const isPerfect = finalScore === totalQuestions;
+      if (isPerfect) {
+        coinReward += 10;  // ボーナス +10コイン
+      }
 
       // チャレンジモード: 全問正解で報酬2倍
-      const isPerfect = finalScore === totalQuestions;
       if (challengeMode && isPerfect) {
         xpReward *= 2;
         coinReward *= 2;
@@ -581,16 +595,33 @@ export default function QuizScreen() {
 
       // サドンデス: 連続正解ボーナス
       if (suddenDeathMode && maxCombo > 0) {
-        xpReward += maxCombo * 2;
         coinReward += Math.floor(maxCombo / 2);
       }
 
-      const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+      const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       
-      await AsyncStorage.setItem('user_xp', (currentXP + xpReward).toString());
-      await AsyncStorage.setItem('user_coins', (currentCoins + coinReward).toString());
+      // コイン加算
+      let newCoins = currentCoins + coinReward;
+
+      // チャレンジモードの賭け金処理
+      if (challengeMode) {
+        const betAmount = parseInt(await AsyncStorage.getItem('challenge_bet') || '0', 10);
+        if (isPerfect) {
+          // 全問正解: 賭け金返還 + 本1冊
+          newCoins += betAmount;
+          const stats = await (await import('./missions')).loadStats();
+          stats.totalBooks = (stats.totalBooks || 0) + 1;
+          stats.questionSlots = (stats.questionSlots || 20) + 5;
+          await (await import('./missions')).saveStats(stats);
+          bookReward = 1;
+        }
+        await AsyncStorage.removeItem('challenge_bet');
+      }
+
+      await AsyncStorage.setItem('user_coins', newCoins.toString());
       
+      // レベルアップ処理
       const currentLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
       const nextLevelThresh = currentLevel * 100;
       const newXP = currentXP + xpReward;
@@ -601,12 +632,27 @@ export default function QuizScreen() {
         const remainingXP = newXP - nextLevelThresh;
         await AsyncStorage.setItem('user_level', newLevel.toString());
         await AsyncStorage.setItem('user_xp', remainingXP.toString());
-        await AsyncStorage.setItem('user_coins', (currentCoins + coinReward + 50).toString());
+        
+        // レベルアップコインボーナス（レベル × 20）
+        const coinBonus = newLevel * 20;
+        const coinsAfterLevelUp = newCoins + coinBonus;
+        await AsyncStorage.setItem('user_coins', coinsAfterLevelUp.toString());
+        newCoins = coinsAfterLevelUp;
+        
         levelUpMessage = locale === 'ja' 
-          ? `\n🎉 レベルアップ！ Lv.${newLevel} (50Qコインボーナス！)`
-          : `\n🎉 Level Up! Lv.${newLevel} (50 coin bonus!)`;
+          ? `\n🎉 レベルアップ！ Lv.${newLevel} (+${coinBonus}コインボーナス！)`
+          : `\n🎉 Level Up! Lv.${newLevel} (+${coinBonus} coin bonus!)`;
       } else {
         await AsyncStorage.setItem('user_xp', newXP.toString());
+      }
+
+      // 統計更新（missions 経由）
+      try {
+        const stats = await (await import('./missions')).loadStats();
+        stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + coinReward;
+        await (await import('./missions')).saveStats(stats);
+      } catch (e) {
+        console.error('Failed to update coin stats:', e);
       }
       
       // 報酬メッセージを表示
@@ -615,13 +661,19 @@ export default function QuizScreen() {
         : `${finalScore}/${totalQuestions} correct\n⚡ +${xpReward} XP\n✨ +${coinReward} Q Coins${levelUpMessage}`;
       
       if (challengeMode && isPerfect) {
-        rewardMessage = locale === 'ja'
-          ? `${rewardMessage}\n🏆 チャレンジ成功！報酬2倍！`
-          : `${rewardMessage}\n🏆 Challenge Success! Double Rewards!`;
+        rewardMessage += locale === 'ja'
+          ? `\n🏆 チャレンジ成功！\n💰 賭け金返還 + 📚 本1冊！`
+          : `\n🏆 Challenge Success!\n💰 Bet returned + 📚 1 book!`;
       } else if (challengeMode && !isPerfect) {
-        rewardMessage = locale === 'ja'
-          ? `${rewardMessage}\n💔 チャレンジ失敗... 参加費10コイン消失`
-          : `${rewardMessage}\n💔 Challenge Failed... 10 coins lost`;
+        rewardMessage += locale === 'ja'
+          ? `\n💔 チャレンジ失敗... 賭け金消失`
+          : `\n💔 Challenge Failed... Bet lost`;
+      }
+      
+      if (bookReward > 0) {
+        rewardMessage += locale === 'ja'
+          ? `\n📚 本を${bookReward}冊獲得！（問題スロット+5）`
+          : `\n📚 Got ${bookReward} book! (+5 question slots)`;
       }
       
       if (suddenDeathMode) {
@@ -759,7 +811,9 @@ export default function QuizScreen() {
             </View>
             {/* スライダー下の表示: filtered.length を使う（タグ絞り込み反映） */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>1問</Text>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
+              {locale === 'ja' ? '1問' : '1 Q'}
+            </Text>
               <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text }]}>
                 {preQuestionCount} / {filtered.length}
               </Text>
@@ -845,7 +899,7 @@ export default function QuizScreen() {
                   🪙 {locale === 'ja' ? 'チャレンジモード' : 'Challenge Mode'}
                 </Text>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-                  {locale === 'ja' ? '全問正解で報酬2倍！（参加費: 10コイン）' : 'Double rewards for perfect score! (Entry: 10 coins)'}
+                  {locale === 'ja' ? '全問正解で報酬2倍！（参加費: 50コイン）' : 'Double rewards for perfect score! (Entry: 50 coins)'}
                 </Text>
               </View>
               <Switch
@@ -985,7 +1039,7 @@ export default function QuizScreen() {
             onPress={startQuiz}
           >
             <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>
-              ▶ スタート
+              ▶ {locale === 'ja' ? 'スタート' : 'Start'}
             </Text>
           </TouchableOpacity>
 
@@ -1092,6 +1146,20 @@ export default function QuizScreen() {
       <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
         <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
       </View>
+
+      {/* サドンデスモード: ライフ表示 */}
+      {suddenDeathMode && quizStarted && (
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          {Array.from({ length: currentLives }).map((_, i) => (
+            <Text key={i} style={{ fontSize: 20, color: colors.error }}>🤍</Text>
+          ))}
+          {comboCount > 0 && (
+            <Text style={{ fontSize: 14, color: colors.success, marginLeft: 12 }}>
+              🔥 {comboCount}{locale === 'ja' ? '連続正解' : 'Combo'}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* スクロールが必要な部分 */}
       <ScrollView 

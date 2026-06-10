@@ -59,6 +59,11 @@ export interface UserStats {
   currentCorrectStreak: number;  // 現在の連続正解数
   maxCorrectStreak: number;       // 最大連続正解数
   tagStats: Record<string, { correct: number; total: number }>; // タグ別成績
+  totalCoins: number;           // 所持コイン
+  totalCoinsEarned: number;     // 累計獲得コイン（統計用）
+  totalCoinsSpent: number;      // 累計消費コイン（統計用）
+  dailyLoginBonusClaimed: string; // 最終ボーナス受領日 (YYYY-MM-DD)
+  loginStreak: number;           // 連続ログイン日数
 }
 
 // ─────────────────────────────────────────────
@@ -123,6 +128,11 @@ export const DEFAULT_STATS: UserStats = {
   currentCorrectStreak: 0,
   maxCorrectStreak: 0,
   tagStats: {},
+  totalCoins: 0,
+  totalCoinsEarned: 0,
+  totalCoinsSpent: 0,
+  dailyLoginBonusClaimed: '',
+  loginStreak: 0,
 };
 
 // ─────────────────────────────────────────────

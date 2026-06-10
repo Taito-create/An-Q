@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import {
-  SHOP_ITEMS, loadStats, loadPurchases, purchaseItem,
+  SHOP_ITEMS, loadStats, saveStats, loadPurchases, purchaseItem,
   UserStats, PurchaseRecord,
 } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -166,6 +166,64 @@ export default function ShopScreen() {
         {stats?.unlockedFeatures?.includes('custom_bgm') && (
           <CustomBGMSection colors={colors} onPrimary={onPrimary} fs={fs} t={t} />
         )}
+
+        {/* ──────── コイン両替所 ──────── */}
+        <View style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}>
+          <View style={styles.itemTop}>
+            <Text style={styles.itemIcon}>💱</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemTitle, { color: colors.text, fontSize: fs(15) }]}>
+                {locale === 'ja' ? 'コイン両替所' : 'Coin Exchange'}
+              </Text>
+              <Text style={[styles.itemDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>
+                {locale === 'ja' ? 'コインを使って本を購入する' : 'Exchange coins for books'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.exchangeRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusTitle, { color: colors.text, fontSize: fs(14) }]}>
+                📚 {locale === 'ja' ? '本1冊' : '1 Book'}
+              </Text>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary, fontSize: fs(12) }]}>
+                {locale === 'ja' ? '問題スロット +5問' : '+5 Question Slots'}
+              </Text>
+            </View>
+            <View style={[styles.costBadge, { backgroundColor: colors.primary + '15', marginRight: 12 }]}>
+              <Text style={[styles.costText, { color: colors.primary, fontSize: fs(14) }]}>
+                💰 1,000 {locale === 'ja' ? 'コイン' : 'Coins'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.buyButton, { backgroundColor: colors.primary, minWidth: 90 }]}
+              onPress={async () => {
+                const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+                if (coins >= 1000) {
+                  const stats = await loadStats();
+                  stats.totalBooks = (stats.totalBooks || 0) + 1;
+                  stats.questionSlots = (stats.questionSlots || 20) + 5;
+                  stats.totalCoinsSpent = (stats.totalCoinsSpent || 0) + 1000;
+                  await saveStats(stats);
+                  await AsyncStorage.setItem('user_coins', (coins - 1000).toString());
+                  setStats(await loadStats());
+                  setMessage(t.purchased);
+                  setTimeout(() => setMessage(''), 2500);
+                  SoundManager.play('complete');
+                } else {
+                  Alert.alert(
+                    locale === 'ja' ? 'コイン不足' : 'Insufficient Coins',
+                    locale === 'ja' ? `あと${1000 - coins}コイン必要です` : `Need ${1000 - coins} more coins`
+                  );
+                }
+              }}
+            >
+              <Text style={[styles.buyButtonText, { color: onPrimary, fontSize: fs(14) }]}>
+                {locale === 'ja' ? '交換する' : 'Exchange'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );

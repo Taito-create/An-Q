@@ -306,6 +306,46 @@ const HomeScreen = () => {
     }
   };
 
+  const checkLoginBonus = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const lastBonus = await AsyncStorage.getItem('daily_login_bonus_date');
+      const streakRaw = await AsyncStorage.getItem('login_streak');
+      let streak = parseInt(streakRaw || '0');
+      
+      if (lastBonus !== today) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        
+        if (lastBonus === yesterdayStr) {
+          streak = Math.min(streak + 1, 30);  // 最大30日
+        } else {
+          streak = 1;
+        }
+        
+        // ボーナス計算: 5 + (streak-1) * 0.5 → 最大約20コイン
+        let bonus = 5 + Math.floor((streak - 1) * 0.5);
+        if (bonus > 20) bonus = 20;
+        
+        const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+        await AsyncStorage.setItem('user_coins', (currentCoins + bonus).toString());
+        await AsyncStorage.setItem('daily_login_bonus_date', today);
+        await AsyncStorage.setItem('login_streak', streak.toString());
+        
+        // ボーナス通知（初回のみ）
+        Alert.alert(
+          currentLocale === 'ja' ? '📅 ログインボーナス' : '📅 Login Bonus',
+          currentLocale === 'ja'
+            ? `${streak}日連続ログイン！ ${bonus}コインを獲得しました！`
+            : `${streak} day streak! You got ${bonus} coins!`
+        );
+      }
+    } catch (e) {
+      console.error('checkLoginBonus error:', e);
+    }
+  };
+
   const loadSettings = async () => {
     try {
       const savedQuestions = await AsyncStorage.getItem('quiz_questions');
@@ -323,6 +363,7 @@ const HomeScreen = () => {
       }
 
       await loadTimerSetting();
+      await checkLoginBonus();
 
       const savedLayout = await AsyncStorage.getItem('home_layout_mode');
     } catch (error) {
