@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { ThemeProvider } from './theme';
+import { ThemeProvider, useTheme } from './theme';
 import { SoundManager } from './sound';
 import { BGMProvider } from './bgmContext';
 import { CustomBGMProvider } from './customBGMContext';
@@ -9,7 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from './missions';
 import MiniPlayer from './miniPlayer';
 
-export default function RootLayout() {
+function RootLayoutInner() {
+  const { colors, isCyberpunk } = useTheme();
   const [bgmReady, setBgmReady] = useState(false);
 
   useEffect(() => {
@@ -66,13 +67,19 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <MiniPlayer />
+      <Outlet />
+    </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <ThemeProvider>
       <BGMProvider>
         <CustomBGMProvider>
-          <View style={{ flex: 1 }}>
-            <MiniPlayer />
-            <Outlet />
-          </View>
+          <RootLayoutInner />
         </CustomBGMProvider>
       </BGMProvider>
     </ThemeProvider>
