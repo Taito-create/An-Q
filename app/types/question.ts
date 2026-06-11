@@ -22,6 +22,7 @@ export interface Question {
   multipleChoice?: MultipleChoice;
   enabled: boolean;
   tags: string[];
+  topic?: string;
   image?: string | null;
   imageAnnotations?: ImageAnnotation[];
   isShared?: boolean;

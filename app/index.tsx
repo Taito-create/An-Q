@@ -38,7 +38,7 @@ const useResponsive = () => {
 
 const HomeScreen = () => {
   const navigate = useNavigate();
-  const { colors, fs, pattern, onPrimary } = useTheme();
+  const { colors, fs, pattern, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
@@ -110,6 +110,9 @@ const HomeScreen = () => {
   };
 
   // カード・ボタンサイズ
+  const cpR = isCyberpunk ? 0 : undefined;
+  const cpB = isCyberpunk ? 2 : undefined;
+
   const cardPadding = {
     mobile: { padding: 12 },
     tablet: { padding: 14 },
@@ -128,26 +131,13 @@ const HomeScreen = () => {
     small: screenType === 'desktop' ? 12 : screenType === 'tablet' ? 11 : 10,
   };
 
-  // 言語変更を監視
-  useEffect(() => {
-    const checkLanguage = async () => {
-      const saved = await AsyncStorage.getItem('user_language');
-      if (saved === 'ja' || saved === 'en') {
-        setCurrentLocale(saved);
-      }
-    };
-    checkLanguage();
-    
-    const interval = setInterval(checkLanguage, 100);
-    return () => clearInterval(interval);
-  }, []);
   const t = translations[currentLocale];
 
   const toggleLanguage = async () => {
     const newLocale = currentLocale === 'ja' ? 'en' : 'ja';
     setCurrentLocale(newLocale);
     try {
-      await AsyncStorage.setItem('user_language', newLocale);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_LANGUAGE, newLocale);
       SoundManager.play('decide');
     } catch (error) {
       console.error('Failed to save language:', error);
@@ -274,7 +264,7 @@ const HomeScreen = () => {
       if (daysUntil <= 7) {
         const messages = locale === 'ja' ? [
           '「諦めたらそこで試合終了ですよ」— 安西先生（スラムダンク）',
-          '「努力した者が全て報われるとは限らん。しかし、成功した者は皆すべからく努力しておる」— 安西先生',
+          '「努力した者が全て報われるとは限らん。しかし、成功した者は皆すべからく努力しておる」— 鴨川源二（はじめの一歩）',
           '「継続は力なり」— 格言',
           '「七転び八起き」— 日本のことわざ',
           '「石の上にも三年」— 日本のことわざ',

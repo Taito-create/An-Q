@@ -73,9 +73,9 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBgmEnabled(enabled);
     
     // BGMのON/OFFを実際に切り替える
-    const currentPreset = currentBGM || 'BGM1';
+    const currentPreset: BGMType = (currentBGM as BGMType) || 'BGM1';
     if (enabled) {
-      await SoundManager.updateBGMSetting(true, currentPreset as any);
+      await SoundManager.updateBGMSetting(true, currentPreset);
       await SoundManager.playBGM();
     } else {
       await SoundManager.updateBGMSetting(false);

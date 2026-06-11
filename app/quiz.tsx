@@ -58,34 +58,8 @@ export default function QuizScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const isSmallScreen = Dimensions.get('window').width < 380;
-  const isJapanese = locale === 'ja';
   const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
   const screenWidth = Dimensions.get('window').width;
-
-  // 正解の文字数に応じてフォントサイズを調整
-  const getAnswerFontSize = (answer: string) => {
-    const length = answer.length;
-    if (isJapanese) {
-      if (length <= 10) return 28;
-      if (length <= 20) return 24;
-      if (length <= 30) return 20;
-      return 18;
-    } else {
-      if (length <= 15) return 28;
-      if (length <= 30) return 24;
-      if (length <= 50) return 20;
-      return 18;
-    }
-  };
-
-  // 文字数に応じてパディングも調整
-  const getAnswerPadding = (answer: string) => {
-    const length = answer.length;
-    if (length <= 10) return 24;
-    if (length <= 20) return 20;
-    return 16;
-  };
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
@@ -255,39 +229,6 @@ export default function QuizScreen() {
     });
   };
 
-  // タグの選択/解除をトグル
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev => {
-      if (prev.includes(tag)) {
-        return prev.filter(t => t !== tag);
-      } else {
-        return [...prev, tag];
-      }
-    });
-  };
-
-  // すべて選択/解除
-  const toggleSelectAll = () => {
-    if (selectedTags.length === allTags.length) {
-      setSelectedTags([]);
-    } else {
-      setSelectedTags([...allTags]);
-    }
-  };
-
-  // タグごとに問題数をカウント
-  const getQuestionsCountForTag = (tag: string): number => {
-    return allQuestions.filter(q => (q.tags || []).includes(tag)).length;
-  };
-
-  // 選択されたタグの合計問題数
-  const getMaxQuestionsForSelectedTags = (): number => {
-    if (selectedTags.length === allTags.length) return allQuestions.length;
-    const filtered = allQuestions.filter(q =>
-      (q.tags || []).some(tag => selectedTags.includes(tag))
-    );
-    return filtered.length;
-  };
 
   // ──────────────────────────────────────────────
   // カウントダウンタイマー
@@ -418,7 +359,7 @@ export default function QuizScreen() {
     const elapsed = Math.round((Date.now() - questionStartTime.current) / 1000);
     const currentQuestion = shuffledQuestions[currentIndex];
     
-    let actualCorrectAnswer: boolean | number | string = currentQuestion.answer;
+    let actualCorrectAnswer: boolean | number | string = getAnswerText(currentQuestion);
     let correct: boolean = false;
     switch (currentQuestion.answerType) {
       case 'truefalse':
@@ -579,10 +520,18 @@ export default function QuizScreen() {
         coinReward += 10;  // ボーナス +10コイン
       }
 
-      // チャレンジモード: 全問正解で報酬2倍
-      if (challengeMode && isPerfect) {
-        xpReward *= 2;
-        coinReward *= 2;
+      // チャレンジモードの処理
+      let challengeBet = 0;
+      if (challengeMode) {
+        challengeBet = parseInt(await AsyncStorage.getItem('challenge_bet') || '0', 10);
+
+        if (isPerfect) {
+          // ✅ 全問正解: 賭け金返還 + 報酬2倍
+          xpReward *= 2;
+          coinReward *= 2;
+          // 賭け金は後で加算（すでに消費済みのため戻す）
+        }
+        // 失敗時は賭け金没収（すでに消費済みのため何もしない）
       }
 
       // ボス討伐モード（weak）: +50% XP
@@ -601,21 +550,22 @@ export default function QuizScreen() {
       const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
       const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       
-      // コイン加算
+      // コイン計算（賭け金返還を含む）
       let newCoins = currentCoins + coinReward;
+      if (challengeMode && isPerfect && challengeBet > 0) {
+        newCoins += challengeBet;  // 賭け金返還
+      }
 
-      // チャレンジモードの賭け金処理
-      if (challengeMode) {
-        const betAmount = parseInt(await AsyncStorage.getItem('challenge_bet') || '0', 10);
-        if (isPerfect) {
-          // 全問正解: 賭け金返還 + 本1冊
-          newCoins += betAmount;
-          const stats = await (await import('./missions')).loadStats();
-          stats.totalBooks = (stats.totalBooks || 0) + 1;
-          stats.questionSlots = (stats.questionSlots || 20) + 5;
-          await (await import('./missions')).saveStats(stats);
-          bookReward = 1;
-        }
+      // チャレンジモード成功時は本の報酬
+      if (challengeMode && isPerfect) {
+        const { loadStats: loadStats2, saveStats: saveStats2 } = await import('./missions');
+        const stats = await loadStats2();
+        stats.totalBooks = (stats.totalBooks || 0) + 1;
+        stats.questionSlots = (stats.questionSlots || 20) + 5;
+        await saveStats2(stats);
+        bookReward = 1;
+        await AsyncStorage.removeItem('challenge_bet');
+      } else if (challengeMode) {
         await AsyncStorage.removeItem('challenge_bet');
       }
 
@@ -648,9 +598,10 @@ export default function QuizScreen() {
 
       // 統計更新（missions 経由）
       try {
-        const stats = await (await import('./missions')).loadStats();
+        const { loadStats: loadStats3, saveStats: saveStats3 } = await import('./missions');
+        const stats = await loadStats3();
         stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + coinReward;
-        await (await import('./missions')).saveStats(stats);
+        await saveStats3(stats);
       } catch (e) {
         console.error('Failed to update coin stats:', e);
       }
@@ -792,6 +743,7 @@ export default function QuizScreen() {
             <View style={{ marginBottom: 12 }}>
               <input
                 type="range"
+                aria-label={locale === 'ja' ? '問題数を選択' : 'Select number of questions'}
                 min="1"
                 max={filtered.length}
                 value={preQuestionCount}

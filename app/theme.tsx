@@ -107,6 +107,19 @@ const themePresets = {
     warning: '#FF9500',
     error: '#CF6679',
   },
+  cyberpunk: {
+    name: 'Cyberpunk',
+    primary: '#00F0FF',
+    secondary: '#FF00FF',
+    background: '#0A0E1A',
+    card: '#111827',
+    text: '#E0E0E0',
+    textSecondary: '#9CA3AF',
+    border: '#1F2937',
+    success: '#00FF88',
+    warning: '#FFB800',
+    error: '#FF0055',
+  },
 };
 
 export type ThemeName = keyof typeof themePresets;
@@ -133,6 +146,7 @@ interface ThemeContextType {
   customColor: string | null;
   pattern: PatternType;
   setPattern: (p: PatternType) => void;
+  isCyberpunk: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -146,7 +160,8 @@ export const useTheme = () => {
   // プライマリカラーの上に乗せるテキスト色（明るい色→黒、暗い色→白）
   const lum = getLuminance(context.colors.primary);
   const onPrimary = lum > 150 ? '#1A1A1A' : '#FFFFFF';
-  return { ...context, fs, onPrimary };
+  const isCyberpunk = context.currentTheme === 'cyberpunk';
+  return { ...context, fs, onPrimary, isCyberpunk };
 };
 
 // HEXから明度を計算（0=暗い, 255=明るい）
@@ -264,7 +279,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   if (isLoading) return null;
 
   return (
-    <ThemeContext.Provider value={{ currentTheme: customColor ? 'custom' : currentTheme, colors, setTheme, setCustomColor, availableThemes, fontSize, setFontSize, scale, customColor, pattern, setPattern }}>
+    <ThemeContext.Provider value={{ currentTheme: customColor ? 'custom' : currentTheme, colors, setTheme, setCustomColor, availableThemes, fontSize, setFontSize, scale, customColor, pattern, setPattern, isCyberpunk: currentTheme === 'cyberpunk' }}>
       {children}
     </ThemeContext.Provider>
   );

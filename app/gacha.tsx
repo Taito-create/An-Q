@@ -10,20 +10,20 @@ import { loadStats, saveStats } from './missions';
 
 const FORTUNES = {
   ja: [
-    { level: '大吉', message: '今日は絶好調！勉強もはかどるでしょう！', reward: 50 },
-    { level: '中吉', message: '順調な1日に。コツコツ頑張ろう！', reward: 30 },
-    { level: '小吉', message: 'ラッキーなことがあるかも？', reward: 20 },
-    { level: '吉', message: '普通が一番。無理せずいきましょう。', reward: 10 },
-    { level: '末吉', message: '運は徐々に上昇中！', reward: 5 },
-    { level: '凶', message: '今日は休むのも大事な選択です。', reward: 0 },
+    { id: 'daikichi', label: '大吉', message: '今日は絶好調！勉強もはかどるでしょう！', reward: 50 },
+    { id: 'chukichi', label: '中吉', message: '順調な1日に。コツコツ頑張ろう！', reward: 30 },
+    { id: 'shokichi', label: '小吉', message: 'ラッキーなことがあるかも？', reward: 20 },
+    { id: 'kichi', label: '吉', message: '普通が一番。無理せずいきましょう。', reward: 10 },
+    { id: 'suekichi', label: '末吉', message: '運は徐々に上昇中！', reward: 5 },
+    { id: 'kyo', label: '凶', message: '今日は休むのも大事な選択です。', reward: 0 },
   ],
   en: [
-    { level: 'Best', message: 'Perfect day for studying!', reward: 50 },
-    { level: 'Good', message: 'Steady progress today!', reward: 30 },
-    { level: 'Fair', message: 'Something lucky might happen?', reward: 20 },
-    { level: 'Normal', message: 'Take it easy today.', reward: 10 },
-    { level: 'So-so', message: 'Luck is rising slowly!', reward: 5 },
-    { level: 'Bad', message: 'Rest is also important.', reward: 0 },
+    { id: 'daikichi', label: 'Best', message: 'Perfect day for studying!', reward: 50 },
+    { id: 'chukichi', label: 'Good', message: 'Steady progress today!', reward: 30 },
+    { id: 'shokichi', label: 'Fair', message: 'Something lucky might happen?', reward: 20 },
+    { id: 'kichi', label: 'Normal', message: 'Take it easy today.', reward: 10 },
+    { id: 'suekichi', label: 'So-so', message: 'Luck is rising slowly!', reward: 5 },
+    { id: 'kyo', label: 'Bad', message: 'Rest is also important.', reward: 0 },
   ],
 };
 
@@ -32,7 +32,7 @@ export default function GachaScreen() {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const [result, setResult] = useState<{ level: string; message: string; reward: number } | null>(null);
+  const [result, setResult] = useState<{ id: string; label: string; message: string; reward: number } | null>(null);
   const [coins, setCoins] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
 
@@ -68,18 +68,27 @@ export default function GachaScreen() {
     stats.totalCoinsSpent = (stats.totalCoinsSpent || 0) + cost;
     await saveStats(stats);
     
-    // 抽選
+    // 抽選 - id ベースで管理
     const fortunes = locale === 'ja' ? FORTUNES.ja : FORTUNES.en;
     const random = Math.random();
-    let selected;
-    if (random < 0.05) selected = fortunes[0];      // 大吉 5%
-    else if (random < 0.15) selected = fortunes[1]; // 中吉 10%
-    else if (random < 0.30) selected = fortunes[2]; // 小吉 15%
-    else if (random < 0.50) selected = fortunes[3]; // 吉 20%
-    else if (random < 0.70) selected = fortunes[4]; // 末吉 20%
-    else selected = fortunes[5];                     // 凶 30%
+    let selectedId: string;
     
-    setResult(selected);
+    if (random < 0.05) selectedId = 'daikichi';      // 大吉 5%
+    else if (random < 0.15) selectedId = 'chukichi'; // 中吉 10%
+    else if (random < 0.30) selectedId = 'shokichi'; // 小吉 15%
+    else if (random < 0.50) selectedId = 'kichi';    // 吉 20%
+    else if (random < 0.70) selectedId = 'suekichi'; // 末吉 20%
+    else selectedId = 'kyo';                          // 凶 30%
+    
+    // 該当する運勢を取得
+    const selected = fortunes.find(f => f.id === selectedId)!;
+    
+    setResult({
+      id: selected.id,
+      label: selected.label,
+      message: selected.message,
+      reward: selected.reward,
+    });
     SoundManager.play('complete');
     
     // 当選コインを付与
@@ -130,7 +139,7 @@ export default function GachaScreen() {
         ) : (
           <View style={[styles.resultCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.resultLevel, { color: colors.primary }]}>
-              {result.level}
+              {result.label}
             </Text>
             <Text style={[styles.resultMessage, { color: colors.text }]}>
               {result.message}

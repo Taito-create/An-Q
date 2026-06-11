@@ -65,8 +65,36 @@ export default function ResultsScreen() {
   }, []);
 
 
+  const appendHistory = async (loadedResults: QuizResult[], existingHistoryRaw: string | null) => {
+    const total = loadedResults.length;
+    const score = loadedResults.filter(r => r.isCorrect).length;
+    const percentage = Math.round((score / total) * 100);
+    const entry: HistoryEntry = {
+      date: new Date().toLocaleDateString(),
+      score,
+      total,
+      percentage,
+    };
+    const existing: HistoryEntry[] = existingHistoryRaw ? JSON.parse(existingHistoryRaw) : [];
+    existing.push(entry);
+    await AsyncStorage.setItem('quizHistory', JSON.stringify(existing));
+    setHistory(existing);
+  };
+
   const loadData = async () => {
     try {
+      // ✅ location.state を優先
+      if (location.state?.results) {
+        const loadedResults: QuizResult[] = location.state.results;
+        setResults(loadedResults);
+
+        // history の更新
+        const historyRaw = await AsyncStorage.getItem('quizHistory');
+        await appendHistory(loadedResults, historyRaw);
+        return;
+      }
+
+      // 従来の AsyncStorage 読み込み（フォールバック）
       const [resultsRaw, historyRaw] = await Promise.all([
         AsyncStorage.getItem('quizResults'),
         AsyncStorage.getItem('quizHistory'),
@@ -77,6 +105,9 @@ export default function ResultsScreen() {
         // Support both old format (array) and new format ({ results, total, score })
         const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed.results || []);
         setResults(loadedResults);
+        if (loadedResults.length > 0) {
+          await appendHistory(loadedResults, historyRaw);
+        }
       }
 
       if (historyRaw) {
@@ -254,7 +285,18 @@ export default function ResultsScreen() {
           <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
         </TouchableOpacity>
         
-        {/* 履歴をすべて削除ボタンは削除 */}
+        {/* フィードバックボタン */}
+      <TouchableOpacity 
+        style={[styles.feedbackBtn, { backgroundColor: colors.warning || '#FF9500' }]} 
+        onPress={() => {
+          SoundManager.play('decide');
+          navigate('/feedback');
+        }}
+      >
+        <Text style={styles.feedbackBtnText}>
+          📝 {locale === 'ja' ? 'フィードバックを送る' : 'Send Feedback'}
+        </Text>
+      </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -320,4 +362,15 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
   dangerBtnText: { color: '#FF3B30', fontSize: 13 },
+  feedbackBtn: {
+    padding: 18,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  feedbackBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

@@ -14,8 +14,9 @@ const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: s
   { key: 'pink',   labelJa: 'ピンク',   labelEn: 'Pink',   emoji: '🩷' },
   { key: 'sakura', labelJa: 'サクラ',   labelEn: 'Sakura', emoji: '🌸' },
   { key: 'purple', labelJa: 'パープル', labelEn: 'Purple', emoji: '🟣' },
-  { key: 'red',    labelJa: 'レッド',   labelEn: 'Red',    emoji: '🔴' },
-  { key: 'dark',   labelJa: 'ダーク',   labelEn: 'Dark',   emoji: '⚫' },
+  { key: 'red',     labelJa: 'レッド',     labelEn: 'Red',     emoji: '🔴' },
+  { key: 'dark',    labelJa: 'ダーク',     labelEn: 'Dark',    emoji: '⚫' },
+  { key: 'cyberpunk', labelJa: 'サイバーパンク', labelEn: 'Cyberpunk', emoji: '🤖' },
 ];
 
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
@@ -89,7 +90,7 @@ export default function SettingsScreen() {
           {ja ? 'プリセット' : 'Presets'}
         </Text>
         <Text style={[styles.sectionDesc, { color: colors.textSecondary, fontSize: Math.round(13 * scale) }]}>
-          {ja ? '8種類のプリセットから選択' : 'Choose from 8 preset themes'}
+          {ja ? '9種類のプリセットから選択' : 'Choose from 9 preset themes'}
         </Text>
         <View style={styles.themeGrid}>
           {themeOptions.map(opt => {

@@ -21,8 +21,8 @@ export default function MiniPlayer() {
     togglePlay, next, prev, play, speed: customSpeed, setSpeed: setCustomSpeed,
   } = useCustomBGM();
   const {
-    bgmEnabled, isPlaying: presetPlaying, currentBGM,
-    toggleBGM, bgmRate, setBGMRate,
+    bgmEnabled, currentBGM,
+    toggleBGM,
   } = useBGM();
   const { colors, onPrimary } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -125,9 +125,9 @@ export default function MiniPlayer() {
         </TouchableOpacity>
         <View style={styles.controls}>
           <TouchableOpacity
-            style={[styles.playBtn, { backgroundColor: presetPlaying ? colors.primary : colors.border }]}
+            style={[styles.playBtn, { backgroundColor: bgmEnabled ? colors.primary : colors.border }]}
             onPress={async () => {
-              if (presetPlaying) {
+              if (bgmEnabled) {
                 await SoundManager.pauseBGM();
                 toggleBGM(false);
               } else {
@@ -136,33 +136,13 @@ export default function MiniPlayer() {
               }
             }}
           >
-            <Text style={[styles.playText, { color: onPrimary }]}>{presetPlaying ? '⏸' : '▶'}</Text>
+            <Text style={[styles.playText, { color: onPrimary }]}>{bgmEnabled ? '⏸' : '▶'}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 展開時：速度変更 */}
-      {expanded && (
-        <View style={[styles.expandedArea, { borderTopColor: colors.border }]}>
-          <Text style={[styles.speedLabel, { color: colors.textSecondary }]}>
-            {locale === 'ja' ? `再生速度: ${bgmRate}x` : `Speed: ${bgmRate}x`}
-          </Text>
-          <View style={styles.speedRow}>
-            {SPEED_OPTIONS.map(s => (
-              <TouchableOpacity
-                key={s}
-                style={[styles.speedBtn, {
-                  backgroundColor: bgmRate === s ? colors.primary : colors.background,
-                  borderColor: bgmRate === s ? colors.primary : colors.border,
-                }]}
-                onPress={() => setBGMRate(s)}
-              >
-                <Text style={[styles.speedText, { color: bgmRate === s ? onPrimary : colors.text }]}>{s}x</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
+      {/* 展開時の速度変更は SoundManager のメソッドがないため非表示 */}
+
     </View>
   );
 }

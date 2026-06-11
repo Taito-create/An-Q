@@ -36,8 +36,7 @@ export default function PatternBackground({ pattern, color, children, style }: P
   const char = PATTERN_CHARS[pattern];
   const size = PATTERN_SIZES[pattern];
   const cols = 20;
-  const rows = 40;
-  const tiles = Array.from({ length: cols * rows });
+  const tiles = Array.from({ length: cols * 40 });
 
   return (
     <View style={[styles.container, style]}>

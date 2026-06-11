@@ -64,6 +64,8 @@ export interface UserStats {
   totalCoinsSpent: number;      // 累計消費コイン（統計用）
   dailyLoginBonusClaimed: string; // 最終ボーナス受領日 (YYYY-MM-DD)
   loginStreak: number;           // 連続ログイン日数
+  questionSlots?: number;        // 問題スロット拡張数
+  unlockedFeatures?: string[];   // 解放済み機能のキー一覧
 }
 
 // ─────────────────────────────────────────────
@@ -388,14 +390,6 @@ export async function purchaseItem(
   await saveStats(stats);
   await savePurchases(updatedPurchases);
   return { success: true };
-}
-
-// questionSlots と unlockedFeatures を UserStats に追加（型拡張）
-declare module './missions' {
-  interface UserStats {
-    questionSlots?: number;
-    unlockedFeatures?: string[];
-  }
 }
 
 // ─────────────────────────────────────────────
