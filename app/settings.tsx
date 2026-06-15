@@ -23,7 +23,7 @@ const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
 
 export default function SettingsScreen() {
   const navigate = useNavigate();
-  const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern, onPrimary } = useTheme();
+  const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const ja = locale === 'ja';
   const [hexInput, setHexInput] = useState(customColor || '');
@@ -77,7 +77,7 @@ export default function SettingsScreen() {
           {ja ? 'テーマカラー設定' : 'Theme Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={[styles.closeButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>

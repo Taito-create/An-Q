@@ -13,7 +13,7 @@ import { useLocale } from './hooks/useLocale';
 
 export default function ShopScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
@@ -72,7 +72,7 @@ export default function ShopScreen() {
         )}
       
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>

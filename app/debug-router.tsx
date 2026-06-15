@@ -61,7 +61,7 @@ export function DebugRouter() {
       window.removeEventListener('popstate', handlePopState);
       clearInterval(interval);
     };
-  }, [router]);
+  }, []);
 
   // Only show on web
   if (Platform.OS !== 'web' || !isVisible) return null;

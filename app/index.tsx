@@ -503,7 +503,7 @@ const HomeScreen = () => {
       {animationLevel !== 'none' ? (
         <Animated.View style={shakeAnim}>
           <TouchableOpacity
-            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]}
+            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
             onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
           >
             <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
@@ -512,7 +512,7 @@ const HomeScreen = () => {
         </Animated.View>
       ) : (
         <TouchableOpacity
-          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]}
+          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
           onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
         >
           <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />

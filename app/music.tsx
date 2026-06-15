@@ -13,7 +13,7 @@ import { useBGM } from './bgmContext';
 
 
 export default function MusicScreen() {
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const navigate = useNavigate();
   const locale = useLocale();
   const ja = locale === 'ja';
@@ -128,7 +128,7 @@ export default function MusicScreen() {
           {locale === 'ja' ? '音楽設定' : 'Music Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={[styles.closeButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>

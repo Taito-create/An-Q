@@ -14,7 +14,7 @@ import { useQuestions } from './hooks/useQuestions';
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions, setQuestions, loading, deleteQuestion, updateQuestion, addTagToQuestions } = useQuestions();

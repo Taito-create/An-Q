@@ -44,7 +44,7 @@ interface ScheduledEvent {
 
 export default function CalendarScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const screenType = useResponsive();
@@ -602,7 +602,7 @@ export default function CalendarScreen() {
           {locale === 'ja' ? 'カレンダー' : 'Calendar'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/');
