@@ -110,8 +110,8 @@ const HomeScreen = () => {
   };
 
   // カード・ボタンサイズ
-  const cpR = isCyberpunk ? 0 : undefined;
-  const cpB = isCyberpunk ? 2 : undefined;
+  const cpR: number | undefined = isCyberpunk ? 0 : undefined;
+  const cpB: number | undefined = isCyberpunk ? 2 : undefined;
 
   const cardPadding = {
     mobile: { padding: 12 },
@@ -437,8 +437,10 @@ const HomeScreen = () => {
     desktop: { flex: 1, minWidth: 0 },
   };
 
+  const primaryTextColor = isCyberpunk ? '#1A1A1A' : onPrimary;
+
   const renderStatsCard = () => (
-    <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card }]}>
+    <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
       <View style={styles.statItem}>
         <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
         <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
@@ -454,7 +456,7 @@ const HomeScreen = () => {
     if (!todayQuestion) return null;
     return (
       <TouchableOpacity
-        style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+        style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
       >
         <View style={styles.todayHeader}>
@@ -474,7 +476,7 @@ const HomeScreen = () => {
     if (weakQuestionCount <= 0) return null;
     return (
       <TouchableOpacity
-        style={[styles.weakCard, cardPadding[screenType], { backgroundColor: colors.error + '15', borderColor: colors.error }]}
+        style={[styles.weakCard, cardPadding[screenType], { backgroundColor: colors.error + '15', borderColor: colors.error, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
         onPress={async () => {
           SoundManager.play('decide');
           await AsyncStorage.setItem('quiz_mode', 'weak');
@@ -501,28 +503,28 @@ const HomeScreen = () => {
       {animationLevel !== 'none' ? (
         <Animated.View style={shakeAnim}>
           <TouchableOpacity
-            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
+            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]}
             onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
           >
-            <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
-            <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
+            <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
+            <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
           </TouchableOpacity>
         </Animated.View>
       ) : (
         <TouchableOpacity
-          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary }]}
+          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]}
           onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
         >
-          <Play size={screenType === 'desktop' ? 24 : 20} color={onPrimary} style={{ marginRight: 8 }} />
-          <Text style={[styles.primaryButtonText, { color: onPrimary, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
+          <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
+          <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
         </TouchableOpacity>
       )}
       <TouchableOpacity
-        style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card }]}
+        style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card, borderRadius: cpR ?? 12, borderWidth: cpB ?? 2 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
       >
-        <Plus size={screenType === 'desktop' ? 28 : 24} color={colors.primary} style={{ marginRight: 8 }} />
-        <Text style={[styles.secondaryButtonText, { color: colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
+        <Plus size={screenType === 'desktop' ? 28 : 24} color={isCyberpunk ? '#1A1A1A' : colors.primary} style={{ marginRight: 8 }} />
+        <Text style={[styles.secondaryButtonText, { color: isCyberpunk ? '#1A1A1A' : colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -540,6 +542,8 @@ const HomeScreen = () => {
       ? ['Calendar', 'Timer', 'Missions', 'Inbox']
       : ['予定登録', 'タイマー', 'ミッション', '受信'];
 
+    const secBtnBg = isCyberpunk ? colors.card : colors.background;
+
     return (
       <View style={{
         display: 'flex',
@@ -556,8 +560,10 @@ const HomeScreen = () => {
               paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
               backgroundColor: colors.card,
               borderColor: colors.border,
+              borderRadius: cpR ?? 10,
+              borderWidth: cpB ?? 1,
             }]} onPress={btn.onPress}>
-              <Text style={{ fontSize: fontSize.body, color: colors.text }}>{labels[i]}</Text>
+              <Text style={{ fontSize: fontSize.body, color: isCyberpunk ? '#E0E0E0' : colors.text }}>{labels[i]}</Text>
             </TouchableOpacity>
           );
           // standard/rich でパルス効果
@@ -574,7 +580,7 @@ const HomeScreen = () => {
   const renderFeatureCards = () => (
     <View style={styles.featureCardsRow}>
       <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border }]}
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}
       >
         <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📝</Text>
@@ -587,7 +593,7 @@ const HomeScreen = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border }]}
+        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/statistics'); }}
       >
         <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📊</Text>
@@ -644,8 +650,9 @@ const HomeScreen = () => {
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
+          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+          borderColor: colors.primary,
+          borderWidth: cpB ?? 1,
         }]} onPress={() => { SoundManager.play('decide'); navigate('/multi'); }} label={t.multiShare || 'Multi Share'}>
           <Share2 size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
@@ -653,8 +660,9 @@ const HomeScreen = () => {
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
+          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+          borderColor: colors.primary,
+          borderWidth: cpB ?? 1,
         }]} onPress={() => { SoundManager.play('decide'); navigate('/settings'); }} label={t.themeSetting}>
           <Palette size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
@@ -662,8 +670,9 @@ const HomeScreen = () => {
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
+          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+          borderColor: colors.primary,
+          borderWidth: cpB ?? 1,
         }]} onPress={toggleLanguage} label={t.language}>
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Globe size={screenType === 'desktop' ? 14 : 12} color={colors.primary} />
@@ -676,8 +685,9 @@ const HomeScreen = () => {
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
+          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+          borderColor: colors.primary,
+          borderWidth: cpB ?? 1,
         }]} onPress={() => { SoundManager.play('decide'); navigate('/music'); }} label={t.musicSettings}>
           <Music size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>
@@ -685,8 +695,9 @@ const HomeScreen = () => {
         <TooltipButton style={[styles.iconButton, { 
           width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
           height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-          borderColor: colors.primary 
+          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+          borderColor: colors.primary,
+          borderWidth: cpB ?? 1,
         }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.appSettings}>
           <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
         </TooltipButton>

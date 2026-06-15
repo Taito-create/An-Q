@@ -55,7 +55,7 @@ const getAnswerModalFontSize = (answer: string, screenWidth: number) => {
 // ──────────────────────────────────────────────
 export default function QuizScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
@@ -987,10 +987,10 @@ export default function QuizScreen() {
 
           {/* スタートボタン */}
           <TouchableOpacity
-            style={[{ backgroundColor: colors.primary, padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 }]}
+            style={[{ backgroundColor: colors.primary, padding: 18, borderRadius: isCyberpunk ? 0 : 16, alignItems: 'center', marginBottom: 12 }]}
             onPress={startQuiz}
           >
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>
+            <Text style={{ color: isCyberpunk ? '#1A1A1A' : '#fff', fontSize: 18, fontWeight: 'bold' }}>
               ▶ {locale === 'ja' ? 'スタート' : 'Start'}
             </Text>
           </TouchableOpacity>
