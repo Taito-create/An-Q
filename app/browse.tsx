@@ -277,7 +277,7 @@ export default function BrowseQuestionsScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.topBackBtn, { backgroundColor: colors.primary }]}
+          style={[styles.topBackBtn, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 16 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={styles.topBackBtnText}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
@@ -304,7 +304,7 @@ export default function BrowseQuestionsScreen() {
         </TouchableOpacity>
       )}
 
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
         {[...filteredQuestions].reverse().map((item) => (
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }, isCompactMode && styles.cardCompact]}>
             {isSelectionMode && (

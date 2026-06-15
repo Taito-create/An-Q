@@ -19,7 +19,7 @@ const PERIOD_LABELS = {
 
 export default function MissionScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const fs = (n: number) => Math.round(n * scale);
 
   const [locale, setLocale] = useState<'ja' | 'en'>('ja');
@@ -60,7 +60,7 @@ export default function MissionScreen() {
   const periods: MissionPeriod[] = ['daily', 'weekly', 'monthly', 'yearly'];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, flex: 1 }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
@@ -95,7 +95,7 @@ export default function MissionScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.list}>
+      <ScrollView style={styles.list} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
         {filteredMissions.map(mission => {
           const p = stats ? getMissionProgress(mission, progress, stats) : null;
           const current = p?.current ?? 0;
@@ -160,7 +160,7 @@ export default function MissionScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.primary }]}
+          style={[styles.backButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 12 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>

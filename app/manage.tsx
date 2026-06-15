@@ -14,7 +14,7 @@ interface CustomTimer {
 }
 
 export default function ManageScreen() {
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const navigate = useNavigate();
@@ -134,15 +134,15 @@ export default function ManageScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
       {/* ヘッダー */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ⏱ {locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
           <Text style={[styles.closeButtonText, { color: onPrimary }]}>

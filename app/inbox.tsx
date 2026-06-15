@@ -18,7 +18,7 @@ interface ReceivedItem {
 
 export default function InboxScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
 
@@ -220,7 +220,7 @@ export default function InboxScreen() {
         </Text>
 
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/');
@@ -232,7 +232,7 @@ export default function InboxScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1, padding: 16 }}>
+      <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
         {/* 情報表示 */}
         <View style={[{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginBottom: 16 }]}>
           <Text style={[{ color: colors.textSecondary, fontSize: 12 }]}>

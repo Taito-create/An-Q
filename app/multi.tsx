@@ -41,7 +41,7 @@ const decodeAndDecompress = (code: string): any => {
 
 export default function MultiScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
 
   const [shareMode, setShareMode] = useState<'send' | 'receive'>('send');
@@ -322,7 +322,7 @@ export default function MultiScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
         {shareMode === 'send' ? (
           <>
             {/* 問題 / 問題集 切り替え */}
@@ -486,7 +486,7 @@ export default function MultiScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
+        style={[styles.backButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 12 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/'); }}
       >
         <Text style={[styles.backButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
