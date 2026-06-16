@@ -523,8 +523,8 @@ const HomeScreen = () => {
         style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card, borderRadius: cpR ?? 12, borderWidth: cpB ?? 2 }]}
         onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
       >
-        <Plus size={screenType === 'desktop' ? 28 : 24} color={isCyberpunk ? '#1A1A1A' : colors.primary} style={{ marginRight: 8 }} />
-        <Text style={[styles.secondaryButtonText, { color: isCyberpunk ? '#1A1A1A' : colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
+        <Plus size={screenType === 'desktop' ? 28 : 24} color={isCyberpunk ? '#E0E0E0' : colors.primary} style={{ marginRight: 8 }} />
+        <Text style={[styles.secondaryButtonText, { color: isCyberpunk ? '#E0E0E0' : colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -739,7 +739,7 @@ const HomeScreen = () => {
 
   return (
     <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, containerStyles[screenType]]}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={[styles.content, containerStyles[screenType]]}>
       <StatusBar barStyle="light-content" />
       
       {/* 試験カウントダウン */}
