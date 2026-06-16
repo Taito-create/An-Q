@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabText: { fontWeight: '600' },
-  list: { flex: 1, padding: 16 },
+  list: { flex: 1, padding: 16, backgroundColor: 'transparent' },
   card: { borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1 },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
   missionTitle: { fontWeight: 'bold', marginBottom: 3 },

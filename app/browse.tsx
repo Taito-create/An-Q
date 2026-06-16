@@ -255,8 +255,23 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.titleRow}>
-        <Text style={[styles.title, { color: colors.text }]}>{t.manageQuestions}</Text>
+      {/* ヘッダー: タイトル + 戻るボタン */}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {t.manageQuestions}
+        </Text>
+        <TouchableOpacity
+          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ツールバー行 */}
+      <View style={styles.toolbarRow}>
         <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
           <Text style={styles.countBadgeText}>{filteredQuestions.length}</Text>
         </View>
@@ -275,12 +290,6 @@ export default function BrowseQuestionsScreen() {
           <Text style={[styles.compactToggleBtnText, { color: isCompactMode ? '#fff' : colors.primary }]}>
             {isCompactMode ? '≡' : '☰'}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.topBackBtn, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 16 }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={styles.topBackBtnText}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -304,7 +313,7 @@ export default function BrowseQuestionsScreen() {
         </TouchableOpacity>
       )}
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
         {[...filteredQuestions].reverse().map((item) => (
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }, isCompactMode && styles.cardCompact]}>
             {isSelectionMode && (
@@ -506,7 +515,7 @@ export default function BrowseQuestionsScreen() {
                 {isFolderDeleteMode && selectedFolderIds.length > 0 && (
                   <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: colors.error }]} onPress={() => setShowDeleteConfirmModal(true)}><Text style={styles.folderHeaderActionBtnText}>実行</Text></TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}><Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
               </View>
             </View>
             <ScrollView>
@@ -629,7 +638,7 @@ export default function BrowseQuestionsScreen() {
           <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
             <View style={styles.folderDetailHeader}>
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>➕ {selectedFolderForAdd?.name} に問題を追加</Text>
-              <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}><Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
             </View>
             <ScrollView>
               {availableQuestionsForAdd.length === 0 ? (
@@ -666,7 +675,7 @@ export default function BrowseQuestionsScreen() {
           <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
             <View style={styles.folderDetailHeader}>
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
-              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
             </View>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 追加可能な問題</Text>
             <ScrollView style={styles.addableQuestionsList}>
@@ -733,7 +742,12 @@ export default function BrowseQuestionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#F5F7FA', paddingTop: 60 },
+  container: { flex: 1, padding: 20, paddingTop: 60 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16 },
+  closeButton: { paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
+  closeButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
@@ -788,7 +802,7 @@ const styles = StyleSheet.create({
   folderArrowBtn: { paddingHorizontal: 12, paddingVertical: 8 },
   foldersModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   foldersModalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
+  closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
   folderItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 4, borderBottomWidth: 1 },
   folderInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   folderIcon: { fontSize: 24 },
