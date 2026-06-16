@@ -748,6 +748,7 @@ const HomeScreen = () => {
             { 
               flexGrow: 1, 
               paddingBottom: 40,
+              backgroundColor: colors.background,
             }
           ]}
         >
