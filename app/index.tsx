@@ -738,65 +738,85 @@ const HomeScreen = () => {
   };
 
   return (
-    <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1, paddingBottom: 20 }, containerStyles[screenType]]}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* 試験カウントダウン */}
-      {examCountdown && (
-        <View style={[styles.examCountdownBox, {
-          backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
-          borderColor: colors.border,
-        }]}>
-          <Text style={[styles.examCountdownTitle, { color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary }]}>
-            {examCountdown.examName}
-          </Text>
-          <Text style={[styles.examCountdownDays, {
-            color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
-            fontSize: fs(28),
-            fontWeight: 'bold',
-          }]}>
-            {locale === 'ja' ? `${examCountdown.examName} まであと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days until ${examCountdown.examName}`}
-          </Text>
-        </View>
-      )}
+    <PatternBackground pattern={pattern} color={colors.primary} style={{ 
+      backgroundColor: colors.background, 
+      flex: 1,
+    }}>
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: colors.background,
+      }}>
+        <ScrollView 
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.background,
+          }}
+          contentContainerStyle={[
+            styles.content, 
+            containerStyles[screenType],
+            { 
+              flexGrow: 1, 
+              paddingBottom: 40,
+              backgroundColor: colors.background,
+            }
+          ]}
+        >
+          <StatusBar barStyle="light-content" />
+          
+          {/* 試験カウントダウン */}
+          {examCountdown && (
+            <View style={[styles.examCountdownBox, {
+              backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
+              borderColor: colors.border,
+            }]}>
+              <Text style={[styles.examCountdownTitle, { color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary }]}>
+                {examCountdown.examName}
+              </Text>
+              <Text style={[styles.examCountdownDays, {
+                color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
+                fontSize: fs(28),
+                fontWeight: 'bold',
+              }]}>
+                {locale === 'ja' ? `${examCountdown.examName} まであと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days until ${examCountdown.examName}`}
+              </Text>
+            </View>
+          )}
 
-      {/* Header */}
-      {renderHeader()}
+          {/* Header */}
+          {renderHeader()}
 
-      {/* モチベーションメッセージ */}
-      {motivationalMessage && (
-        <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', marginBottom: 12 }]}>
-          <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
-          <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
-            {motivationalMessage}
-          </Text>
-        </View>
-      )}
+          {/* モチベーションメッセージ */}
+          {motivationalMessage && (
+            <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', marginBottom: 12 }]}>
+              <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
+              <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
+                {motivationalMessage}
+              </Text>
+            </View>
+          )}
 
-      {/* デスクトップ時1カラムレイアウト（右カラム削除） */}
-      {screenType === 'desktop' ? (
-        <View style={{ flexDirection: 'column' as const, gap: 0 }}>
-          {renderStatsCard()}
-          {renderWeakCard()}
-          {renderMainButtons()}
-          {renderSecondaryButtons()}
-          {renderFeatureCards()}
-        </View>
-      ) : (
-        <View style={mainContentStyle[screenType]}>
-          {renderStatsCard()}
-          {renderWeakCard()}
-          {renderMainButtons()}
-          {renderSecondaryButtons()}
-          {renderFeatureCards()}
-          {renderMobileInfoSections()}
-        </View>
-      )}
+          {/* デスクトップ時1カラムレイアウト（右カラム削除） */}
+          {screenType === 'desktop' ? (
+            <View style={{ flexDirection: 'column' as const, gap: 0 }}>
+              {renderStatsCard()}
+              {renderWeakCard()}
+              {renderMainButtons()}
+              {renderSecondaryButtons()}
+              {renderFeatureCards()}
+            </View>
+          ) : (
+            <View style={mainContentStyle[screenType]}>
+              {renderStatsCard()}
+              {renderWeakCard()}
+              {renderMainButtons()}
+              {renderSecondaryButtons()}
+              {renderFeatureCards()}
+              {renderMobileInfoSections()}
+            </View>
+          )}
 
-    </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
     </PatternBackground>
   );
 };
