@@ -739,7 +739,8 @@ const HomeScreen = () => {
 
   return (
     <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: colors.background }}>
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={[styles.content, containerStyles[screenType]]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ flexGrow: 1, paddingBottom: 20 }, containerStyles[screenType]]}>
       <StatusBar barStyle="light-content" />
       
       {/* 試験カウントダウン */}
@@ -795,6 +796,7 @@ const HomeScreen = () => {
       )}
 
     </ScrollView>
+    </View>
     </PatternBackground>
   );
 };
