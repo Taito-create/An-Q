@@ -819,6 +819,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
