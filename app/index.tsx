@@ -741,14 +741,14 @@ const HomeScreen = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
     <PatternBackground pattern={pattern} color={colors.primary} style={{ backgroundColor: 'transparent' }}>
         <ScrollView 
-          style={{ backgroundColor: 'transparent' }}
+          style={{ backgroundColor: colors.background, flex: 1 }}
           contentContainerStyle={[
             styles.content, 
             containerStyles[screenType],
             { 
               flexGrow: 1, 
               paddingBottom: 40,
-              backgroundColor: colors.background,
+              backgroundColor: 'transparent',
             }
           ]}
         >
