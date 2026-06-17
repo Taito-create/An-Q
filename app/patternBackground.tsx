@@ -30,7 +30,7 @@ const PATTERN_SIZES: Record<PatternType, number> = {
 
 export default function PatternBackground({ pattern, color, children, style }: Props) {
   if (pattern === 'none') {
-    return <View style={[styles.container, style]}>{children}</View>;
+    return <View style={[styles.container, style, { backgroundColor: 'transparent' }]}>{children}</View>;
   }
 
   const char = PATTERN_CHARS[pattern];
@@ -39,7 +39,7 @@ export default function PatternBackground({ pattern, color, children, style }: P
   const tiles = Array.from({ length: cols * 40 });
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style, { backgroundColor: 'transparent' }]}>
       {/* Pattern overlay */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <View style={styles.patternWrap}>
