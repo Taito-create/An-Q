@@ -1,6 +1,6 @@
 import React, { ReactNode, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { ThemeProvider } from '../app/theme';
+import { ThemeProvider, useTheme } from '../app/theme';
 import { SoundManager } from '../app/sound';
 import { BGMProvider } from '../app/bgmContext';
 import { SEProvider } from '../app/seContext';
@@ -9,6 +9,20 @@ import MiniPlayer from '../app/miniPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from '../app/missions';
 import { useLocation } from 'react-router-dom';
+
+function ThemedRoot({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  
+  useEffect(() => {
+    document.body.style.backgroundColor = colors.background;
+  }, [colors.background]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {children}
+    </View>
+  );
+}
 
 interface RootLayoutProps {
   children: ReactNode;
@@ -102,10 +116,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <BGMProvider>
         <SEProvider>
           <CustomBGMProvider>
-            <View style={{ flex: 1 }}>
+            <ThemedRoot>
               <MiniPlayer />
               {children}
-            </View>
+            </ThemedRoot>
           </CustomBGMProvider>
         </SEProvider>
       </BGMProvider>
