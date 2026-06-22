@@ -142,10 +142,10 @@ export default function ManageScreen() {
           ⏱ {locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
@@ -261,8 +261,6 @@ const styles = StyleSheet.create({
   deleteButton: { padding: 8, borderRadius: 6, alignItems: 'center', marginLeft: 8 },
   deleteButtonText: { fontSize: 16 },
   clearButton: { margin: 16, padding: 12, borderRadius: 8, borderWidth: 2 },
-  closeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
-  closeButtonText: { fontSize: 14, fontWeight: 'bold', color: '#fff' },
   confirmOverlay: { position: 'absolute', bottom: 80, left: 20, right: 20, backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#ddd', elevation: 8 },
   confirmText: { fontSize: 14, color: '#333', marginBottom: 12, textAlign: 'center' },
   confirmButtons: { flexDirection: 'row', gap: 10 },

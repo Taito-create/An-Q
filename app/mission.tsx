@@ -14,7 +14,7 @@ import { useLocale } from './hooks/useLocale';
 
 export default function MissionScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
@@ -61,23 +61,26 @@ export default function MissionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           {t.missionsTitle}
         </Text>
-        {stats && (
-          <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
-            📚 {stats.totalBooks}
-          </Text>
-        )}
-      
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
-        </TouchableOpacity>
-</View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {stats && (
+            <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
+              📚 {stats.totalBooks}
+            </Text>
+          )}
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Claim message */}
       {claimMessage ? (
@@ -160,8 +163,6 @@ export default function MissionScreen() {
 }
 
 const styles = StyleSheet.create({
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },

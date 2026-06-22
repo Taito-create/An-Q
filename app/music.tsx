@@ -123,15 +123,15 @@ export default function MusicScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ヘッダー: タイトル + 戻るボタン */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {locale === 'ja' ? '音楽設定' : 'Music Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{ja ? '戻る' : 'Back'}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
       {/* 重複警告バナー */}
@@ -401,8 +401,6 @@ export default function MusicScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  closeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
-  closeButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   container: { flex: 1 },
   scrollContent: { flex: 1 },
   scrollContainer: { padding: 16, paddingBottom: 90 },

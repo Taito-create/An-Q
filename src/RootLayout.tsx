@@ -15,6 +15,7 @@ function ThemedRoot({ children }: { children: ReactNode }) {
   
   useEffect(() => {
     document.body.style.backgroundColor = colors.background;
+    document.documentElement.style.backgroundColor = colors.background;
   }, [colors.background]);
 
   return (

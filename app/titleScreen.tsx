@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function TitleScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const fs = (n: number) => Math.round(n * scale);
 
   const [locale, setLocale] = useState<'ja' | 'en'>('ja');
@@ -35,7 +35,7 @@ export default function TitleScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
             {ja ? '🏅 称号' : '🏅 Titles'}
@@ -44,16 +44,24 @@ export default function TitleScreen() {
             {unlockedCount} / {totalCount} {ja ? '解除済み' : 'unlocked'}
           </Text>
         </View>
-        {stats?.equippedTitle && (
-          <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-            <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
-              {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
-              {ja
-                ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
-                : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
-            </Text>
-          </View>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {stats?.equippedTitle && (
+            <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+              <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
+                {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
+                {ja
+                  ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
+                  : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.list}>
@@ -129,14 +137,6 @@ export default function TitleScreen() {
         })}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
-          {ja ? '戻る' : 'Back'}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -163,6 +163,4 @@ const styles = StyleSheet.create({
   equippingTagText: { fontWeight: 'bold' },
   lockIcon: {},
   badgeDesc: { lineHeight: 18 },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold' },
 });

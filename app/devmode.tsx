@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DevModeScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const [log, setLog] = useState<string[]>([]);
@@ -122,15 +122,16 @@ export default function DevModeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#1A1A1A', borderBottomColor: '#333' }]}>
-        <Text style={styles.headerTitle}>🛠️ Developer Mode</Text>
-        <Text style={styles.headerSub}>開発者モード - 本番環境では使用しないこと</Text>
-      
+      <View style={[styles.header, { backgroundColor: '#1A1A1A', borderBottomColor: '#333', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <View>
+          <Text style={styles.headerTitle}>🛠️ Developer Mode</Text>
+          <Text style={styles.headerSub}>開発者モード - 本番環境では使用しないこと</Text>
+        </View>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
 </View>
 
@@ -179,6 +180,4 @@ const styles = StyleSheet.create({
   logTitle: { color: '#00FF41', fontWeight: 'bold', marginBottom: 8, fontFamily: 'monospace' },
   logEmpty: { color: '#666', fontSize: 12, fontFamily: 'monospace' },
   logEntry: { color: '#00FF41', fontSize: 11, fontFamily: 'monospace', marginBottom: 3 },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold', fontSize: 16 },
 });

@@ -693,15 +693,15 @@ export default function QuizScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* ヘッダー（戻るボタン付き） */}
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             📝 {locale === 'ja' ? 'クイズ設定' : 'Quiz Settings'}
           </Text>
           <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: colors.primary }]}
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
-            <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
@@ -1707,18 +1707,5 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  closeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 70,
-  },
-  closeButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
   },
 });

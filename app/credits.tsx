@@ -60,7 +60,7 @@ const CREDITS = {
 
 export default function CreditsScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const [locale, setLocale] = useState<'ja' | 'en'>('ja');
 
   useEffect(() => {
@@ -99,10 +99,18 @@ export default function CreditsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {ja ? '🎼 引用BGM・効果音' : '🎼 Music & Sound Credits'}
         </Text>
+        <TouchableOpacity
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+        >
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+            {ja ? '戻る' : 'Back'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.list}>
@@ -118,16 +126,6 @@ export default function CreditsScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>
-            {ja ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -145,7 +143,4 @@ const styles = StyleSheet.create({
   itemComposer: { fontSize: 12 },
   itemLink: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   itemLicense: { fontSize: 11, lineHeight: 16 },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, padding: 12 },
-  backButton: { padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold', fontSize: 16 },
 });

@@ -13,7 +13,7 @@ const APP_VERSION = '1.0.0';
 
 export default function AppSettingsScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const { bgmEnabled, toggleBGM } = useBGM();
   const locale = useLocale();
   const t = translations[locale];
@@ -64,10 +64,10 @@ export default function AppSettingsScreen() {
         </Text>
       
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
 </View>
 
@@ -240,6 +240,4 @@ const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   segBtnText: { fontWeight: '600' },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold' },
 });

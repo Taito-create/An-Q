@@ -15,7 +15,7 @@ import {
 
 export default function StatisticsScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions: allQuestions } = useQuestions();
@@ -174,15 +174,15 @@ export default function StatisticsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           📊 {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
         </Text>
         <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.primary }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.backButtonText, { color: onPrimary }]}>{t.back}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -275,8 +275,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 16, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  backButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  backButtonText: { fontWeight: 'bold', fontSize: 14 },
   content: { padding: 16 },
   section: { borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e0e0e0' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },

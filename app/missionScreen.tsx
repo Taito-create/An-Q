@@ -62,15 +62,25 @@ export default function MissionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, flex: 1 }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           {ja ? '🎯 ミッション' : '🎯 Missions'}
         </Text>
-        {stats && (
-          <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
-            📚 {stats.totalBooks}
-          </Text>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {stats && (
+            <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
+              📚 {stats.totalBooks}
+            </Text>
+          )}
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+              {ja ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Claim message */}
@@ -159,14 +169,6 @@ export default function MissionScreen() {
             🛍️ {ja ? 'ショップを見る' : 'View Shop'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 12 }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.backButtonText, { color: onPrimary, fontSize: fs(16) }]}>
-            {ja ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -195,6 +197,4 @@ const styles = StyleSheet.create({
   claimButton: { padding: 10, borderRadius: 8, alignItems: 'center' },
   claimButtonText: { color: '#fff', fontWeight: 'bold' },
   claimedText: { textAlign: 'center', paddingVertical: 6 },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold' },
 });

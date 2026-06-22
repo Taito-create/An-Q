@@ -602,13 +602,13 @@ export default function CalendarScreen() {
           {locale === 'ja' ? 'カレンダー' : 'Calendar'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/');
           }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
@@ -694,8 +694,6 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 20 },
   header: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  backButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  backButtonText: { fontWeight: 'bold' },
   calendarContainer: { padding: 16, alignItems: 'center' },
   monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%' },
   monthArrow: { fontSize: 24, fontWeight: 'bold', paddingHorizontal: 16 },

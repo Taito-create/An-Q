@@ -146,8 +146,8 @@ export default function CreateQuestionScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
-        <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 8 }]} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+        <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 

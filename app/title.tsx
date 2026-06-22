@@ -10,7 +10,7 @@ import { useLocale } from './hooks/useLocale';
 
 export default function TitleScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
@@ -35,7 +35,7 @@ export default function TitleScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
             {t.titlesTitle}
@@ -44,24 +44,25 @@ export default function TitleScreen() {
             {unlockedCount} / {totalCount} {t.unlockedLabel}
           </Text>
         </View>
-        {stats?.equippedTitle && (
-          <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-            <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
-              {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
-              {locale === 'ja'
-                ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
-                : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
-            </Text>
-          </View>
-        )}
-      
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
-        </TouchableOpacity>
-</View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {stats?.equippedTitle && (
+            <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+              <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
+                {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
+                {locale === 'ja'
+                  ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
+                  : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <ScrollView style={styles.list}>
         {/* Stats summary */}
@@ -140,8 +141,6 @@ export default function TitleScreen() {
 }
 
 const styles = StyleSheet.create({
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },

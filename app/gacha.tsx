@@ -29,7 +29,7 @@ const FORTUNES = {
 
 export default function GachaScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const [result, setResult] = useState<{ id: string; label: string; message: string; reward: number } | null>(null);
@@ -103,21 +103,23 @@ export default function GachaScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           🎋 {locale === 'ja' ? 'おみくじ' : 'Omikuji'}
         </Text>
-        <Text style={[styles.coinText, { color: colors.primary }]}>
-          💰 {coins} {locale === 'ja' ? 'コイン' : 'Coins'}
-        </Text>
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>
-            {locale === 'ja' ? '戻る' : 'Back'}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Text style={[styles.coinText, { color: colors.primary }]}>
+            💰 {coins} {locale === 'ja' ? 'コイン' : 'Coins'}
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -169,8 +171,6 @@ const styles = StyleSheet.create({
   header: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1 },
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   coinText: { fontSize: 16, fontWeight: 'bold' },
-  closeButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, minWidth: 70 },
-  closeButtonText: { fontSize: 14, fontWeight: 'bold', color: '#fff' },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   costText: { fontSize: 18, marginBottom: 20 },
   drawButton: { paddingHorizontal: 40, paddingVertical: 15, borderRadius: 12 },

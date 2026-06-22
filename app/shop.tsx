@@ -59,25 +59,26 @@ export default function ShopScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           {t.shopTitle}
         </Text>
-        {stats && (
-          <View style={[styles.booksBadge, { backgroundColor: colors.primary + '20' }]}>
-            <Text style={[styles.booksText, { color: colors.primary, fontSize: fs(15) }]}>
-              📚 {stats.totalBooks}
-            </Text>
-          </View>
-        )}
-      
-        <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{t.back}</Text>
-        </TouchableOpacity>
-</View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {stats && (
+            <View style={[styles.booksBadge, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[styles.booksText, { color: colors.primary, fontSize: fs(15) }]}>
+                📚 {stats.totalBooks}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Message */}
       {message ? (
@@ -312,8 +313,6 @@ function CustomBGMSection({ colors, onPrimary, fs, t }: any) {
 }
 
 const styles = StyleSheet.create({
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },
