@@ -91,6 +91,7 @@ export default function CreateQuestionScreen() {
         createdAt: Date.now(),
         isShared: false,
         ...newQuestionData,
+        question: newQuestionData.question || '',
         image: selectedImage || newQuestionData.image || null,
         imageAnnotations: imageAnnotations && imageAnnotations.length > 0
           ? imageAnnotations
@@ -112,7 +113,7 @@ export default function CreateQuestionScreen() {
       Alert.alert(t.error, t.enterQuestion);
       return;
     }
-    let dataToSave: any = { question: question.trim(), answerType: answerType };
+    let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
       if (!descriptiveAnswer.trim()) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
       dataToSave.descriptiveAnswer = descriptiveAnswer.trim();
@@ -152,7 +153,7 @@ export default function CreateQuestionScreen() {
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.answerType}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{locale === 'ja' ? '回答形式' : 'Answer Type'}</Text>
         <View style={styles.answerTypeContainer}>
           {[{ id: 'descriptive', label: t.descriptive }, { id: 'truefalse', label: t.truefalse }, { id: 'multiple', label: t.multiple }].map((type) => (
             <TouchableOpacity key={type.id} style={[styles.answerTypeButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, answerType === type.id && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('select'); setAnswerType(type.id as any); }}>
@@ -211,7 +212,7 @@ export default function CreateQuestionScreen() {
                 </View>
                 <View style={[{ flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
                   <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>{locale === 'ja' ? '透明度' : 'Opacity'}</Text>
-                  <input type="range" min="0" max="100" value={annotationOpacity} onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))} style={{ flex: 1, height: 6, borderRadius: 3, accentColor: colors.primary }} />
+                  <input type="range" min="0" max="100" value={annotationOpacity} onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))} style={{ flex: 1, height: 6, borderRadius: 3, accentColor: colors.primary }} aria-label={locale === 'ja' ? '透明度を調整' : 'Adjust opacity'} />
                 </View>
                 <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary, borderRadius: cpR ?? 8 }]} onPress={addAnnotation}>
                   <Text style={[styles.buttonText, { color: onPrimary, fontSize: 13 }]}>＋ {locale === 'ja' ? 'ボックスを追加' : 'Add Box'}</Text>
@@ -220,7 +221,7 @@ export default function CreateQuestionScreen() {
             </View>
           </View>
         )}
-        <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+        <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} aria-label={locale === 'ja' ? '画像をアップロード' : 'Upload image'} />
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>

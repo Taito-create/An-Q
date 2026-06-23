@@ -284,7 +284,7 @@ export default function ProfileScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} style={{ display: 'none' }} />
+      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} style={{ display: 'none' }} aria-label={locale === 'ja' ? 'プロフィール画像をアップロード' : 'Upload profile image'} />
     </View>
   );
 }

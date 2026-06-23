@@ -9,14 +9,12 @@ import {
   getMissionProgress, UserStats, MissionProgress,
 } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 
 export default function MissionScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
-  const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
 
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -46,16 +44,16 @@ export default function MissionScreen() {
     await saveProgress(updatedProgress);
     await saveStats(updatedStats);
     SoundManager.play('complete');
-    setClaimMessage(locale === 'ja' ? `📚 ${mission.reward}${t.booksEarned}` : `📚 ${t.gotBooks} ${mission.reward} ${t.booksEarned}`);
+    setClaimMessage(locale === 'ja' ? `📚 ${mission.reward}冊の本を獲得！` : `📚 Got ${mission.reward} books!`);
     setTimeout(() => setClaimMessage(''), 2500);
   };
 
   const periods: MissionPeriod[] = ['daily', 'weekly', 'monthly', 'yearly'];
   const periodLabels: Record<MissionPeriod, string> = {
-    daily: t.daily,
-    weekly: t.weekly,
-    monthly: t.monthly,
-    yearly: t.yearly,
+    daily:   locale === 'ja' ? 'デイリー'   : 'Daily',
+    weekly:  locale === 'ja' ? 'ウィークリー' : 'Weekly',
+    monthly: locale === 'ja' ? 'マンスリー'  : 'Monthly',
+    yearly:  locale === 'ja' ? '通年'       : 'Yearly',
   };
 
   return (
@@ -63,7 +61,7 @@ export default function MissionScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
-          {t.missionsTitle}
+          {locale === 'ja' ? '🎯 ミッション' : '🎯 Missions'}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {stats && (
@@ -145,13 +143,13 @@ export default function MissionScreen() {
                   onPress={() => claimReward(mission)}
                 >
                   <Text style={[styles.claimButtonText, { fontSize: fs(13) }]}>
-                    {t.claim}
+                    {locale === 'ja' ? '受け取る' : 'Claim'}
                   </Text>
                 </TouchableOpacity>
               )}
               {claimed && (
                 <Text style={[styles.claimedText, { color: colors.textSecondary, fontSize: fs(12) }]}>
-                  {t.claimed}
+                  {locale === 'ja' ? '✓ 受け取り済み' : '✓ Claimed'}
                 </Text>
               )}
             </View>
