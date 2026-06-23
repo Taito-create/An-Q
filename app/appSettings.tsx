@@ -58,18 +58,27 @@ export default function AppSettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           ⚙️ {t.appSettings}
         </Text>
-      
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          style={{
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            backgroundColor: colors.primary,
+            borderRadius: isCyberpunk ? 0 : 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 70,
+          }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
         </TouchableOpacity>
-</View>
+      </View>
 
       <ScrollView style={styles.list}>
 
@@ -221,8 +230,6 @@ export default function AppSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  closeButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   container: { flex: 1 },
   header: { padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },

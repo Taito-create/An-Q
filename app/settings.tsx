@@ -72,15 +72,25 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header with close button */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale) }]}>
           {ja ? 'テーマカラー設定' : 'Theme Settings'}
         </Text>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 8 }]}
+          style={{
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            backgroundColor: colors.primary,
+            borderRadius: isCyberpunk ? 0 : 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 70,
+          }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={[styles.closeButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -273,8 +283,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1 },
   headerTitle: { fontWeight: 'bold' },
-  closeButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minWidth: 60 },
-  closeButtonText: { fontSize: 14, fontWeight: 'bold' },
   section: { padding: 20, marginBottom: 12 },
   sectionTitle: { fontWeight: 'bold', marginBottom: 6 },
   sectionDesc: { marginBottom: 16 },

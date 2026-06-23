@@ -484,13 +484,6 @@ export default function MultiScreen() {
           </>
         )}
       </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.backButton, { backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 12 }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-      >
-        <Text style={[styles.backButtonText, { color: onPrimary }]}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -507,6 +500,4 @@ const styles = StyleSheet.create({
   button: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 16 },
   buttonText: { fontWeight: '700', fontSize: 15 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, marginBottom: 12, minHeight: 100, textAlignVertical: 'top' },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: '700', fontSize: 16 },
 });

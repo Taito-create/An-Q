@@ -994,21 +994,6 @@ export default function QuizScreen() {
               ▶ {locale === 'ja' ? 'スタート' : 'Start'}
             </Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[{ 
-              backgroundColor: colors.primary,
-              padding: 14,
-              borderRadius: 12,
-              alignItems: 'center',
-              marginTop: 4,
-            }]}
-            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-          >
-            <Text style={{ color: onPrimary, fontSize: 16, fontWeight: 'bold' }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
     );
@@ -1358,8 +1343,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#EFEFEF' },
   startButton: { backgroundColor: '#4CAF50', paddingVertical: 16, paddingHorizontal: 50, borderRadius: 14, marginBottom: 12 },
   startButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  backButton: { padding: 12 },
-  backButtonText: { color: '#888', fontSize: 15 },
   backButtonFull: { width: '100%', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   backButtonFullText: { fontSize: 16, fontWeight: 'bold' },
   pausedOverlay: {
