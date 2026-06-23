@@ -27,7 +27,7 @@ interface UserProfile {
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
 
@@ -139,22 +139,25 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={[styles.backBtn, { color: colors.primary }]}>←</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.title, { color: colors.text }]}>👤 {t.profile || 'Profile'}</Text>
-        <TouchableOpacity onPress={() => {
-          if (isEditing) {
-            saveProfile();
-          } else {
-            setIsEditing(true);
-          }
-        }}>
-          <Text style={[{ color: colors.primary, fontSize: 14, fontWeight: '700' }]}>
-            {isEditing ? (locale === 'ja' ? '保存' : 'Save') : (locale === 'ja' ? '編集' : 'Edit')}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => {
+            if (isEditing) { saveProfile(); } else { setIsEditing(true); }
+          }}>
+            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>
+              {isEditing ? (locale === 'ja' ? '保存' : 'Save') : (locale === 'ja' ? '編集' : 'Edit')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content}>
@@ -289,7 +292,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },
-  backBtn: { fontSize: 20, fontWeight: 'bold' },
   title: { fontSize: 18, fontWeight: '700', flex: 1 },
   content: { padding: 16, flex: 1 },
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },

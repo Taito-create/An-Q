@@ -185,6 +185,4 @@ const styles = StyleSheet.create({
   claimButton: { padding: 10, borderRadius: 8, alignItems: 'center' },
   claimButtonText: { color: '#fff', fontWeight: 'bold' },
   claimedText: { textAlign: 'center', paddingVertical: 6 },
-  backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
-  backButtonText: { fontWeight: 'bold' },
 });
