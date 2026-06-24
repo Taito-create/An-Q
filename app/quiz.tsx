@@ -674,7 +674,7 @@ export default function QuizScreen() {
       console.error('updateStreak error:', e);
     }
   };
-  const timerColor = timeLeft > timerLimit * 0.4 ? '#4CAF50' : timeLeft > timerLimit * 0.2 ? '#FF9800' : '#F44336';
+  const timerColor = timeLeft > timerLimit * 0.4 ? colors.success : timeLeft > timerLimit * 0.2 ? colors.warning : colors.error;
   const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);
   const timeSec = timeLeft % 60;
@@ -1036,12 +1036,12 @@ export default function QuizScreen() {
               
               <View style={styles.reviewAnswers}>
                 <View style={styles.reviewAnswerItem}>
-                  <Text style={styles.reviewAnswerLabel}>{t.yourAnswer}:</Text>
-                  <Text style={styles.reviewAnswerValue}>{String(answer.yourAnswer)}</Text>
+                  <Text style={[styles.reviewAnswerLabel, { color: colors.textSecondary }]}>{t.yourAnswer}:</Text>
+                  <Text style={[styles.reviewAnswerValue, { color: colors.text }]}>{String(answer.yourAnswer)}</Text>
                 </View>
                 <View style={styles.reviewAnswerItem}>
-                  <Text style={styles.reviewAnswerLabel}>{t.correctAnswer}:</Text>
-                  <Text style={styles.reviewAnswerValue}>{String(answer.correctAnswer)}</Text>
+                  <Text style={[styles.reviewAnswerLabel, { color: colors.textSecondary }]}>{t.correctAnswer}:</Text>
+                  <Text style={[styles.reviewAnswerValue, { color: colors.text }]}>{String(answer.correctAnswer)}</Text>
                 </View>
               </View>
             </View>
@@ -1189,7 +1189,7 @@ export default function QuizScreen() {
           {currentQuestion.answerType === 'descriptive' && (
             <View style={styles.descriptiveContainer}>
               <TextInput
-                style={styles.descriptiveInput}
+                style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
                 value={userDescriptiveAnswer}
                 onChangeText={setUserDescriptiveAnswer}
                 placeholder="回答を入力"
@@ -1592,8 +1592,8 @@ const styles = StyleSheet.create({
   },
   reviewAnswers: { gap: 8 },
   reviewAnswerItem: { flexDirection: 'row', justifyContent: 'space-between' },
-  reviewAnswerLabel: { fontSize: 14, color: '#666', fontWeight: '600' },
-  reviewAnswerValue: { fontSize: 14, color: '#1A1A1A', fontWeight: 'bold' },
+  reviewAnswerLabel: { fontSize: 14, fontWeight: '600' },
+  reviewAnswerValue: { fontSize: 14, fontWeight: 'bold' },
   descriptiveContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1605,12 +1605,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 100,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
     textAlignVertical: 'top',
-    backgroundColor: '#fff',
   },
   descriptiveBtn: {
     paddingVertical: 12,
@@ -1641,7 +1639,6 @@ const styles = StyleSheet.create({
   multipleText: {
     flex: 1,
     fontSize: 16,
-    color: '#1A1A1A',
   },
   tagFilterSection: {
     width: '100%',
@@ -1684,7 +1681,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     backgroundColor: 'transparent',
   },
   headerTitle: {

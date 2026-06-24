@@ -232,7 +232,7 @@ export default function InboxScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1, padding: 16, backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView style={{ flex: 1, padding: 16, backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20, backgroundColor: colors.background }}>
         {/* 情報表示 */}
         <View style={[{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginBottom: 16 }]}>
           <Text style={[{ color: colors.textSecondary, fontSize: 12 }]}>

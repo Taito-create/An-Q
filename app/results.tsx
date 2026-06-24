@@ -31,7 +31,7 @@ interface HistoryEntry {
 export default function ResultsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
 
@@ -173,7 +173,7 @@ export default function ResultsScreen() {
           <Text style={styles.startBtnText}>{t.takeQuizChallenge}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigate('/')}>
-          <Text style={styles.homeLinkText}>{t.backHome}</Text>
+          <Text style={[styles.homeLinkText, { color: colors.primary }]}>{t.backHome}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -196,12 +196,12 @@ export default function ResultsScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statVal}>{formatTime(totalTime)}</Text>
-            <Text style={styles.statLbl}>{t.timeSpent}</Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>{t.timeSpent}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statVal}>{avgTime}s</Text>
-            <Text style={styles.statLbl}>{t.avgTimePerQuestion}</Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>{t.avgTimePerQuestion}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
@@ -214,9 +214,9 @@ export default function ResultsScreen() {
       {/* Wrong Questions */}
       {wrongResults.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={styles.sectionTitle}> ⚠️ {t.questionsToReview}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> ⚠️ {t.questionsToReview}</Text>
           {wrongResults.map((r, i) => (
-            <View key={i} style={styles.wrongCard}>
+            <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '15', borderLeftColor: colors.error }]}>
               <Text style={styles.wrongQuestion}>{r.question}</Text>
               <Text style={styles.correctHint}>
                 {t.correctAnswer}: {typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '✕') : String(r.correctAnswer)}
@@ -229,12 +229,12 @@ export default function ResultsScreen() {
       {/* All Answers Detail */}
       <View style={[styles.section, { backgroundColor: colors.card }]}>
         <TouchableOpacity style={styles.toggleHeader} onPress={() => setShowAll(!showAll)}>
-          <Text style={styles.sectionTitle}>{t.viewAllAnswers}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.viewAllAnswers}</Text>
           <Text style={styles.toggleArrow}>{showAll ? `▲ ${t.hide}` : `▼ ${t.expand}`}</Text>
         </TouchableOpacity>
 
         {showAll && results.map((r, i) => (
-          <View key={i} style={[styles.resultItem, r.isCorrect ? styles.resultCorrect : styles.resultWrong]}>
+          <View key={i} style={[styles.resultItem, { backgroundColor: r.isCorrect ? colors.success + '15' : colors.error + '15' }]}>
             <Text style={styles.resultQuestion}>Q{i+1}: {r.question}</Text>
             <Text style={[styles.resultStatus, { color: r.isCorrect ? '#4CAF50' : '#F44336' }]}>
               {r.isCorrect 
@@ -248,12 +248,12 @@ export default function ResultsScreen() {
       {/* History Graph */}
       {history.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={styles.sectionTitle}> 📊 {t.progressHistory}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> 📊 {t.progressHistory}</Text>
           {history.map((h, i) => (
             <View key={i} style={styles.historyRow}>
-              <Text style={styles.historyDate}>{h.date}</Text>
+              <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{h.date}</Text>
               <View style={styles.historyBar}>
-                <View style={[styles.historyFill, { width: `${h.percentage}%` }]} />
+                <View style={[styles.historyFill, { width: `${h.percentage}%`, backgroundColor: colors.primary }]} />
               </View>
               <Text style={styles.historyPct}>{h.percentage}%</Text>
             </View>
@@ -270,7 +270,7 @@ export default function ResultsScreen() {
             navigate('/quiz');
           }}
         >
-          <Text style={styles.primaryBtnText}>
+          <Text style={[styles.primaryBtnText, { color: onPrimary }]}>
             {locale === 'ja' ? 'もういちどプレイする' : 'Play Again'}
           </Text>
         </TouchableOpacity>
@@ -293,7 +293,7 @@ export default function ResultsScreen() {
           navigate('/feedback');
         }}
       >
-        <Text style={styles.feedbackBtnText}>
+        <Text style={[styles.feedbackBtnText, { color: onPrimary }]}>
           📝 {locale === 'ja' ? 'フィードバックを送る' : 'Send Feedback'}
         </Text>
       </TouchableOpacity>
@@ -303,17 +303,16 @@ export default function ResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F8FA' },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 50 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#1A1A1A' },
+  container: { flex: 1 },
+  content: { padding: 20, paddingTop: 20, paddingBottom: 50 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, paddingTop: 100 },
   emptyEmoji: { fontSize: 60, marginBottom: 20 },
   emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#888', marginBottom: 20 },
-  startBtn: { backgroundColor: '#4CAF50', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },
+  startBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },
   startBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  homeLinkText: { color: '#007AFF', fontSize: 14 },
+  homeLinkText: { fontSize: 14 },
   summaryCard: { 
-    backgroundColor: '#fff', 
     borderRadius: 20, 
     padding: 25, 
     marginBottom: 20, 
@@ -336,29 +335,29 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 20, width: '100%', justifyContent: 'space-around' },
   statBox: { alignItems: 'center' },
   statVal: { fontSize: 18, fontWeight: 'bold' },
-  statLbl: { fontSize: 12, color: '#888' },
+  statLbl: { fontSize: 12 },
   statDivider: { width: 1, height: 30, backgroundColor: '#EEE' },
-  section: { backgroundColor: '#fff', borderRadius: 15, padding: 15, marginBottom: 15 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#333' },
-  wrongCard: { backgroundColor: '#FFF5F5', padding: 12, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#F44336' },
+  section: { borderRadius: 15, padding: 15, marginBottom: 15 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
+  wrongCard: { padding: 12, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4 },
   wrongQuestion: { fontSize: 14, color: '#333', marginBottom: 5 },
   correctHint: { fontSize: 13, fontWeight: 'bold', color: '#F44336' },
   toggleHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   toggleArrow: { color: '#007AFF', fontWeight: 'bold' },
   resultItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  resultCorrect: { backgroundColor: '#F9FFF9' },
-  resultWrong: { backgroundColor: '#FFF9F9' },
+  resultCorrect: {},
+  resultWrong: {},
   resultQuestion: { fontSize: 14, color: '#444' },
   resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 3 },
   historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  historyDate: { fontSize: 10, color: '#888', width: 80 },
+  historyDate: { fontSize: 10, width: 80 },
   historyBar: { flex: 1, height: 8, backgroundColor: '#EEE', borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },
-  historyFill: { height: '100%', backgroundColor: '#007AFF' },
+  historyFill: { height: '100%' },
   historyPct: { fontSize: 12, fontWeight: 'bold', width: 35 },
   actions: { gap: 12 },
-  primaryBtn: { backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center' },
+  primaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  secondaryBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 15, alignItems: 'center' },
+  secondaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
   secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
   dangerBtnText: { color: '#FF3B30', fontSize: 13 },

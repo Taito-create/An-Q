@@ -188,7 +188,7 @@ export default function StatisticsScreen() {
 
       <ScrollView style={styles.content}>
         {/* スクリーンタイム推移（折れ線グラフ） */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             ⏱ {locale === 'ja' ? 'スクリーンタイム推移' : 'Screen Time History'}
           </Text>
@@ -208,7 +208,7 @@ export default function StatisticsScreen() {
         </View>
 
         {/* 問題作成数の推移（棒グラフ） */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             ✏️ {locale === 'ja' ? '作成問題数の推移' : 'Problems Created'}
           </Text>
@@ -228,7 +228,7 @@ export default function StatisticsScreen() {
         </View>
 
         {/* クイズプレイ回数の推移（棒グラフ） */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             🎮 {locale === 'ja' ? 'クイズプレイ回数の推移' : 'Quiz Plays'}
           </Text>
@@ -248,7 +248,7 @@ export default function StatisticsScreen() {
         </View>
 
         {/* 正答率 */}
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             📈 {locale === 'ja' ? '正答率' : 'Correct Rate'}
           </Text>
@@ -260,7 +260,7 @@ export default function StatisticsScreen() {
               {locale === 'ja' ? '今週の平均' : 'This week'}
             </Text>
           </View>
-          <View style={styles.progressBar}>
+          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
             <View style={[styles.progressFill, { width: `${stats.correctRate}%`, backgroundColor: colors.success }]} />
           </View>
         </View>
@@ -276,12 +276,12 @@ const styles = StyleSheet.create({
   header: { padding: 16, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   content: { padding: 16 },
-  section: { borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e0e0e0' },
+  section: { borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   statBox: { alignItems: 'center', marginBottom: 12 },
   statValue: { fontWeight: '700' },
   statLabel: { fontSize: 12, marginTop: 4 },
   statDetail: { fontSize: 12, marginTop: 8, textAlign: 'center' },
-  progressBar: { width: '100%', height: 8, backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden' },
+  progressBar: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
 });

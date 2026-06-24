@@ -159,7 +159,7 @@ export default function SettingsScreen() {
             style={[styles.applyButton, { backgroundColor: colors.primary }]}
             onPress={handleCustomColor}
           >
-            <Text style={styles.applyButtonText}>{ja ? '適用' : 'Apply'}</Text>
+            <Text style={[styles.applyButtonText, { color: onPrimary }]}>{ja ? '適用' : 'Apply'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -220,7 +220,7 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
           {ja ? 'エフェクト' : 'Effects'}
         </Text>
-        <View style={styles.settingRow}>
+        <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
           <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
             {ja ? 'アニメーション' : 'Animations'}
           </Text>
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   colorPreviewBox: { width: 40, height: 40, borderRadius: 8 },
   hexInput: { flex: 1, borderWidth: 1, borderRadius: 8, padding: 10, fontFamily: 'monospace' },
   applyButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  applyButtonText: { color: 'white', fontWeight: 'bold' },
+  applyButtonText: { fontWeight: 'bold' },
   errorText: { fontSize: 12, marginBottom: 8 },
   customActiveBadge: { padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: 12 },
   customActiveBadgeText: { fontSize: 13, fontWeight: '600' },
@@ -323,7 +323,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
   },
   settingLabel: {
     fontSize: 16,

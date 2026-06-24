@@ -322,7 +322,7 @@ export default function MultiScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={[styles.content, { backgroundColor: colors.background }]} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView style={[styles.content, { backgroundColor: colors.background }]} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20, backgroundColor: colors.background }}>
         {shareMode === 'send' ? (
           <>
             {/* 問題 / 問題集 切り替え */}
