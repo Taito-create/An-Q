@@ -12,14 +12,26 @@ import { useLocation } from 'react-router-dom';
 
 function ThemedRoot({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
-  
+
   useEffect(() => {
-    document.body.style.backgroundColor = colors.background;
-    document.documentElement.style.backgroundColor = colors.background;
+    const apply = () => {
+      document.body.style.setProperty('background-color', colors.background, 'important');
+      document.documentElement.style.setProperty('background-color', colors.background, 'important');
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.setProperty('background-color', colors.background, 'important');
+        root.style.setProperty('min-height', '100vh', 'important');
+      }
+    };
+    apply();
+    // React Native for Web が後からスタイルを注入する場合があるため、
+    // 少し遅らせてもう一度適用する
+    const t = setTimeout(apply, 100);
+    return () => clearTimeout(t);
   }, [colors.background]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background } as any}>
       {children}
     </View>
   );
