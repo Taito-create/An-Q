@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import LoadingScreen from '../app/LoadingScreen';
 import RootLayout from './RootLayout';
 import NotFound from './pages/NotFound';
 
@@ -31,11 +32,7 @@ const TitleListScreen = lazy(() => import('../app/titleScreen'));
 const AppSettingsScreen = lazy(() => import('../app/appSettings'));
 const GachaScreen = lazy(() => import('../app/gacha'));
 
-const Loading = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <ActivityIndicator size="large" />
-  </View>
-);
+const Loading = () => <LoadingScreen />;
 
 export default function App() {
   return (

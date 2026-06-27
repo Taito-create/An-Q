@@ -255,57 +255,46 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* ヘッダー: タイトル + 戻るボタン */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {t.manageQuestions}
         </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ツールバー行 */}
-      <View style={styles.toolbarRow}>
-        <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.countBadgeText}>{filteredQuestions.length}</Text>
-        </View>
-        {selectedFilterTag && (
-          <TouchableOpacity 
-            style={[styles.filterActiveBadge, { backgroundColor: colors.primary + '20' }]}
-            onPress={() => setSelectedFilterTag(null)}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.countBadgeText}>{filteredQuestions.length}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
+            onPress={() => { setIsCompactMode(!isCompactMode); if (isCompactMode) setExpandedQuestionId(null); }}
           >
-            <Text style={[styles.filterActiveBadgeText, { color: colors.primary }]}>🏷️ {selectedFilterTag} ✕</Text>
+            <Text style={[styles.compactToggleBtnText, { color: '#fff' }]}>
+              {isCompactMode ? '≡' : '☰'}
+            </Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
-          onPress={() => { setIsCompactMode(!isCompactMode); if (isCompactMode) setExpandedQuestionId(null); }}
-        >
-          <Text style={[styles.compactToggleBtnText, { color: isCompactMode ? '#fff' : colors.primary }]}>
-            {isCompactMode ? '≡' : '☰'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
+            onPress={() => setShowFoldersView(true)}
+          >
+            <Text style={[styles.headerBtnText, { color: '#fff' }]}>📚 {t.folders}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
+            onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
+          >
+            <Text style={[styles.headerBtnText, { color: isSelectionMode ? '#fff' : colors.primary }]}>
+              {isSelectionMode ? t.cancelSelection : t.batchEdit}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+              {locale === 'ja' ? '戻る' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerButtonsScroll} contentContainerStyle={styles.headerButtons}>
-        <TouchableOpacity style={[styles.headerBtn, { borderColor: colors.primary }]} onPress={() => setShowFoldersView(true)}>
-          <Text style={[styles.headerBtnText, { color: colors.primary }]}>📚 {t.folders}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.headerBtn, { borderColor: colors.primary }]} onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}>
-          <Text style={[styles.headerBtnText, { color: colors.primary }]}>{isSelectionMode ? t.cancelSelection : t.batchEdit}</Text>
-        </TouchableOpacity>
-        {availableTags.length > 0 && (
-          <TouchableOpacity style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: selectedFilterTag ? colors.primary + '20' : 'transparent' }]} onPress={() => setShowTagFilterModal(true)}>
-                  <Text style={[styles.headerBtnText, { color: colors.primary }]}>🏷️ {selectedFilterTag ? selectedFilterTag : (locale === 'ja' ? '全問' : 'All')}</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
 
       {isSelectionMode && selectedQuestionIds.length > 0 && (
         <TouchableOpacity style={[styles.batchTagBar, { backgroundColor: colors.primary }]} onPress={() => setShowBatchTagModal(true)}>
@@ -318,7 +307,7 @@ export default function BrowseQuestionsScreen() {
           <View key={item.id} style={[styles.card, { backgroundColor: colors.card }, isCompactMode && styles.cardCompact]}>
             {isSelectionMode && (
               <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
-                <Text style={styles.checkboxText}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
+                <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
               </TouchableOpacity>
             )}
             <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
@@ -390,52 +379,50 @@ export default function BrowseQuestionsScreen() {
       </ScrollView>
 
       {/* 編集モーダル */}
-      <Modal visible={showEditModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <View style={[styles.modalContainer, { backgroundColor: colors.card, width: '95%', maxWidth: 560, maxHeight: '90%' }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
-              <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
-              <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
-              {editingQuestionFull?.answerType === 'descriptive' && (
-                <>
-                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
-                  <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editAnswerText} onChangeText={setEditAnswerText} placeholder="回答を入力" placeholderTextColor={colors.textSecondary} multiline />
-                </>
-              )}
-              {editingQuestionFull?.answerType === 'truefalse' && (
-                <>
-                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>回答</Text>
-                  <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-                    <TouchableOpacity style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editTrueFalseAnswer ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => setEditTrueFalseAnswer(true)}>
-                      <Text style={[styles.modalCancelText, { color: editTrueFalseAnswer ? '#fff' : colors.success, fontSize: 20 }]}>○</Text>
+      <Modal visible={showEditModal} transparent={false} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: colors.card }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20 }}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
+            <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
+            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
+            {editingQuestionFull?.answerType === 'descriptive' && (
+              <>
+                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
+                <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editAnswerText} onChangeText={setEditAnswerText} placeholder="回答を入力" placeholderTextColor={colors.textSecondary} multiline />
+              </>
+            )}
+            {editingQuestionFull?.answerType === 'truefalse' && (
+              <>
+                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>回答</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                  <TouchableOpacity style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editTrueFalseAnswer ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => setEditTrueFalseAnswer(true)}>
+                    <Text style={[styles.modalCancelText, { color: editTrueFalseAnswer ? '#fff' : colors.success, fontSize: 20 }]}>○</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalCancelBtn, { flex: 1, backgroundColor: !editTrueFalseAnswer ? colors.error : 'transparent', borderColor: colors.error }]} onPress={() => setEditTrueFalseAnswer(false)}>
+                    <Text style={[styles.modalCancelText, { color: !editTrueFalseAnswer ? '#fff' : colors.error, fontSize: 20 }]}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            {editingQuestionFull?.answerType === 'multiple' && (
+              <>
+                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
+                {editMultipleOptions.map((opt, i) => (
+                  <TextInput key={i} style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? ' ✓ 正解' : ''}`} placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary} />
+                ))}
+                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>正解番号</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                  {[0, 1, 2, 3].map(i => (
+                    <TouchableOpacity key={i} style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editMultipleCorrect === i ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => setEditMultipleCorrect(i)}>
+                      <Text style={[styles.modalCancelText, { color: editMultipleCorrect === i ? '#fff' : colors.success }]}>{i + 1}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.modalCancelBtn, { flex: 1, backgroundColor: !editTrueFalseAnswer ? colors.error : 'transparent', borderColor: colors.error }]} onPress={() => setEditTrueFalseAnswer(false)}>
-                      <Text style={[styles.modalCancelText, { color: !editTrueFalseAnswer ? '#fff' : colors.error, fontSize: 20 }]}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-              {editingQuestionFull?.answerType === 'multiple' && (
-                <>
-                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
-                  {editMultipleOptions.map((opt, i) => (
-                    <TextInput key={i} style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? ' ✓ 正解' : ''}`} placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary} />
                   ))}
-                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>正解番号</Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                    {[0, 1, 2, 3].map(i => (
-                      <TouchableOpacity key={i} style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editMultipleCorrect === i ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => setEditMultipleCorrect(i)}>
-                        <Text style={[styles.modalCancelText, { color: editMultipleCorrect === i ? '#fff' : colors.success }]}>{i + 1}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowEditModal(false); setEditingQuestionFull(null); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={saveEditedQuestion}><Text style={styles.modalSaveText}>保存</Text></TouchableOpacity>
-              </View>
+                </View>
+              </>
+            )}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowEditModal(false); setEditingQuestionFull(null); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={saveEditedQuestion}><Text style={styles.modalSaveText}>保存</Text></TouchableOpacity>
             </View>
           </ScrollView>
         </View>
@@ -502,9 +489,9 @@ export default function BrowseQuestionsScreen() {
       </Modal>
 
       {/* 問題集一覧モーダル */}
-      <Modal visible={showFoldersView} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.foldersModalContainer, { backgroundColor: colors.card }]}>
+      <Modal visible={showFoldersView} transparent={false} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: colors.card }}>
+          <View style={{ flex: 1, padding: 20 }}>
             <View style={styles.foldersModalHeader}>
               <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders || (locale === 'ja' ? '問題集' : 'Folders')}</Text>
               <View style={styles.foldersModalActions}>
@@ -529,7 +516,7 @@ export default function BrowseQuestionsScreen() {
                     <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }, isSelected && { backgroundColor: colors.error + '10' }]}>
                       {isFolderDeleteMode && (
                         <TouchableOpacity onPress={() => { setSelectedFolderIds(prev => prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]); }} style={styles.checkbox}>
-                          <Text style={[styles.checkboxText, { color: colors.primary }]}>{isSelected ? '☑' : '☐'}</Text>
+                          <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{isSelected ? '☑' : '☐'}</Text>
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity style={styles.folderInfo} onPress={() => { if (!isFolderDeleteMode) openFolderDetail(folder); }}>
@@ -795,7 +782,6 @@ const styles = StyleSheet.create({
   checkboxText: { fontSize: 20 },
   batchTagBar: { marginVertical: 12, padding: 12, borderRadius: 8, alignItems: 'center' },
   batchTagBarText: { color: '#fff', fontWeight: 'bold' },
-  foldersModalContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 16, maxHeight: '80%' },
   foldersModalActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   folderArrowBtn: { paddingHorizontal: 12, paddingVertical: 8 },
   foldersModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
