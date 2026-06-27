@@ -47,6 +47,8 @@ export default function BrowseQuestionsScreen() {
   const [showFoldersView, setShowFoldersView] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [folderQuestions, setFolderQuestions] = useState<Question[]>([]);
+  const [isFolderBatchMode, setIsFolderBatchMode] = useState(false);
+  const [selectedFolderQuestionIds, setSelectedFolderQuestionIds] = useState<number[]>([]);
 
   // タグ絞り込み用 state
   const [selectedFilterTag, setSelectedFilterTag] = useState<string | null>(null);
@@ -267,7 +269,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
             onPress={() => { setIsCompactMode(!isCompactMode); if (isCompactMode) setExpandedQuestionId(null); }}
           >
-            <Text style={[styles.compactToggleBtnText, { color: '#fff' }]}>
+            <Text style={[styles.compactToggleBtnText, { color: '#000000' }]}>
               {isCompactMode ? '≡' : '☰'}
             </Text>
           </TouchableOpacity>
@@ -275,7 +277,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
             onPress={() => setShowFoldersView(true)}
           >
-            <Text style={[styles.headerBtnText, { color: '#fff' }]}>📚 {t.folders}</Text>
+            <Text style={[styles.headerBtnText, { color: '#000000' }]}>📚 {t.folders}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
@@ -289,7 +291,7 @@ export default function BrowseQuestionsScreen() {
             style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+            <Text style={{ color: '#000000', fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
@@ -443,11 +445,11 @@ export default function BrowseQuestionsScreen() {
       </Modal>
 
       {/* フォルダ作成モーダル */}
-      <Modal visible={showFolderModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+      <Modal visible={showFolderModal} transparent animationType="fade" statusBarTranslucent={true}>
+        <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{t.folderCreate}</Text>
-            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={newFolderName} onChangeText={setNewFolderName} placeholder={t.folderName} placeholderTextColor={colors.textSecondary} />
+            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={newFolderName} onChangeText={setNewFolderName} placeholder={t.folderName} placeholderTextColor={colors.textSecondary} maxLength={30} />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowFolderModal(false); setShowFoldersView(true); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={createFolder}><Text style={styles.modalSaveText}>{t.folderCreate}</Text></TouchableOpacity>
@@ -657,12 +659,14 @@ export default function BrowseQuestionsScreen() {
       </Modal>
 
       {/* 問題集の中身を表示するモーダル */}
-      <Modal visible={!!selectedFolder} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
+      <Modal visible={!!selectedFolder} transparent={false} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: colors.card }}>
+          <View style={{ flex: 1, padding: 20 }}>
             <View style={styles.folderDetailHeader}>
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
-              <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
+              </View>
             </View>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 追加可能な問題</Text>
             <ScrollView style={styles.addableQuestionsList}>
@@ -693,6 +697,20 @@ export default function BrowseQuestionsScreen() {
               ) : (
                 folderQuestions.map(question => (
                   <View key={question.id} style={[styles.folderQuestionItem, { borderBottomColor: colors.border }]}>
+                    {isFolderBatchMode && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedFolderQuestionIds(prev =>
+                            prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]
+                          );
+                        }}
+                        style={styles.checkbox}
+                      >
+                        <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
+                          {selectedFolderQuestionIds.includes(question.id) ? '☑' : '☐'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     <View style={styles.folderQuestionContent}>
                       <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
                       <View style={styles.folderQuestionActions}>
@@ -721,6 +739,25 @@ export default function BrowseQuestionsScreen() {
                 ))
               )}
             </ScrollView>
+            {isFolderBatchMode && selectedFolderQuestionIds.length > 0 && (
+              <TouchableOpacity
+                style={[styles.batchTagBar, { backgroundColor: colors.error }]}
+                onPress={async () => {
+                  if (!selectedFolder) return;
+                  const newIds = selectedFolder.questionIds.filter(id => !selectedFolderQuestionIds.includes(id));
+                  const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newIds } : f);
+                  await saveFolders(updatedFolders);
+                  setSelectedFolder({ ...selectedFolder, questionIds: newIds });
+                  setFolderQuestions(prev => prev.filter(q => !selectedFolderQuestionIds.includes(q.id)));
+                  setSelectedFolderQuestionIds([]);
+                  setIsFolderBatchMode(false);
+                }}
+              >
+                <Text style={[styles.batchTagBarText, { color: '#fff' }]}>
+                  🗑️ {locale === 'ja' ? `選択した${selectedFolderQuestionIds.length}問を除外` : `Remove ${selectedFolderQuestionIds.length} questions`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -773,17 +810,17 @@ const styles = StyleSheet.create({
   modalCancelBtn: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   modalCancelText: { fontWeight: 'bold' },
   modalSaveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  modalSaveText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  modalSaveText: { color: '#000000', fontWeight: 'bold', fontSize: 15 },
   headerButtonsScroll: { marginBottom: 12 },
   headerButtons: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
   headerBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
-  headerBtnText: { fontSize: 12, fontWeight: 'bold' },
+  headerBtnText: { fontSize: 12, fontWeight: 'bold', color: '#000000' },
   checkbox: { marginRight: 12, padding: 4 },
   checkboxText: { fontSize: 20 },
   batchTagBar: { marginVertical: 12, padding: 12, borderRadius: 8, alignItems: 'center' },
-  batchTagBarText: { color: '#fff', fontWeight: 'bold' },
+  batchTagBarText: { color: '#000000', fontWeight: 'bold' },
   foldersModalActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  folderArrowBtn: { paddingHorizontal: 12, paddingVertical: 8 },
+  folderArrowBtn: { paddingHorizontal: 20, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   foldersModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   foldersModalTitle: { fontSize: 20, fontWeight: 'bold' },
   closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
@@ -792,7 +829,7 @@ const styles = StyleSheet.create({
   folderIcon: { fontSize: 24 },
   folderName: { fontSize: 16, fontWeight: '500' },
   folderCount: { fontSize: 12, marginTop: 2 },
-  folderArrow: { fontSize: 18, fontWeight: 'bold', paddingHorizontal: 4 },
+  folderArrow: { fontSize: 28, fontWeight: 'bold' },
   folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 16, maxHeight: '80%' },
   folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   folderDetailTitle: { fontSize: 20, fontWeight: 'bold' },
@@ -815,12 +852,12 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#eee', marginVertical: 12 },
   folderQuestionsList: { maxHeight: 300, marginHorizontal: 16 },
   addToFolderBar: { marginTop: 16, padding: 14, borderRadius: 10, alignItems: 'center' },
-  addToFolderBarText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
   folderHeaderActionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  folderHeaderActionBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  folderHeaderActionBtnText: { color: '#000000', fontSize: 12, fontWeight: 'bold' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16, paddingTop: 16 },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
-  countBadgeText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  countBadgeText: { color: '#000000', fontWeight: 'bold', fontSize: 13 },
   filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
   cardCompact: { marginVertical: 1, borderRadius: 6, padding: 0 },
