@@ -170,42 +170,46 @@ export default function QuizScreen() {
 
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
+    setAutoPlayCountdown(autoPlayInterval);
 
-    let count = autoPlayInterval;
-    setAutoPlayCountdown(count);
+    // autoPlayInterval 秒後に答えフェーズへ
+    const questionTimer = setTimeout(() => {
+      autoPlayPhaseRef.current = 'answer';
+      setAutoPlayPhase('answer');
+      setAutoPlayCountdown(autoPlayInterval);
 
-    autoPlayTimerRef.current = setInterval(() => {
-      count -= 1;
-      setAutoPlayCountdown(count);
-
-      if (count <= 0) {
-        if (autoPlayPhaseRef.current === 'question') {
-          autoPlayPhaseRef.current = 'answer';
-          setAutoPlayPhase('answer');
-          count = autoPlayInterval;
-          setAutoPlayCountdown(count);
+      // さらに autoPlayInterval 秒後に次の問題へ
+      const answerTimer = setTimeout(() => {
+        autoPlayPhaseRef.current = 'question';
+        setAutoPlayPhase('question');
+        const nextIndex = currentIndexRef.current + 1;
+        if (nextIndex >= shuffledQuestions.length) {
+          navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
         } else {
-          autoPlayPhaseRef.current = 'question';
-          setAutoPlayPhase('question');
-          count = autoPlayInterval;
-          setAutoPlayCountdown(count);
-
-          const nextIndex = currentIndexRef.current + 1;
-          if (nextIndex >= shuffledQuestions.length) {
-            clearInterval(autoPlayTimerRef.current!);
-            navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-          } else {
-            setCurrentIndex(nextIndex);
-            questionStartTime.current = Date.now();
-          }
+          setCurrentIndex(nextIndex);
+          questionStartTime.current = Date.now();
         }
-      }
+      }, autoPlayInterval * 1000);
+
+      (autoPlayTimerRef.current as any) = answerTimer;
+    }, autoPlayInterval * 1000);
+
+    (autoPlayTimerRef.current as any) = questionTimer;
+
+    // カウントダウン表示用
+    const countdownRef = { current: null as any };
+    let remaining = autoPlayInterval;
+    countdownRef.current = setInterval(() => {
+      remaining -= 1;
+      setAutoPlayCountdown(remaining);
     }, 1000);
 
     return () => {
-      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+      clearTimeout(questionTimer);
+      if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current as any);
+      if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval]);
+  }, [autoPlayMode, quizStarted, isPaused, currentIndex, autoPlayInterval]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -1463,8 +1467,8 @@ export default function QuizScreen() {
 
       {/* 中断確認モーダル（フルスクリーン改善） */}
       {showConfirmModal && (
-        <View style={styles.fullScreenOverlay}>
-          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+        <View style={[styles.fullScreenOverlay, { backgroundColor: colors.background }]}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.background }]}>
             <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
               {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz?'}
             </Text>
@@ -1749,29 +1753,29 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   confirmModalContainer: {
-    width: '80%',
-    maxWidth: 300,
-    padding: 24,
-    borderRadius: 16,
+    width: '100%',
+    height: '100%',
+    padding: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   confirmModalTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   confirmModalMessage: {
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
   },
   confirmModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 16,
   },
   confirmModalCancel: {
-    flex: 1,
-    paddingVertical: 10,
+    width: '100%',
+    paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 8,
     borderWidth: 1,
@@ -1781,8 +1785,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   confirmModalConfirm: {
-    flex: 1,
-    paddingVertical: 10,
+    width: '100%',
+    paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
