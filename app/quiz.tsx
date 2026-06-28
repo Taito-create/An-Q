@@ -162,74 +162,64 @@ export default function QuizScreen() {
   // 自動再生タイマー
   useEffect(() => {
     if (!autoPlayMode || !quizStarted || isPaused) {
-      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
       return;
     }
 
-    if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+    if (autoPlayTimerRef.current) {
+      clearInterval(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
 
-    // フェーズと残り秒数を ref で管理（state の遅延を避ける）
-    autoPlayPhaseRef.current = 'question';
-    setAutoPlayPhase('question');
+    const startAutoPlay = () => {
+      autoPlayPhaseRef.current = 'question';
+      setAutoPlayPhase('question');
 
-    let remaining = autoPlayInterval;
-    setAutoPlayCountdown(remaining);
-
-    autoPlayTimerRef.current = setInterval(() => {
-      remaining -= 1;
+      let remaining = autoPlayInterval;
       setAutoPlayCountdown(remaining);
 
-      if (remaining <= 0) {
-        if (autoPlayPhaseRef.current === 'question') {
-          // 問題フェーズ終了 → 答えフェーズへ
-          autoPlayPhaseRef.current = 'answer';
-          setAutoPlayPhase('answer');
-          remaining = autoPlayInterval;
-          setAutoPlayCountdown(remaining);
-        } else {
-          // 答えフェーズ終了 → 次の問題へ
-          clearInterval(autoPlayTimerRef.current!);
-          autoPlayTimerRef.current = null;
+      const tick = () => {
+        remaining -= 1;
 
-          const nextIndex = currentIndexRef.current + 1;
-          if (nextIndex >= shuffledQuestions.length) {
-            navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-          } else {
-            currentIndexRef.current = nextIndex;
-            setCurrentIndex(nextIndex);
-            questionStartTime.current = Date.now();
-            // 次の問題のタイマーを開始
-            autoPlayPhaseRef.current = 'question';
-            setAutoPlayPhase('question');
+        if (remaining <= 0) {
+          if (autoPlayPhaseRef.current === 'question') {
+            // 問題フェーズ終了 → 答えフェーズへ
+            autoPlayPhaseRef.current = 'answer';
+            setAutoPlayPhase('answer');
             remaining = autoPlayInterval;
             setAutoPlayCountdown(remaining);
-            autoPlayTimerRef.current = setInterval(() => {
-              remaining -= 1;
-              setAutoPlayCountdown(remaining);
-              if (remaining <= 0) {
-                if (autoPlayPhaseRef.current === 'question') {
-                  autoPlayPhaseRef.current = 'answer';
-                  setAutoPlayPhase('answer');
-                  remaining = autoPlayInterval;
-                  setAutoPlayCountdown(remaining);
-                } else {
-                  clearInterval(autoPlayTimerRef.current!);
-                  autoPlayTimerRef.current = null;
-                  const ni = currentIndexRef.current + 1;
-                  if (ni >= shuffledQuestions.length) {
-                    navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-                  } else {
-                    currentIndexRef.current = ni;
-                    setCurrentIndex(ni);
-                    questionStartTime.current = Date.now();
-                  }
-                }
-              }
-            }, 1000);
+          } else {
+            // 答えフェーズ終了 → 次の問題へ
+            if (autoPlayTimerRef.current) {
+              clearInterval(autoPlayTimerRef.current);
+              autoPlayTimerRef.current = null;
+            }
+            const nextIndex = currentIndexRef.current + 1;
+            if (nextIndex >= shuffledQuestions.length) {
+              navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
+            } else {
+              currentIndexRef.current = nextIndex;
+              setCurrentIndex(nextIndex);
+              questionStartTime.current = Date.now();
+              // 少し待ってから次のサイクル開始（state更新を待つ）
+              setTimeout(() => {
+                startAutoPlay();
+              }, 50);
+            }
+            return;
           }
+        } else {
+          setAutoPlayCountdown(remaining);
         }
-      }
-    }, 1000);
+      };
+
+      autoPlayTimerRef.current = setInterval(tick, 1000);
+    };
+
+    startAutoPlay();
 
     return () => {
       if (autoPlayTimerRef.current) {
@@ -238,7 +228,6 @@ export default function QuizScreen() {
       }
     };
   }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval]);
-  // ↑ currentIndex を依存配列に入れない（currentIndexRef で追跡）
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
