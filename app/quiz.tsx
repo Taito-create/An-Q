@@ -154,39 +154,56 @@ export default function QuizScreen() {
 
   // 自動再生タイマー
   useEffect(() => {
-    if (!autoPlayMode || !quizStarted || isPaused || answered) {
+    if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
       return;
     }
+
+    // フェーズをリセット
+    setAutoPlayPhase('question');
     setAutoPlayCountdown(autoPlayInterval);
+
+    // 問題フェーズのカウントダウン
     autoPlayTimerRef.current = setInterval(() => {
       setAutoPlayCountdown(prev => {
         if (prev <= 1) {
+          // 問題フェーズ終了 → 答えフェーズへ
           clearInterval(autoPlayTimerRef.current!);
-          if (autoPlayPhase === 'question') {
-            // 問題フェーズ終了 → 答えを表示
-            setAutoPlayPhase('answer');
-            setAutoPlayCountdown(autoPlayInterval);
-            autoPlayTimerRef.current = setInterval(() => {
-              setAutoPlayCountdown(prev2 => {
-                if (prev2 <= 1) {
-                  clearInterval(autoPlayTimerRef.current!);
-                  // 答えフェーズ終了 → 次の問題へ（正解扱いで進む）
-                  setAutoPlayPhase('question');
-                  handleAnswer(true); // 自動再生では正解扱いで進む
-                  return autoPlayInterval;
+          setAutoPlayPhase('answer');
+          setAutoPlayCountdown(autoPlayInterval);
+
+          // 答えフェーズのカウントダウン
+          autoPlayTimerRef.current = setInterval(() => {
+            setAutoPlayCountdown(prev2 => {
+              if (prev2 <= 1) {
+                clearInterval(autoPlayTimerRef.current!);
+                // 答えフェーズ終了 → 次の問題へ
+                setAutoPlayPhase('question');
+                const currentQ = shuffledQuestions[currentIndex];
+                if (!currentQ) return autoPlayInterval;
+                // 次の問題に進む（結果は記録せず index だけ進める）
+                if (currentIndex + 1 >= shuffledQuestions.length) {
+                  // 全問終了
+                  navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
+                } else {
+                  setCurrentIndex(prev3 => prev3 + 1);
+                  questionStartTime.current = Date.now();
                 }
-                return prev2 - 1;
-              });
-            }, 1000);
-          }
+                return autoPlayInterval;
+              }
+              return prev2 - 1;
+            });
+          }, 1000);
           return autoPlayInterval;
         }
         return prev - 1;
       });
     }, 1000);
-    return () => { if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current); };
-  }, [autoPlayMode, quizStarted, isPaused, currentIndex, autoPlayPhase]);
+
+    return () => {
+      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+    };
+  }, [autoPlayMode, quizStarted, isPaused, currentIndex, autoPlayInterval]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -907,9 +924,21 @@ export default function QuizScreen() {
               </View>
             )}
           </View>
+          {autoPlayMode && (
+            <Text style={{ fontSize: 11, color: colors.warning, marginTop: 6 }}>
+              {locale === 'ja'
+                ? '⚠ 自動再生中は他のモードは使用できません'
+                : '⚠ Other modes are disabled during Auto Play'}
+            </Text>
+          )}
 
           {/* タイマー設定 */}
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View
+            pointerEvents={autoPlayMode ? 'none' : 'auto'}
+            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+              autoPlayMode && { opacity: 0.3 }
+            ]}
+          >
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
               ⏱ {locale === 'ja' ? '制限時間' : 'Time Limit'}
             </Text>
@@ -944,7 +973,12 @@ export default function QuizScreen() {
           </View>
 
           {/* チャレンジモード */}
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View
+            pointerEvents={autoPlayMode ? 'none' : 'auto'}
+            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+              autoPlayMode && { opacity: 0.3 }
+            ]}
+          >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
@@ -964,7 +998,12 @@ export default function QuizScreen() {
           </View>
 
           {/* サドンデスモード */}
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View
+            pointerEvents={autoPlayMode ? 'none' : 'auto'}
+            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+              autoPlayMode && { opacity: 0.3 }
+            ]}
+          >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
@@ -997,7 +1036,12 @@ export default function QuizScreen() {
           </View>
 
           {/* タイムアタックモード */}
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View
+            pointerEvents={autoPlayMode ? 'none' : 'auto'}
+            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+              autoPlayMode && { opacity: 0.3 }
+            ]}
+          >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
@@ -1198,13 +1242,20 @@ export default function QuizScreen() {
       )}
 
       {/* 自動再生中の答え表示エリア */}
-      {autoPlayMode && autoPlayPhase === 'answer' && (
-        <View style={[{ margin: 16, padding: 16, backgroundColor: colors.card, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: colors.primary }]}>
-          <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }]}>
-            {locale === 'ja' ? '答え' : 'Answer'}
+      {autoPlayMode && autoPlayPhase === 'answer' && shuffledQuestions[currentIndex] && (
+        <View style={[{ margin: 16, padding: 20, backgroundColor: colors.card, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: colors.success }]}>
+          <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }]}>
+            {locale === 'ja' ? '✅ 答え' : '✅ Answer'}
           </Text>
-          <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text }]}>
-            {currentQuestion?.descriptiveAnswer || ''}
+          <Text style={[{ fontSize: 20, fontWeight: '700', color: colors.text }]}>
+            {isReverseMode
+              ? shuffledQuestions[currentIndex].question
+              : (shuffledQuestions[currentIndex].descriptiveAnswer
+                || (shuffledQuestions[currentIndex].answerType === 'truefalse'
+                  ? (shuffledQuestions[currentIndex].correctAnswer ? '○' : '✕')
+                  : shuffledQuestions[currentIndex].options?.[shuffledQuestions[currentIndex].correctAnswer as number] || '')
+              )
+            }
           </Text>
         </View>
       )}
