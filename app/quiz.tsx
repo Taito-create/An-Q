@@ -154,8 +154,6 @@ export default function QuizScreen() {
   }, []);
 
   // 自動再生タイマー（useRef でフェーズを管理）
-  const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
-
   useEffect(() => {
     if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
