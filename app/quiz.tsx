@@ -183,6 +183,7 @@ export default function QuizScreen() {
 
       const tick = () => {
         remaining -= 1;
+        console.log('[AutoPlay] tick:', remaining, 'phase:', autoPlayPhaseRef.current);
         setAutoPlayCountdown(remaining);
 
         if (remaining <= 0) {
