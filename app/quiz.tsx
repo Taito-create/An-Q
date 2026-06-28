@@ -80,6 +80,13 @@ export default function QuizScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // 自動再生モード
+  const [autoPlayMode, setAutoPlayMode] = useState(false);
+  const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
+  const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
+  const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
+  const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // タグフィルター用 state
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -144,6 +151,42 @@ export default function QuizScreen() {
     loadTimerPresets();
     SoundManager.initialize();
   }, []);
+
+  // 自動再生タイマー
+  useEffect(() => {
+    if (!autoPlayMode || !quizStarted || isPaused || answered) {
+      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+      return;
+    }
+    setAutoPlayCountdown(autoPlayInterval);
+    autoPlayTimerRef.current = setInterval(() => {
+      setAutoPlayCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(autoPlayTimerRef.current!);
+          if (autoPlayPhase === 'question') {
+            // 問題フェーズ終了 → 答えを表示
+            setAutoPlayPhase('answer');
+            setAutoPlayCountdown(autoPlayInterval);
+            autoPlayTimerRef.current = setInterval(() => {
+              setAutoPlayCountdown(prev2 => {
+                if (prev2 <= 1) {
+                  clearInterval(autoPlayTimerRef.current!);
+                  // 答えフェーズ終了 → 次の問題へ（正解扱いで進む）
+                  setAutoPlayPhase('question');
+                  handleAnswer(true); // 自動再生では正解扱いで進む
+                  return autoPlayInterval;
+                }
+                return prev2 - 1;
+              });
+            }, 1000);
+          }
+          return autoPlayInterval;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current); };
+  }, [autoPlayMode, quizStarted, isPaused, currentIndex, autoPlayPhase]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -246,7 +289,10 @@ export default function QuizScreen() {
       return;
     }
     const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+    };
   }, [isTimerActive, timeLeft, quizStarted, timeAttackMode]);
 
   const handleTimeUp = () => {
@@ -808,6 +854,60 @@ export default function QuizScreen() {
             </View>
           </View>
 
+          {/* 自動再生モード */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: autoPlayMode ? 16 : 0 }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  ▶ {locale === 'ja' ? '自動再生モード' : 'Auto Play Mode'}
+                </Text>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                  {locale === 'ja'
+                    ? '問題→答えを自動で切り替えて表示します'
+                    : 'Automatically switches between question and answer'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[{
+                  width: 56, height: 30, borderRadius: 15,
+                  backgroundColor: autoPlayMode ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 2,
+                }]}
+                onPress={() => setAutoPlayMode(!autoPlayMode)}
+              >
+                <View style={[{
+                  width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff',
+                  alignSelf: autoPlayMode ? 'flex-end' : 'flex-start',
+                }]} />
+              </TouchableOpacity>
+            </View>
+            {autoPlayMode && (
+              <View>
+                <Text style={[{ fontSize: 13, color: colors.text, marginBottom: 8 }]}>
+                  {locale === 'ja' ? `表示時間: ${autoPlayInterval}秒` : `Display time: ${autoPlayInterval}s`}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[3, 5, 7, 10].map(sec => (
+                    <TouchableOpacity
+                      key={sec}
+                      style={[{
+                        flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+                        backgroundColor: autoPlayInterval === sec ? colors.primary : colors.background,
+                        borderWidth: 1, borderColor: autoPlayInterval === sec ? colors.primary : colors.border,
+                      }]}
+                      onPress={() => setAutoPlayInterval(sec)}
+                    >
+                      <Text style={{ color: autoPlayInterval === sec ? '#000' : colors.text, fontWeight: '600' }}>
+                        {sec}{locale === 'ja' ? '秒' : 's'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+
           {/* タイマー設定 */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
@@ -1083,6 +1183,31 @@ export default function QuizScreen() {
       <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
         <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
       </View>
+
+      {autoPlayMode && (
+        <View style={[{ backgroundColor: colors.primary + '20', paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <Text style={[{ color: colors.primary, fontSize: 13, fontWeight: '600' }]}>
+            ▶ {locale === 'ja'
+              ? (autoPlayPhase === 'question' ? '問題表示中' : '答え表示中')
+              : (autoPlayPhase === 'question' ? 'Showing Question' : 'Showing Answer')}
+          </Text>
+          <Text style={[{ color: colors.primary, fontSize: 20, fontWeight: '700' }]}>
+            {autoPlayCountdown}
+          </Text>
+        </View>
+      )}
+
+      {/* 自動再生中の答え表示エリア */}
+      {autoPlayMode && autoPlayPhase === 'answer' && (
+        <View style={[{ margin: 16, padding: 16, backgroundColor: colors.card, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: colors.primary }]}>
+          <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }]}>
+            {locale === 'ja' ? '答え' : 'Answer'}
+          </Text>
+          <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text }]}>
+            {currentQuestion?.descriptiveAnswer || ''}
+          </Text>
+        </View>
+      )}
 
       {/* サドンデスモード: ライフ表示 */}
       {suddenDeathMode && quizStarted && (
