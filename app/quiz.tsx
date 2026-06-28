@@ -87,6 +87,12 @@ export default function QuizScreen() {
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
+  const currentIndexRef = useRef(0);
+
+  // currentIndex が変わったら ref も更新
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   // タグフィルター用 state
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -153,18 +159,27 @@ export default function QuizScreen() {
     SoundManager.initialize();
   }, []);
 
-  // 自動再生タイマー（useRef でフェーズを管理）
+  // 自動再生タイマー
+  const currentIndexRef = useRef(0);
+
+  // currentIndex が変わったら ref も更新
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
   useEffect(() => {
     if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
       return;
     }
 
+    if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
-    setAutoPlayCountdown(autoPlayInterval);
 
     let count = autoPlayInterval;
+    setAutoPlayCountdown(count);
 
     autoPlayTimerRef.current = setInterval(() => {
       count -= 1;
@@ -172,26 +187,24 @@ export default function QuizScreen() {
 
       if (count <= 0) {
         if (autoPlayPhaseRef.current === 'question') {
-          // 問題フェーズ終了 → 答えフェーズへ
           autoPlayPhaseRef.current = 'answer';
           setAutoPlayPhase('answer');
           count = autoPlayInterval;
           setAutoPlayCountdown(count);
         } else {
-          // 答えフェーズ終了 → 次の問題へ
           autoPlayPhaseRef.current = 'question';
           setAutoPlayPhase('question');
           count = autoPlayInterval;
           setAutoPlayCountdown(count);
-          setCurrentIndex(prev => {
-            if (prev + 1 >= shuffledQuestions.length) {
-              clearInterval(autoPlayTimerRef.current!);
-              navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-              return prev;
-            }
+
+          const nextIndex = currentIndexRef.current + 1;
+          if (nextIndex >= shuffledQuestions.length) {
+            clearInterval(autoPlayTimerRef.current!);
+            navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
+          } else {
+            setCurrentIndex(nextIndex);
             questionStartTime.current = Date.now();
-            return prev + 1;
-          });
+          }
         }
       }
     }, 1000);
@@ -199,7 +212,7 @@ export default function QuizScreen() {
     return () => {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
     };
-  }, [autoPlayMode, quizStarted, isPaused, currentIndex, autoPlayInterval]);
+  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -1390,7 +1403,7 @@ export default function QuizScreen() {
               style={[{ backgroundColor: colors.error, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30 }]}
               onPress={() => {
                 if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
-                navigate('/');
+                setShowConfirmModal(true);
               }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
@@ -1482,6 +1495,7 @@ export default function QuizScreen() {
               <TouchableOpacity 
                 style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
                 onPress={() => {
+                  if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
                   setShowConfirmModal(false);
                   setIsTimerActive(false);  // タイマー停止
                   navigate('/');
