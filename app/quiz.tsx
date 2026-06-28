@@ -86,6 +86,7 @@ export default function QuizScreen() {
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
 
   // タグフィルター用 state
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -152,52 +153,49 @@ export default function QuizScreen() {
     SoundManager.initialize();
   }, []);
 
-  // 自動再生タイマー
+  // 自動再生タイマー（useRef でフェーズを管理）
+  const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
+
   useEffect(() => {
     if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
       return;
     }
 
-    // フェーズをリセット
+    autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
     setAutoPlayCountdown(autoPlayInterval);
 
-    // 問題フェーズのカウントダウン
-    autoPlayTimerRef.current = setInterval(() => {
-      setAutoPlayCountdown(prev => {
-        if (prev <= 1) {
-          // 問題フェーズ終了 → 答えフェーズへ
-          clearInterval(autoPlayTimerRef.current!);
-          setAutoPlayPhase('answer');
-          setAutoPlayCountdown(autoPlayInterval);
+    let count = autoPlayInterval;
 
-          // 答えフェーズのカウントダウン
-          autoPlayTimerRef.current = setInterval(() => {
-            setAutoPlayCountdown(prev2 => {
-              if (prev2 <= 1) {
-                clearInterval(autoPlayTimerRef.current!);
-                // 答えフェーズ終了 → 次の問題へ
-                setAutoPlayPhase('question');
-                const currentQ = shuffledQuestions[currentIndex];
-                if (!currentQ) return autoPlayInterval;
-                // 次の問題に進む（結果は記録せず index だけ進める）
-                if (currentIndex + 1 >= shuffledQuestions.length) {
-                  // 全問終了
-                  navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-                } else {
-                  setCurrentIndex(prev3 => prev3 + 1);
-                  questionStartTime.current = Date.now();
-                }
-                return autoPlayInterval;
-              }
-              return prev2 - 1;
-            });
-          }, 1000);
-          return autoPlayInterval;
+    autoPlayTimerRef.current = setInterval(() => {
+      count -= 1;
+      setAutoPlayCountdown(count);
+
+      if (count <= 0) {
+        if (autoPlayPhaseRef.current === 'question') {
+          // 問題フェーズ終了 → 答えフェーズへ
+          autoPlayPhaseRef.current = 'answer';
+          setAutoPlayPhase('answer');
+          count = autoPlayInterval;
+          setAutoPlayCountdown(count);
+        } else {
+          // 答えフェーズ終了 → 次の問題へ
+          autoPlayPhaseRef.current = 'question';
+          setAutoPlayPhase('question');
+          count = autoPlayInterval;
+          setAutoPlayCountdown(count);
+          setCurrentIndex(prev => {
+            if (prev + 1 >= shuffledQuestions.length) {
+              clearInterval(autoPlayTimerRef.current!);
+              navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
+              return prev;
+            }
+            questionStartTime.current = Date.now();
+            return prev + 1;
+          });
         }
-        return prev - 1;
-      });
+      }
     }, 1000);
 
     return () => {
@@ -1198,31 +1196,33 @@ export default function QuizScreen() {
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {/* スクロールしないヘッダー部分 */}
-      <View style={styles.topBar}>
-        <Text style={[styles.timer, { color: timerColor }]}>
-          {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
-        </Text>
-        <TouchableOpacity 
-          style={[
-            styles.pauseBtn, 
-            { 
-              backgroundColor: isPaused ? colors.success : colors.border,
-              borderWidth: isPaused ? 2 : 0,
-              borderColor: isPaused ? '#fff' : 'transparent',
-            }
-          ]} 
-          onPress={() => {
-            SoundManager.play('decide');
-            setIsPaused(!isPaused);
-            setIsTimerActive(isPaused);
-          }}
-        >
-          <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
-            {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+      {!autoPlayMode && (
+        <View style={styles.topBar}>
+          <Text style={[styles.timer, { color: timerColor }]}>
+            {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
           </Text>
-        </TouchableOpacity>
-        <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>{currentIndex + 1} / {shuffledQuestions.length}</Text>
-      </View>
+          <TouchableOpacity 
+            style={[
+              styles.pauseBtn, 
+              { 
+                backgroundColor: isPaused ? colors.success : colors.border,
+                borderWidth: isPaused ? 2 : 0,
+                borderColor: isPaused ? '#fff' : 'transparent',
+              }
+            ]} 
+            onPress={() => {
+              SoundManager.play('decide');
+              setIsPaused(!isPaused);
+              setIsTimerActive(isPaused);
+            }}
+          >
+            <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
+              {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>{currentIndex + 1} / {shuffledQuestions.length}</Text>
+        </View>
+      )}
 
       <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
         <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
@@ -1326,89 +1326,109 @@ export default function QuizScreen() {
             </View>
           </Animated.View>
         )}
-        <View style={styles.answerRow}>
-          {currentQuestion.answerType === 'truefalse' && (
-            <View style={styles.trueFalseContainer}>
-              <TouchableOpacity
-                style={[styles.answerBtn, styles.trueBtn, { backgroundColor: colors.success }]}
-                onPress={() => handleAnswer(true)}
-                disabled={answered || isPaused}
-              >
-                <Text style={styles.answerBtnText}>○</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.answerBtn, styles.falseBtn, { backgroundColor: colors.error }]}
-                onPress={() => handleAnswer(false)}
-                disabled={answered || isPaused}
-              >
-                <Text style={styles.answerBtnText}>×</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {currentQuestion.answerType === 'multiple' && (
-            <View style={styles.multipleContainer}>
-              {currentQuestion.multipleChoice?.options.map((option, i) => (
+        {!autoPlayMode && (
+          <View style={styles.answerRow}>
+            {currentQuestion.answerType === 'truefalse' && (
+              <View style={styles.trueFalseContainer}>
                 <TouchableOpacity
-                  key={i}
-                  style={[styles.multipleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={() => handleAnswer(i)}
+                  style={[styles.answerBtn, styles.trueBtn, { backgroundColor: colors.success }]}
+                  onPress={() => handleAnswer(true)}
                   disabled={answered || isPaused}
                 >
-                  <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}️⃣</Text>
-                  <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
+                  <Text style={styles.answerBtnText}>○</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                <TouchableOpacity
+                  style={[styles.answerBtn, styles.falseBtn, { backgroundColor: colors.error }]}
+                  onPress={() => handleAnswer(false)}
+                  disabled={answered || isPaused}
+                >
+                  <Text style={styles.answerBtnText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
-          {currentQuestion.answerType === 'descriptive' && (
-            <View style={styles.descriptiveContainer}>
-              <TextInput
-                style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
-                value={userDescriptiveAnswer}
-                onChangeText={setUserDescriptiveAnswer}
-                placeholder="回答を入力"
-                placeholderTextColor="#999"
-                multiline
-                editable={!answered && !isPaused}
-              />
-              <TouchableOpacity
-                style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
-                onPress={() => handleAnswer(userDescriptiveAnswer)}
-                disabled={answered || isPaused}
-              >
-                <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+            {currentQuestion.answerType === 'multiple' && (
+              <View style={styles.multipleContainer}>
+                {currentQuestion.multipleChoice?.options.map((option, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.multipleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => handleAnswer(i)}
+                    disabled={answered || isPaused}
+                  >
+                    <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}️⃣</Text>
+                    <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity 
-            style={[
-              styles.quitBtn, 
-              { 
-                backgroundColor: colors.primary,
-                paddingVertical: 12, 
-                paddingHorizontal: 24, 
-                borderRadius: 30,
-                alignSelf: 'center',
-                marginTop: 20,
-                minWidth: 180,
-                alignItems: 'center',
-              }
-            ]} 
-            onPress={() => {
-              SoundManager.play('decide');
-              setShowConfirmModal(true);
-            }}
-          >
-            <Text style={[styles.quitBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
-              {t.quitQuiz}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {currentQuestion.answerType === 'descriptive' && (
+              <View style={styles.descriptiveContainer}>
+                <TextInput
+                  style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
+                  value={userDescriptiveAnswer}
+                  onChangeText={setUserDescriptiveAnswer}
+                  placeholder="回答を入力"
+                  placeholderTextColor="#999"
+                  multiline
+                  editable={!answered && !isPaused}
+                />
+                <TouchableOpacity
+                  style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => handleAnswer(userDescriptiveAnswer)}
+                  disabled={answered || isPaused}
+                >
+                  <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {autoPlayMode && (
+          <View style={{ alignItems: 'center', marginTop: 32 }}>
+            <TouchableOpacity
+              style={[{ backgroundColor: colors.error, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30 }]}
+              onPress={() => {
+                if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+                navigate('/');
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                {locale === 'ja' ? '⏹ 自動再生を終了' : '⏹ Stop Auto Play'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!autoPlayMode && (
+          <View style={styles.bottomButtons}>
+            <TouchableOpacity 
+              style={[
+                styles.quitBtn, 
+                { 
+                  backgroundColor: colors.primary,
+                  paddingVertical: 12, 
+                  paddingHorizontal: 24, 
+                  borderRadius: 30,
+                  alignSelf: 'center',
+                  marginTop: 20,
+                  minWidth: 180,
+                  alignItems: 'center',
+                }
+              ]} 
+              onPress={() => {
+                SoundManager.play('decide');
+                setShowConfirmModal(true);
+              }}
+            >
+              <Text style={[styles.quitBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
+                {t.quitQuiz}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
       
       {/* ポーズ時のフルスクリーンモーダル */}
