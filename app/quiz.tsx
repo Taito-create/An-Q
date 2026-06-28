@@ -183,16 +183,15 @@ export default function QuizScreen() {
 
       const tick = () => {
         remaining -= 1;
+        setAutoPlayCountdown(remaining);
 
         if (remaining <= 0) {
           if (autoPlayPhaseRef.current === 'question') {
-            // 問題フェーズ終了 → 答えフェーズへ
             autoPlayPhaseRef.current = 'answer';
             setAutoPlayPhase('answer');
             remaining = autoPlayInterval;
             setAutoPlayCountdown(remaining);
           } else {
-            // 答えフェーズ終了 → 次の問題へ
             if (autoPlayTimerRef.current) {
               clearInterval(autoPlayTimerRef.current);
               autoPlayTimerRef.current = null;
@@ -204,15 +203,9 @@ export default function QuizScreen() {
               currentIndexRef.current = nextIndex;
               setCurrentIndex(nextIndex);
               questionStartTime.current = Date.now();
-              // 少し待ってから次のサイクル開始（state更新を待つ）
-              setTimeout(() => {
-                startAutoPlay();
-              }, 50);
+              setTimeout(() => startAutoPlay(), 50);
             }
-            return;
           }
-        } else {
-          setAutoPlayCountdown(remaining);
         }
       };
 
