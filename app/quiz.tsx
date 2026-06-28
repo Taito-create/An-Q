@@ -160,13 +160,6 @@ export default function QuizScreen() {
   }, []);
 
   // 自動再生タイマー
-  const currentIndexRef = useRef(0);
-
-  // currentIndex が変わったら ref も更新
-  useEffect(() => {
-    currentIndexRef.current = currentIndex;
-  }, [currentIndex]);
-
   useEffect(() => {
     if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
