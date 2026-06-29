@@ -161,6 +161,7 @@ export default function QuizScreen() {
 
   // 自動再生タイマー
   useEffect(() => {
+    console.log('[AutoPlay] useEffect triggered:', { autoPlayMode, quizStarted, isPaused });
     if (!autoPlayMode || !quizStarted || isPaused) {
       if (autoPlayTimerRef.current) {
         clearInterval(autoPlayTimerRef.current);
@@ -347,6 +348,7 @@ export default function QuizScreen() {
   // クイズ開始（タグフィルター＋問題数制限＋リバース反映）
   // ──────────────────────────────────────────────
   const startQuiz = async () => {
+    console.log('[AutoPlay] startQuiz called, quizStarted will be true');
     let filtered = getFilteredQuestions();
 
     if (filtered.length === 0) {
