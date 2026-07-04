@@ -39,4 +39,5 @@ export interface Folder {
   createdAt?: number;
   isShared?: boolean;
   sharedMark?: string;
+  parentId?: string;
 }

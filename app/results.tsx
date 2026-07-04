@@ -184,7 +184,7 @@ export default function ResultsScreen() {
       <Text style={[styles.headerTitle, { color: colors.text }]}>{t.quizResults}</Text>
 
       {/* Score Card */}
-      <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
         <View style={styles.bigScore}>
           <Text style={styles.bigScoreNum}>{correctCount}</Text>
           <Text style={styles.bigScoreSlash}>/</Text>
@@ -213,10 +213,10 @@ export default function ResultsScreen() {
 
       {/* Wrong Questions */}
       {wrongResults.length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.text }]}> ⚠️ {t.questionsToReview}</Text>
           {wrongResults.map((r, i) => (
-            <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '15', borderLeftColor: colors.error }]}>
+            <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '15', borderLeftColor: colors.error, borderColor: colors.border }]}> 
               <Text style={styles.wrongQuestion}>{r.question}</Text>
               <Text style={styles.correctHint}>
                 {t.correctAnswer}: {typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '✕') : String(r.correctAnswer)}
@@ -227,14 +227,14 @@ export default function ResultsScreen() {
       )}
 
       {/* All Answers Detail */}
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
         <TouchableOpacity style={styles.toggleHeader} onPress={() => setShowAll(!showAll)}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.viewAllAnswers}</Text>
           <Text style={styles.toggleArrow}>{showAll ? `▲ ${t.hide}` : `▼ ${t.expand}`}</Text>
         </TouchableOpacity>
 
         {showAll && results.map((r, i) => (
-          <View key={i} style={[styles.resultItem, { backgroundColor: r.isCorrect ? colors.success + '15' : colors.error + '15' }]}>
+          <View key={i} style={[styles.resultItem, { backgroundColor: r.isCorrect ? colors.success + '15' : colors.error + '15', borderColor: colors.border }]}> 
             <Text style={styles.resultQuestion}>Q{i+1}: {r.question}</Text>
             <Text style={[styles.resultStatus, { color: r.isCorrect ? '#4CAF50' : '#F44336' }]}>
               {r.isCorrect 
@@ -247,7 +247,7 @@ export default function ResultsScreen() {
 
       {/* History Graph */}
       {history.length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.text }]}> 📊 {t.progressHistory}</Text>
           {history.map((h, i) => (
             <View key={i} style={styles.historyRow}>
@@ -304,19 +304,20 @@ export default function ResultsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingTop: 20, paddingBottom: 50 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, paddingTop: 100 },
+  content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 32, gap: 16 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, letterSpacing: 0.2 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 },
   emptyEmoji: { fontSize: 60, marginBottom: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#888', marginBottom: 20 },
-  startBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },
+  emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#888', marginBottom: 20, textAlign: 'center' },
+  startBtn: { paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, marginBottom: 16, minWidth: 180, alignItems: 'center' },
   startBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   homeLinkText: { fontSize: 14 },
   summaryCard: { 
-    borderRadius: 20, 
-    padding: 25, 
-    marginBottom: 20, 
+    borderRadius: 22, 
+    padding: 24, 
+    marginBottom: 6, 
     alignItems: 'center', 
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -326,46 +327,48 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5, 
   },
-  bigScore: { flexDirection: 'row', alignItems: 'baseline' },
-  bigScoreNum: { fontSize: 60, fontWeight: 'bold', color: '#007AFF' },
-  bigScoreSlash: { fontSize: 30, color: '#CCC', marginHorizontal: 5 },
-  bigScoreTotal: { fontSize: 30, color: '#999' },
-  pctText: { fontSize: 22, fontWeight: '600', color: '#444' },
-  gradeText: { fontSize: 18, fontWeight: 'bold', marginVertical: 10, textAlign: 'center' },
-  statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 20, width: '100%', justifyContent: 'space-around' },
-  statBox: { alignItems: 'center' },
-  statVal: { fontSize: 18, fontWeight: 'bold' },
+  bigScore: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 },
+  bigScoreNum: { fontSize: 64, fontWeight: 'bold', color: '#2563EB' },
+  bigScoreSlash: { fontSize: 30, color: '#CBD5E1', marginHorizontal: 6 },
+  bigScoreTotal: { fontSize: 32, color: '#64748B', fontWeight: '600' },
+  pctText: { fontSize: 22, fontWeight: '700', color: '#334155', marginBottom: 6 },
+  gradeText: { fontSize: 18, fontWeight: 'bold', marginVertical: 12, textAlign: 'center' },
+  statsRow: { flexDirection: 'row', marginTop: 18, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 18, width: '100%', justifyContent: 'space-around', gap: 10 },
+  statBox: { alignItems: 'center', flex: 1, paddingHorizontal: 6 },
+  statVal: { fontSize: 19, fontWeight: 'bold', textAlign: 'center' },
   statLbl: { fontSize: 12 },
-  statDivider: { width: 1, height: 30, backgroundColor: '#EEE' },
-  section: { borderRadius: 15, padding: 15, marginBottom: 15 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
-  wrongCard: { padding: 12, borderRadius: 10, marginBottom: 10, borderLeftWidth: 4 },
-  wrongQuestion: { fontSize: 14, color: '#333', marginBottom: 5 },
+  statDivider: { width: 1, height: 34, backgroundColor: '#E2E8F0' },
+  section: { borderRadius: 20, padding: 18, marginBottom: 16, borderWidth: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 14, letterSpacing: 0.2 },
+  wrongCard: { padding: 16, borderRadius: 16, marginBottom: 12, borderLeftWidth: 4, borderWidth: 1 },
+  wrongQuestion: { fontSize: 14, color: '#334155', marginBottom: 6, lineHeight: 21 },
   correctHint: { fontSize: 13, fontWeight: 'bold', color: '#F44336' },
-  toggleHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  toggleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   toggleArrow: { color: '#007AFF', fontWeight: 'bold' },
-  resultItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  resultItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', borderRadius: 14, marginBottom: 10, borderWidth: 1 },
   resultCorrect: {},
   resultWrong: {},
-  resultQuestion: { fontSize: 14, color: '#444' },
-  resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 3 },
-  historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  resultQuestion: { fontSize: 14, color: '#334155', lineHeight: 21, marginBottom: 4 },
+  resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   historyDate: { fontSize: 10, width: 80 },
-  historyBar: { flex: 1, height: 8, backgroundColor: '#EEE', borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },
+  historyBar: { flex: 1, height: 8, backgroundColor: '#EEF2F6', borderRadius: 999, overflow: 'hidden', marginHorizontal: 10 },
   historyFill: { height: '100%' },
   historyPct: { fontSize: 12, fontWeight: 'bold', width: 35 },
-  actions: { gap: 12 },
-  primaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
+  actions: { gap: 14, paddingTop: 4 },
+  primaryBtn: { paddingVertical: 16, paddingHorizontal: 18, borderRadius: 16, alignItems: 'center', minHeight: 54 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  secondaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
+  secondaryBtn: { paddingVertical: 16, paddingHorizontal: 18, borderRadius: 16, alignItems: 'center', minHeight: 54 },
   secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
   dangerBtnText: { color: '#FF3B30', fontSize: 13 },
   feedbackBtn: {
-    padding: 18,
-    borderRadius: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 2,
+    minHeight: 54,
   },
   feedbackBtnText: {
     color: '#fff',

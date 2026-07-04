@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
@@ -7,6 +7,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { loadStats } from './missions';
+import { useAuth } from './auth/AuthContext';
 
 interface UserProfile {
   username: string;
@@ -30,6 +31,7 @@ export default function ProfileScreen() {
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+  const { user, logout } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile>({
     username: 'An-Q Learner',
@@ -157,6 +159,37 @@ export default function ProfileScreen() {
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
+          {user && (
+            <TouchableOpacity
+              style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+              onPress={async () => {
+                SoundManager.play('decide');
+                Alert.alert(
+                  locale === 'ja' ? 'ログアウト' : 'Logout',
+                  locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
+                  [
+                    { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                    {
+                      text: locale === 'ja' ? 'ログアウト' : 'Logout',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await logout();
+                          navigate('/login');
+                        } catch (error) {
+                          console.error('Logout failed:', error);
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+                {locale === 'ja' ? 'ログアウト' : 'Logout'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

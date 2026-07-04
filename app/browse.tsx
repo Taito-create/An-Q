@@ -10,6 +10,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert } from './utils/answerUtils';
 import { useQuestions } from './hooks/useQuestions';
+import './browse.css';
 
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ export default function BrowseQuestionsScreen() {
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   // 一括タグ編集関連 state
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
@@ -104,6 +106,23 @@ export default function BrowseQuestionsScreen() {
     setSelectedFolder(folder);
   };
 
+  const currentFolder = currentFolderId
+    ? folders.find(folder => folder.id === currentFolderId) || null
+    : null;
+
+  const visibleFolders = folders.filter(folder => {
+    if (currentFolderId === null) {
+      return folder.parentId === undefined || folder.parentId === null;
+    }
+    return folder.parentId === currentFolderId;
+  });
+
+  const goToParentFolder = () => {
+    if (!currentFolderId) return;
+    const parentId = folders.find(folder => folder.id === currentFolderId)?.parentId ?? null;
+    setCurrentFolderId(parentId);
+  };
+
   const filteredQuestions = useMemo(() => {
     let filtered = questions;
     if (selectedFilterTag) {
@@ -126,6 +145,7 @@ export default function BrowseQuestionsScreen() {
       id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
       name: newFolderName.trim(),
       questionIds: [],
+      parentId: currentFolderId ?? undefined,
     };
     const updatedFolders = [...folders, newFolder];
     await saveFolders(updatedFolders);
@@ -257,11 +277,11 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {t.manageQuestions}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={styles.headerActions}>
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
             <Text style={styles.countBadgeText}>{filteredQuestions.length}</Text>
           </View>
@@ -275,7 +295,10 @@ export default function BrowseQuestionsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-            onPress={() => setShowFoldersView(true)}
+            onPress={() => {
+              setCurrentFolderId(null);
+              setShowFoldersView(true);
+            }}
           >
             <Text style={[styles.headerBtnText, { color: '#000000' }]}>📚 {t.folders}</Text>
           </TouchableOpacity>
@@ -304,9 +327,19 @@ export default function BrowseQuestionsScreen() {
         </TouchableOpacity>
       )}
 
-      <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={styles.mainScrollContent}
+      >
         {[...filteredQuestions].reverse().map((item) => (
-          <View key={item.id} style={[styles.card, { backgroundColor: colors.card }, isCompactMode && styles.cardCompact]}>
+          <View
+            key={item.id}
+            style={[
+              styles.card,
+              { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.primary },
+              isCompactMode && styles.cardCompact,
+            ]}
+          >
             {isSelectionMode && (
               <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
                 <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
@@ -329,7 +362,7 @@ export default function BrowseQuestionsScreen() {
               <View style={styles.cardHeaderRight}>
                 {item.image && (
                   <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
-                    <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={item.image} alt="" className="browse-thumbnail" />
                   </View>
                 )}
                 <TouchableOpacity
@@ -507,15 +540,28 @@ export default function BrowseQuestionsScreen() {
                 <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
               </View>
             </View>
+            {currentFolderId !== null && (
+              <TouchableOpacity style={[styles.parentNavBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={goToParentFolder}>
+                <Text style={[styles.parentNavText, { color: colors.primary }]}>⬅️ 上の階層へ戻る</Text>
+                <Text style={[styles.parentNavSubText, { color: colors.textSecondary }]}>{currentFolder?.name || 'ルート'}</Text>
+              </TouchableOpacity>
+            )}
             <ScrollView>
-              {folders.length === 0 ? (
+              {visibleFolders.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
               ) : (
-                folders.map(folder => {
+                visibleFolders.map(folder => {
                   const folderQuestionCount = folder.questionIds.length;
                   const isSelected = selectedFolderIds.includes(folder.id);
                   return (
-                    <View key={folder.id} style={[styles.folderItem, { borderBottomColor: colors.border }, isSelected && { backgroundColor: colors.error + '10' }]}>
+                    <View
+                      key={folder.id}
+                      style={[
+                        styles.folderItem,
+                        { borderBottomColor: colors.border, borderColor: colors.border, backgroundColor: colors.card },
+                        isSelected && { backgroundColor: colors.error + '10' },
+                      ]}
+                    >
                       {isFolderDeleteMode && (
                         <TouchableOpacity onPress={() => { setSelectedFolderIds(prev => prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]); }} style={styles.checkbox}>
                           <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{isSelected ? '☑' : '☐'}</Text>
@@ -607,13 +653,13 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>🏷️ {t.filterByTags || 'タグで絞り込み'}</Text>
-            <ScrollView style={styles.tagFilterList}>
-              <TouchableOpacity style={[styles.tagFilterChip, selectedFilterTag === null && { backgroundColor: colors.primary }]} onPress={() => { setSelectedFilterTag(null); setShowTagFilterModal(false); }}>
-                <Text style={[styles.tagFilterChipText, selectedFilterTag === null && { color: '#fff' }]}>📋 {locale === 'ja' ? '全問' : 'All'}</Text>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <TouchableOpacity style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: selectedFilterTag === null ? colors.primary : 'transparent' }} onPress={() => { setSelectedFilterTag(null); setShowTagFilterModal(false); }}>
+                <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === null ? '#fff' : colors.text }}>📋 {locale === 'ja' ? '全問' : 'All'}</Text>
               </TouchableOpacity>
               {availableTags.map(tag => (
-                <TouchableOpacity key={tag} style={[styles.tagFilterChip, selectedFilterTag === tag && { backgroundColor: colors.primary }]} onPress={() => { setSelectedFilterTag(tag); setShowTagFilterModal(false); }}>
-                  <Text style={[styles.tagFilterChipText, selectedFilterTag === tag && { color: '#fff' }]}>🏷️ {tag}</Text>
+                <TouchableOpacity key={tag} style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: selectedFilterTag === tag ? colors.primary : 'transparent' }} onPress={() => { setSelectedFilterTag(tag); setShowTagFilterModal(false); }}>
+                  <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === tag ? '#fff' : colors.text }}>🏷️ {tag}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -629,14 +675,14 @@ export default function BrowseQuestionsScreen() {
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>➕ {selectedFolderForAdd?.name} に問題を追加</Text>
               <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
             </View>
-            <ScrollView>
+            <ScrollView contentContainerStyle={styles.modalListContent}>
               {availableQuestionsForAdd.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>追加できる問題がありません</Text>
               ) : (
                 availableQuestionsForAdd.map(question => (
-                  <TouchableOpacity key={question.id} style={[styles.questionSelectItem, { borderBottomColor: colors.border }]} onPress={() => { setSelectedQuestionIdsForAdd(prev => prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]); }}>
+                  <TouchableOpacity key={question.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => { setSelectedQuestionIdsForAdd(prev => prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]); }}>
                     <Text style={[styles.checkboxText, { color: colors.primary }]}>{selectedQuestionIdsForAdd.includes(question.id) ? '☑' : '☐'}</Text>
-                    <Text style={[styles.questionSelectText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
+                    <Text style={{ fontSize: 15, flex: 1, lineHeight: 22, color: colors.text }} numberOfLines={2}>{question.question}</Text>
                   </TouchableOpacity>
                 ))
               )}
@@ -661,20 +707,32 @@ export default function BrowseQuestionsScreen() {
       {/* 問題集の中身を表示するモーダル */}
       <Modal visible={!!selectedFolder} transparent={false} animationType="slide">
         <View style={{ flex: 1, backgroundColor: colors.card }}>
-          <View style={{ flex: 1, padding: 20 }}>
+          <View style={styles.folderDetailBody}>
             <View style={styles.folderDetailHeader}>
               <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.openFolderBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                if (!selectedFolder) return;
+                setSelectedFolder(null);
+                setFolderQuestions([]);
+                setShowFolderAnswerId(null);
+                setCurrentFolderId(selectedFolder.id);
+              }}
+            >
+              <Text style={[styles.openFolderBtnText, { color: onPrimary }]}>このフォルダを開く</Text>
+            </TouchableOpacity>
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 追加可能な問題</Text>
-            <ScrollView style={styles.addableQuestionsList}>
+            <ScrollView style={styles.addableQuestionsList} contentContainerStyle={styles.modalListContent}>
               {questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>追加できる問題がありません</Text>
               ) : (
                 questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).map(question => (
-                  <TouchableOpacity key={question.id} style={[styles.addableQuestionItem, { borderBottomColor: colors.border }]} onPress={async () => {
+                  <TouchableOpacity key={question.id} style={[styles.folderAddableQuestionItem, { borderBottomColor: colors.border }]} onPress={async () => {
                     if (!selectedFolder) return;
                     const newQuestionIds = [...new Set([...selectedFolder.questionIds, question.id])];
                     const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f);
@@ -683,7 +741,7 @@ export default function BrowseQuestionsScreen() {
                     setSelectedFolder(updatedFolder);
                     setFolderQuestions(questions.filter(q => newQuestionIds.includes(q.id)));
                   }}>
-                    <Text style={[styles.addableQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
+                    <Text style={[styles.folderAddableQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
                     <Text style={[styles.addButton, { color: colors.primary }]}>+ 追加</Text>
                   </TouchableOpacity>
                 ))
@@ -691,7 +749,7 @@ export default function BrowseQuestionsScreen() {
             </ScrollView>
             <View style={styles.divider} />
             <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📖 この問題集の問題</Text>
-            <ScrollView style={styles.folderQuestionsList}>
+            <ScrollView style={styles.folderQuestionsList} contentContainerStyle={styles.modalListContent}>
               {folderQuestions.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
               ) : (
@@ -767,33 +825,55 @@ export default function BrowseQuestionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  header: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    rowGap: 12,
+    columnGap: 12,
+  },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, paddingRight: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 },
+  mainScrollContent: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16 },
   title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
-  card: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-  cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  card: {
+    backgroundColor: '#FFF',
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerDeleteBtn: { padding: 6, borderRadius: 20 },
   headerDeleteBtnText: { fontSize: 18 },
-  questionPreview: { fontSize: 14, fontWeight: '500', flex: 1 },
+  questionPreview: { fontSize: 15, fontWeight: '500', flex: 1, lineHeight: 22 },
   expandIcon: { fontSize: 16, fontWeight: 'bold', paddingHorizontal: 8 },
-  expandedContent: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee', gap: 10 },
-  fullQuestion: { fontSize: 16, fontWeight: '500' },
-  typeBadge: { fontSize: 12, fontWeight: 'bold', backgroundColor: '#E1EFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 6, marginLeft: 'auto' },
+  expandedContent: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#eee', gap: 12 },
+  fullQuestion: { fontSize: 16, fontWeight: '500', lineHeight: 24 },
+  typeBadge: { fontSize: 12, fontWeight: 'bold', backgroundColor: '#E1EFFF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, alignSelf: 'flex-start' },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8, marginLeft: 'auto', flexWrap: 'wrap', rowGap: 10 },
   deleteText: { color: '#FF3B30', fontWeight: 'bold' },
   answerBtnText: { fontWeight: 'bold' },
   editTagBtnText: { fontWeight: 'bold' },
   questionText: { fontSize: 16 },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#999' },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  miniTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  emptyText: { textAlign: 'center', marginTop: 56, color: '#999', paddingHorizontal: 16, lineHeight: 22 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  miniTag: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   miniTagText: { fontSize: 11, fontWeight: '500' },
-  answerBox: { marginTop: 10, padding: 10, borderRadius: 8, borderWidth: 1 },
+  answerBox: { marginTop: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
   answerLabel: { fontSize: 12, fontWeight: 'bold', marginBottom: 4 },
-  answerText: { fontSize: 15 },
+  answerText: { fontSize: 15, lineHeight: 22 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
   confirmModalContainer: { width: '80%', maxWidth: 300, padding: 24, borderRadius: 16, alignItems: 'center' },
   confirmModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
@@ -803,68 +883,75 @@ const styles = StyleSheet.create({
   confirmModalCancelText: { fontWeight: 'bold' },
   confirmModalConfirm: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   confirmModalConfirmText: { color: '#fff', fontWeight: 'bold' },
-  modalContainer: { width: '85%', maxWidth: 400, padding: 24, borderRadius: 16 },
+  modalContainer: { width: '85%', maxWidth: 400, padding: 24, borderRadius: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-  modalInput: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 20 },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 20, backgroundColor: '#fff' },
   modalButtons: { flexDirection: 'row', gap: 12 },
-  modalCancelBtn: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  modalCancelBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   modalCancelText: { fontWeight: 'bold' },
-  modalSaveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  modalSaveBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center' },
   modalSaveText: { color: '#000000', fontWeight: 'bold', fontSize: 15 },
   headerButtonsScroll: { marginBottom: 12 },
   headerButtons: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
-  headerBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  headerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1 },
   headerBtnText: { fontSize: 12, fontWeight: 'bold', color: '#000000' },
-  checkbox: { marginRight: 12, padding: 4 },
+  checkbox: { marginRight: 12, padding: 6 },
   checkboxText: { fontSize: 20 },
-  batchTagBar: { marginVertical: 12, padding: 12, borderRadius: 8, alignItems: 'center' },
+  batchTagBar: { marginVertical: 12, padding: 14, borderRadius: 14, alignItems: 'center' },
   batchTagBarText: { color: '#000000', fontWeight: 'bold' },
   foldersModalActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  folderArrowBtn: { paddingHorizontal: 20, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  folderArrowBtn: { paddingHorizontal: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   foldersModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   foldersModalTitle: { fontSize: 20, fontWeight: 'bold' },
+  parentNavBtn: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14, gap: 4 },
+  parentNavText: { fontSize: 14, fontWeight: 'bold' },
+  parentNavSubText: { fontSize: 12 },
   closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
-  folderItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 4, borderBottomWidth: 1 },
-  folderInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  folderItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 14, borderBottomWidth: 1, borderWidth: 1, borderRadius: 16, marginBottom: 12 },
+  folderInfo: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
   folderIcon: { fontSize: 24 },
   folderName: { fontSize: 16, fontWeight: '500' },
-  folderCount: { fontSize: 12, marginTop: 2 },
+  folderCount: { fontSize: 12, marginTop: 4 },
   folderArrow: { fontSize: 28, fontWeight: 'bold' },
-  folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 16, maxHeight: '80%' },
-  folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  folderDetailTitle: { fontSize: 20, fontWeight: 'bold' },
-  folderQuestionItem: { paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
-  folderQuestionContent: { gap: 8 },
-  folderQuestionText: { fontSize: 15, lineHeight: 22 },
-  folderQuestionActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  folderActionBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
-  folderActionBtnText: { fontSize: 13, fontWeight: 'bold' },
+  folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 20, maxHeight: '80%' },
   tagFilterList: { maxHeight: 400 },
-  tagFilterChip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#ddd' },
+  tagFilterChip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8 },
   tagFilterChipText: { fontSize: 15, fontWeight: '500' },
-  questionSelectItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
+  questionSelectItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1 },
   questionSelectText: { fontSize: 15, flex: 1, lineHeight: 22 },
-  sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginVertical: 8, marginHorizontal: 16 },
-  addableQuestionsList: { maxHeight: 200, marginHorizontal: 16 },
-  addableQuestionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
-  addableQuestionText: { flex: 1, fontSize: 13, marginRight: 10 },
-  addButton: { fontSize: 14, fontWeight: 'bold', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, overflow: 'hidden' },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 12 },
-  folderQuestionsList: { maxHeight: 300, marginHorizontal: 16 },
-  addToFolderBar: { marginTop: 16, padding: 14, borderRadius: 10, alignItems: 'center' },
-  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
-  folderHeaderActionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  addButton: { fontSize: 14, fontWeight: 'bold', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, overflow: 'hidden' },
+  folderHeaderActionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   folderHeaderActionBtnText: { color: '#000000', fontSize: 12, fontWeight: 'bold' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16, paddingTop: 16 },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
   countBadgeText: { color: '#000000', fontWeight: 'bold', fontSize: 13 },
   filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
-  cardCompact: { marginVertical: 1, borderRadius: 6, padding: 0 },
-  cardHeaderCompact: { paddingVertical: 5, paddingHorizontal: 10 },
+  cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },
+  cardHeaderCompact: { paddingVertical: 8, paddingHorizontal: 10 },
   questionPreviewCompact: { fontSize: 11, lineHeight: 14 },
-  compactToggleBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
+  compactToggleBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   compactToggleBtnText: { fontSize: 16, fontWeight: 'bold' },
   topBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   topBackBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  folderDetailBody: { flex: 1, paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
+  folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
+  folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
+  openFolderBtn: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center' },
+  openFolderBtnText: { fontSize: 14, fontWeight: 'bold' },
+  sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginTop: 6, marginBottom: 4, marginHorizontal: 4, letterSpacing: 0.2 },
+  addableQuestionsList: { maxHeight: 200, marginHorizontal: 0, borderRadius: 16, overflow: 'hidden' },
+  folderQuestionsList: { maxHeight: 300, marginHorizontal: 0, borderRadius: 16, overflow: 'hidden' },
+  folderQuestionItem: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },
+  folderQuestionContent: { gap: 12, paddingTop: 2 },
+  folderQuestionText: { fontSize: 15, lineHeight: 22 },
+  folderQuestionActions: { flexDirection: 'row', gap: 10, marginTop: 2, flexWrap: 'wrap' },
+  folderAddableQuestionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, gap: 10 },
+  folderAddableQuestionText: { flex: 1, fontSize: 13, marginRight: 10, lineHeight: 20 },
+  folderActionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
+  folderActionBtnText: { fontSize: 13, fontWeight: 'bold' },
+  divider: { height: 1, backgroundColor: '#eee', marginVertical: 14 },
+  addToFolderBar: { marginTop: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
+  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
+  modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
 });

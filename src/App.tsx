@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
 import RootLayout from './RootLayout';
 import NotFound from './pages/NotFound';
+import ProtectedRoute from '../app/auth/ProtectedRoute';
 
 // Lazy load all screens for better performance
 const HomeScreen = lazy(() => import('../app/index'));
@@ -23,6 +24,7 @@ const MusicScreen = lazy(() => import('../app/music'));
 const ProfileScreen = lazy(() => import('../app/profile'));
 const StatisticsScreen = lazy(() => import('../app/statistics'));
 const QuizScreen = lazy(() => import('../app/quiz'));
+const LoginScreen = lazy(() => import('../app/auth/loginScreen'));
 const ReorderConfirmScreen = lazy(() => import('../app/reorderConfirm'));
 const ResultsScreen = lazy(() => import('../app/results'));
 const SettingsScreen = lazy(() => import('../app/settings'));
@@ -39,31 +41,121 @@ export default function App() {
     <RootLayout>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/" element={<HomeScreen />} />
-          <Route path="/browse" element={<BrowseQuestionsScreen />} />
-          <Route path="/calendar" element={<CalendarScreen />} />
-          <Route path="/create" element={<CreateQuestionScreen />} />
+          <Route path="/login" element={<LoginScreen />} />
           <Route path="/credits" element={<CreditsScreen />} />
-          <Route path="/devmode" element={<DevModeScreen />} />
-          <Route path="/feedback" element={<FeedbackScreen />} />
-          <Route path="/inbox" element={<InboxScreen />} />
-          <Route path="/manage" element={<ManageTimerScreen />} />
-          <Route path="/mission" element={<MissionScreen />} />
-          <Route path="/missions" element={<MissionsScreen />} />
-          <Route path="/missionScreen" element={<MissionDetailScreen />} />
-          <Route path="/multi" element={<MultiScreen />} />
-          <Route path="/music" element={<MusicScreen />} />
-          <Route path="/profile" element={<ProfileScreen />} />
-          <Route path="/statistics" element={<StatisticsScreen />} />
-          <Route path="/quiz" element={<QuizScreen />} />
-          <Route path="/reorderConfirm" element={<ReorderConfirmScreen />} />
-          <Route path="/results" element={<ResultsScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="/shop" element={<ShopScreen />} />
           <Route path="/title" element={<TitleScreen />} />
           <Route path="/titleScreen" element={<TitleListScreen />} />
-          <Route path="/appSettings" element={<AppSettingsScreen />} />
-          <Route path="/gacha" element={<GachaScreen />} />
+          
+          <Route path="/" element={
+            <ProtectedRoute>
+              <HomeScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/browse" element={
+            <ProtectedRoute>
+              <BrowseQuestionsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/calendar" element={
+            <ProtectedRoute>
+              <CalendarScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/create" element={
+            <ProtectedRoute>
+              <CreateQuestionScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/devmode" element={
+            <ProtectedRoute>
+              <DevModeScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/feedback" element={
+            <ProtectedRoute>
+              <FeedbackScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/inbox" element={
+            <ProtectedRoute>
+              <InboxScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/manage" element={
+            <ProtectedRoute>
+              <ManageTimerScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/mission" element={
+            <ProtectedRoute>
+              <MissionScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/missions" element={
+            <ProtectedRoute>
+              <MissionsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/missionScreen" element={
+            <ProtectedRoute>
+              <MissionDetailScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/multi" element={
+            <ProtectedRoute>
+              <MultiScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/music" element={
+            <ProtectedRoute>
+              <MusicScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <ProfileScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/statistics" element={
+            <ProtectedRoute>
+              <StatisticsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/quiz" element={
+            <ProtectedRoute>
+              <QuizScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/reorderConfirm" element={
+            <ProtectedRoute>
+              <ReorderConfirmScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/results" element={
+            <ProtectedRoute>
+              <ResultsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <SettingsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/shop" element={
+            <ProtectedRoute>
+              <ShopScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/appSettings" element={
+            <ProtectedRoute>
+              <AppSettingsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/gacha" element={
+            <ProtectedRoute>
+              <GachaScreen />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

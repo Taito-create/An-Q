@@ -110,8 +110,10 @@ export default function MultiScreen() {
         );
 
         return {
+          id: folder.id,
           name: folder.name,
           description: folder.description || '',
+          parentId: folder.parentId ?? null,
           questions: folderQuestions.map(q => ({
             question: q.question,
             answerType: q.answerType,

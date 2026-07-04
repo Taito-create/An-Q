@@ -93,37 +93,48 @@ export default function InboxScreen() {
       }
 
       // 2. 問題集（folder）を転送
-      const foldersToAdd = itemsToTransfer
-        .filter(item => item.type === 'folder')
-        .map(item => {
-          const folderData = item.data;
-          const newFolderId = Date.now() + Math.random();
+      const folderItems = itemsToTransfer.filter(item => item.type === 'folder');
+      const createId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      const folderIdMap = new Map<string, string>();
 
-          const newQuestionIds: number[] = [];
-          const newQuestions: any[] = [];
+      folderItems.forEach(item => {
+        const originalFolderId = String(item.data?.id ?? item.id);
+        folderIdMap.set(originalFolderId, createId());
+      });
 
-          (folderData.questions || []).forEach((q: any) => {
-            const newQuestionId = Date.now() + Math.random();
-            newQuestions.push({
-              ...q,
-              id: newQuestionId,
-              isShared: true,
-              sharedMark: '🔗',
-              originalFolderId: newFolderId,
-            });
-            newQuestionIds.push(newQuestionId);
-          });
+      const foldersToAdd = folderItems.map(item => {
+        const folderData = item.data;
+        const originalFolderId = String(folderData.id ?? item.id);
+        const newFolderId = folderIdMap.get(originalFolderId) || createId();
 
-          return {
-            name: folderData.name,
-            description: folderData.description || '',
-            id: newFolderId,
-            questionIds: newQuestionIds,
-            questions: newQuestions,
+        const newQuestionIds: number[] = [];
+        const newQuestions: any[] = [];
+
+        (folderData.questions || []).forEach((q: any) => {
+          const newQuestionId = Date.now() + Math.random();
+          newQuestions.push({
+            ...q,
+            id: newQuestionId,
             isShared: true,
-            originalInboxId: item.id,
-          };
+            sharedMark: '🔗',
+            originalFolderId: newFolderId,
+          });
+          newQuestionIds.push(newQuestionId);
         });
+
+        const parentId = folderData.parentId ? folderIdMap.get(String(folderData.parentId)) : undefined;
+
+        return {
+          name: folderData.name,
+          description: folderData.description || '',
+          id: newFolderId,
+          questionIds: newQuestionIds,
+          questions: newQuestions,
+          isShared: true,
+          originalInboxId: item.id,
+          parentId,
+        };
+      });
 
       if (foldersToAdd.length > 0) {
         const allNewQuestions = foldersToAdd.flatMap(f => f.questions || []);
