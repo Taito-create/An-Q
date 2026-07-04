@@ -1,11 +1,8 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeAuth, getReactNativePersistence, getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// 新しく取得した、完全に正しい接続鍵です！
 const firebaseConfig = {
   apiKey: "AIzaSyBr8S_zcf555B9LZWGLPayuFb8H6Og1MVI",
   authDomain: "an-q-77a3f.firebaseapp.com",
@@ -16,6 +13,18 @@ const firebaseConfig = {
   measurementId: "G-03Y08B7NEY"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// 既に初期化されている場合は既存のアプリを使い、なければ初期化する（重複エラー防止）
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// React Native（Vercel/Web両対応）で安全にログイン状態を保持する設定
+let firebaseAuth;
+try {
+  firebaseAuth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch (error) {
+  // すでに初期化済みの場合は既存のAuthインスタンスを取得
+  firebaseAuth = getAuth(app);
+}
+
+export const auth = firebaseAuth;
