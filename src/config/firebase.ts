@@ -11,21 +11,23 @@ const firebaseConfig = {
   messagingSenderId: "211342470418",
   appId: "1:211342470418:web:7955a86694880684d0d7cb",
   measurementId: "G-03Y08B7NEY"
-};
+  };
 
 // 既に初期化されている場合は既存のアプリを使い、なければ初期化する
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 let firebaseAuth;
 
-// Vercel（Web）環境と、スマホ（iOS/Android）環境で処理をクッキリ分ける
 if (Platform.OS === 'web') {
-  // Web環境では通常のgetAuthを使用。Firebaseがブラウザ用の保存領域（LocalStorage）を自動で使ってくれます。
+  // Vercel（Web）環境では、一切スマホ用ライブラリに触れずに初期化
   firebaseAuth = getAuth(app);
 } else {
-  // スマホ環境のときだけ、エラーの原因になるAsyncStorageを「その場」で安全に読み込む（動的インポート）
-  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
   try {
+    // Vercelのビルド静的解析を完全に騙すため、文字列を組み立てて require します
+    // これによりWebのコンパイラはスマホ用ライブラリの存在を完全に無視します
+    const moduleName = "@react-native-async-storage/async-storage";
+    const AsyncStorage = require(moduleName).default;
+    
     firebaseAuth = initializeAuth(app, {
       persistence: getReactNativePersistence(AsyncStorage),
     });
