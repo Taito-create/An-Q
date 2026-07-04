@@ -14,6 +14,7 @@ import { useQuestions } from './hooks/useQuestions';
 import { getAnswerText } from './utils/answerUtils';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
+import './quiz.css';
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -354,7 +355,6 @@ export default function QuizScreen() {
     const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
     return () => {
       clearInterval(id);
-      if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
     };
   }, [isTimerActive, timeLeft, quizStarted, timeAttackMode]);
 
@@ -861,14 +861,7 @@ export default function QuizScreen() {
                   SoundManager.play('select');
                   setPreQuestionCount(parseInt(e.target.value, 10));
                 }}
-                style={{
-                  width: '100%',
-                  height: 8,
-                  borderRadius: 4,
-                  outline: 'none',
-                  accentColor: colors.primary,
-                  cursor: 'pointer',
-                }}
+                className="quiz-range"
               />
             </View>
             {/* スライダー下の表示: filtered.length を使う（タグ絞り込み反映） */}
@@ -1337,7 +1330,7 @@ export default function QuizScreen() {
               <img
                 src={currentQuestion.image}
                 alt="問題の画像"
-                style={{ width: '100%', height: 'auto', maxHeight: 300 }}
+                className="quiz-question-image"
               />
               
               {currentQuestion.imageAnnotations?.map((annotation) => (
