@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../src/config/firebase';
@@ -56,25 +56,37 @@ export default function LoginScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit || loading) return;
+    // 入力値の簡易チェック
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('入力エラー', 'メールアドレスとパスワードを入力してください。');
+      return;
+    }
+
+    if (loading) return;
 
     try {
       setLoading(true);
       SoundManager.play('decide');
 
+      let userCredential;
       if (isRegisterMode) {
-        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        // 新規登録
+        userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        console.log('Registration successful:', userCredential.user.uid);
         Alert.alert('登録完了', 'アカウントを作成しました。ホームへ移動します。');
-        navigate('/');
-        return;
+      } else {
+        // ログイン
+        userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        console.log('Login successful:', userCredential.user.uid);
+        Alert.alert('ログイン成功', 'ようこそ。学習を始めましょう。');
       }
 
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      Alert.alert('ログイン成功', 'ようこそ。学習を始めましょう。');
+      // 認証成功後、ホーム画面へ遷移
       navigate('/');
     } catch (e: any) {
-      console.error('LoginScreen error:', e);
-      Alert.alert('認証エラー', getAuthErrorMessage(e));
+      console.error('Auth error:', e);
+      const errorMessage = getAuthErrorMessage(e);
+      Alert.alert('認証エラー', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -110,15 +122,24 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={!canSubmit || loading}
+          disabled={loading}
           style={[
             styles.primaryButton,
-            { backgroundColor: !canSubmit || loading ? colors.border : colors.primary }
+            { backgroundColor: loading ? colors.border : colors.primary }
           ]}
         >
-          <Text style={[styles.primaryButtonText, { color: !canSubmit || loading ? colors.textSecondary : onPrimary }]}>
-            {loading ? '処理中...' : isRegisterMode ? '新規登録する' : 'ログインする'}
-          </Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.textSecondary} />
+              <Text style={[styles.primaryButtonText, { color: colors.textSecondary, marginLeft: 8 }]}>
+                通信中...
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.primaryButtonText, { color: onPrimary }]}>
+              {isRegisterMode ? '新規登録する' : 'ログインする'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -196,6 +217,11 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
