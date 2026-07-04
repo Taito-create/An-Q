@@ -160,35 +160,44 @@ export default function QuizScreen() {
   }, []);
 
   // ──────────────────────────────────────────────
-  // 自動再生タイマー（修正版）
+  // 自動再生タイマー（修正版 2）
   // ──────────────────────────────────────────────
   useEffect(() => {
+    console.log('[AutoPlay] useEffect triggered:', { autoPlayMode, quizStarted, isPaused, shuffledQuestionsLength: shuffledQuestions.length });
+
     if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
       if (autoPlayTimerRef.current) {
+        console.log('[AutoPlay] Clearing timer (exit condition)');
         clearInterval(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
       return;
     }
 
+    // 既存のタイマーをクリア
     if (autoPlayTimerRef.current) {
+      console.log('[AutoPlay] Clearing existing timer');
       clearInterval(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
 
+    // フェーズをリセット
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
 
     let remaining = autoPlayInterval;
     setAutoPlayCountdown(remaining);
+    console.log('[AutoPlay] Starting new timer, interval:', autoPlayInterval);
 
     const timer = setInterval(() => {
       remaining -= 1;
       setAutoPlayCountdown(remaining);
+      console.log('[AutoPlay] Countdown:', remaining, 'Phase:', autoPlayPhaseRef.current);
 
       if (remaining <= 0) {
         if (autoPlayPhaseRef.current === 'question') {
           // 質問 → 回答へ切り替え
+          console.log('[AutoPlay] Switching to answer phase');
           autoPlayPhaseRef.current = 'answer';
           setAutoPlayPhase('answer');
           remaining = autoPlayInterval;
@@ -196,7 +205,10 @@ export default function QuizScreen() {
         } else {
           // 回答表示終了 → 次の問題へ
           const nextIdx = currentIndexRef.current + 1;
+          console.log('[AutoPlay] Moving to next question:', nextIdx, '/', shuffledQuestions.length);
+          
           if (nextIdx >= shuffledQuestions.length) {
+            console.log('[AutoPlay] All questions completed');
             clearInterval(timer);
             autoPlayTimerRef.current = null;
             navigate('/results', { 
@@ -207,13 +219,17 @@ export default function QuizScreen() {
               } 
             });
           } else {
+            // 次の問題に遷移
             currentIndexRef.current = nextIdx;
             setCurrentIndex(nextIdx);
             questionStartTime.current = Date.now();
+            
+            // 質問フェーズに戻してタイマーを継続
             autoPlayPhaseRef.current = 'question';
             setAutoPlayPhase('question');
             remaining = autoPlayInterval;
             setAutoPlayCountdown(remaining);
+            console.log('[AutoPlay] Moved to question', nextIdx, 'resetting timer');
           }
         }
       }
@@ -223,6 +239,7 @@ export default function QuizScreen() {
 
     return () => {
       if (autoPlayTimerRef.current) {
+        console.log('[AutoPlay] Cleanup timer');
         clearInterval(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
