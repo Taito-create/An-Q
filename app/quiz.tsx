@@ -87,6 +87,7 @@ export default function QuizScreen() {
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
+  const autoPlayRemainingRef = useRef<number>(5);
   const currentIndexRef = useRef(0);
 
   // currentIndex が変わったら ref も更新
@@ -160,10 +161,15 @@ export default function QuizScreen() {
   }, []);
 
   // ──────────────────────────────────────────────
-  // 自動再生タイマー（修正版 2）
+  // 自動再生タイマー（修正版 3 - useRef 使用）
   // ──────────────────────────────────────────────
   useEffect(() => {
-    console.log('[AutoPlay] useEffect triggered:', { autoPlayMode, quizStarted, isPaused, shuffledQuestionsLength: shuffledQuestions.length });
+    console.log('[AutoPlay] useEffect triggered:', { 
+      autoPlayMode, 
+      quizStarted, 
+      isPaused, 
+      shuffledQuestionsLength: shuffledQuestions.length 
+    });
 
     if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
       if (autoPlayTimerRef.current) {
@@ -181,27 +187,26 @@ export default function QuizScreen() {
       autoPlayTimerRef.current = null;
     }
 
-    // フェーズをリセット
+    // フェーズと残り時間をリセット
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
-
-    let remaining = autoPlayInterval;
-    setAutoPlayCountdown(remaining);
+    autoPlayRemainingRef.current = autoPlayInterval;
+    setAutoPlayCountdown(autoPlayRemainingRef.current);
     console.log('[AutoPlay] Starting new timer, interval:', autoPlayInterval);
 
     const timer = setInterval(() => {
-      remaining -= 1;
-      setAutoPlayCountdown(remaining);
-      console.log('[AutoPlay] Countdown:', remaining, 'Phase:', autoPlayPhaseRef.current);
+      autoPlayRemainingRef.current -= 1;
+      setAutoPlayCountdown(autoPlayRemainingRef.current);
+      console.log('[AutoPlay] Countdown:', autoPlayRemainingRef.current, 'Phase:', autoPlayPhaseRef.current);
 
-      if (remaining <= 0) {
+      if (autoPlayRemainingRef.current <= 0) {
         if (autoPlayPhaseRef.current === 'question') {
           // 質問 → 回答へ切り替え
           console.log('[AutoPlay] Switching to answer phase');
           autoPlayPhaseRef.current = 'answer';
           setAutoPlayPhase('answer');
-          remaining = autoPlayInterval;
-          setAutoPlayCountdown(remaining);
+          autoPlayRemainingRef.current = autoPlayInterval;
+          setAutoPlayCountdown(autoPlayRemainingRef.current);
         } else {
           // 回答表示終了 → 次の問題へ
           const nextIdx = currentIndexRef.current + 1;
@@ -227,8 +232,8 @@ export default function QuizScreen() {
             // 質問フェーズに戻してタイマーを継続
             autoPlayPhaseRef.current = 'question';
             setAutoPlayPhase('question');
-            remaining = autoPlayInterval;
-            setAutoPlayCountdown(remaining);
+            autoPlayRemainingRef.current = autoPlayInterval;
+            setAutoPlayCountdown(autoPlayRemainingRef.current);
             console.log('[AutoPlay] Moved to question', nextIdx, 'resetting timer');
           }
         }
