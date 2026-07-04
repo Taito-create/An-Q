@@ -89,6 +89,7 @@ export default function QuizScreen() {
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
   const autoPlayRemainingRef = useRef<number>(5);
+  const autoPlaySessionRef = useRef(0);
   const currentIndexRef = useRef(0);
 
   // currentIndex が変わったら ref も更新
@@ -175,18 +176,21 @@ export default function QuizScreen() {
     if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
       if (autoPlayTimerRef.current) {
         console.log('[AutoPlay] Clearing timer (exit condition)');
-        clearInterval(autoPlayTimerRef.current);
+        clearTimeout(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
+      autoPlaySessionRef.current += 1;
       return;
     }
 
     // 既存のタイマーをクリア
     if (autoPlayTimerRef.current) {
       console.log('[AutoPlay] Clearing existing timer');
-      clearInterval(autoPlayTimerRef.current);
+      clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
+
+    const sessionId = ++autoPlaySessionRef.current;
 
     // フェーズと残り時間をリセット
     autoPlayPhaseRef.current = 'question';
@@ -195,7 +199,11 @@ export default function QuizScreen() {
     setAutoPlayCountdown(autoPlayRemainingRef.current);
     console.log('[AutoPlay] Starting new timer, interval:', autoPlayInterval);
 
-    const timer = setInterval(() => {
+    const tick = () => {
+      if (sessionId !== autoPlaySessionRef.current) {
+        return;
+      }
+
       autoPlayRemainingRef.current -= 1;
       setAutoPlayCountdown(autoPlayRemainingRef.current);
       console.log('[AutoPlay] Countdown:', autoPlayRemainingRef.current, 'Phase:', autoPlayPhaseRef.current);
@@ -215,8 +223,11 @@ export default function QuizScreen() {
           
           if (nextIdx >= shuffledQuestions.length) {
             console.log('[AutoPlay] All questions completed');
-            clearInterval(timer);
-            autoPlayTimerRef.current = null;
+                      autoPlaySessionRef.current += 1;
+                      if (autoPlayTimerRef.current) {
+                        clearTimeout(autoPlayTimerRef.current);
+                        autoPlayTimerRef.current = null;
+                      }
             navigate('/results', { 
               state: { 
                 total: shuffledQuestions.length, 
@@ -239,18 +250,19 @@ export default function QuizScreen() {
           }
         }
       }
-    }, 1000);
+      autoPlayTimerRef.current = setTimeout(tick, 1000);
+    };
 
-    autoPlayTimerRef.current = timer;
+    autoPlayTimerRef.current = setTimeout(tick, 1000);
 
     return () => {
       if (autoPlayTimerRef.current) {
         console.log('[AutoPlay] Cleanup timer');
-        clearInterval(autoPlayTimerRef.current);
+        clearTimeout(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
     };
-  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length, navigate]);
+  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
