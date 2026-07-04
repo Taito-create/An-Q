@@ -1,8 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence, getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
-// 新しく取得した、完全に正しい接続鍵です！
+// 正しい接続鍵です！
 const firebaseConfig = {
   apiKey: "AIzaSyBr8S_zcf555B9LZWGLPayuFb8H6Og1MVI",
   authDomain: "an-q-77a3f.firebaseapp.com",
@@ -13,18 +13,25 @@ const firebaseConfig = {
   measurementId: "G-03Y08B7NEY"
 };
 
-// 既に初期化されている場合は既存のアプリを使い、なければ初期化する（重複エラー防止）
+// 既に初期化されている場合は既存のアプリを使い、なければ初期化する
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// React Native（Vercel/Web両対応）で安全にログイン状態を保持する設定
 let firebaseAuth;
-try {
-  firebaseAuth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (error) {
-  // すでに初期化済みの場合は既存のAuthインスタンスを取得
+
+// Vercel（Web）環境と、スマホ（iOS/Android）環境で処理をクッキリ分ける
+if (Platform.OS === 'web') {
+  // Web環境では通常のgetAuthを使用。Firebaseがブラウザ用の保存領域（LocalStorage）を自動で使ってくれます。
   firebaseAuth = getAuth(app);
+} else {
+  // スマホ環境のときだけ、エラーの原因になるAsyncStorageを「その場」で安全に読み込む（動的インポート）
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  try {
+    firebaseAuth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error) {
+    firebaseAuth = getAuth(app);
+  }
 }
 
 export const auth = firebaseAuth;
