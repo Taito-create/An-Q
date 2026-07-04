@@ -159,10 +159,11 @@ export default function QuizScreen() {
     SoundManager.initialize();
   }, []);
 
-  // 自動再生タイマー
+  // ──────────────────────────────────────────────
+  // 自動再生タイマー（修正版）
+  // ──────────────────────────────────────────────
   useEffect(() => {
-    console.log('[AutoPlay] useEffect triggered:', { autoPlayMode, quizStarted, isPaused });
-    if (!autoPlayMode || !quizStarted || isPaused) {
+    if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
       if (autoPlayTimerRef.current) {
         clearInterval(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
@@ -175,46 +176,50 @@ export default function QuizScreen() {
       autoPlayTimerRef.current = null;
     }
 
-    const startAutoPlay = () => {
-      autoPlayPhaseRef.current = 'question';
-      setAutoPlayPhase('question');
+    autoPlayPhaseRef.current = 'question';
+    setAutoPlayPhase('question');
 
-      let remaining = autoPlayInterval;
+    let remaining = autoPlayInterval;
+    setAutoPlayCountdown(remaining);
+
+    const timer = setInterval(() => {
+      remaining -= 1;
       setAutoPlayCountdown(remaining);
 
-      const tick = () => {
-        remaining -= 1;
-        console.log('[AutoPlay] tick:', remaining, 'phase:', autoPlayPhaseRef.current);
-        setAutoPlayCountdown(remaining);
-
-        if (remaining <= 0) {
-          if (autoPlayPhaseRef.current === 'question') {
-            autoPlayPhaseRef.current = 'answer';
-            setAutoPlayPhase('answer');
+      if (remaining <= 0) {
+        if (autoPlayPhaseRef.current === 'question') {
+          // 質問 → 回答へ切り替え
+          autoPlayPhaseRef.current = 'answer';
+          setAutoPlayPhase('answer');
+          remaining = autoPlayInterval;
+          setAutoPlayCountdown(remaining);
+        } else {
+          // 回答表示終了 → 次の問題へ
+          const nextIdx = currentIndexRef.current + 1;
+          if (nextIdx >= shuffledQuestions.length) {
+            clearInterval(timer);
+            autoPlayTimerRef.current = null;
+            navigate('/results', { 
+              state: { 
+                total: shuffledQuestions.length, 
+                score: 0, 
+                results: [] 
+              } 
+            });
+          } else {
+            currentIndexRef.current = nextIdx;
+            setCurrentIndex(nextIdx);
+            questionStartTime.current = Date.now();
+            autoPlayPhaseRef.current = 'question';
+            setAutoPlayPhase('question');
             remaining = autoPlayInterval;
             setAutoPlayCountdown(remaining);
-          } else {
-            if (autoPlayTimerRef.current) {
-              clearInterval(autoPlayTimerRef.current);
-              autoPlayTimerRef.current = null;
-            }
-            const nextIndex = currentIndexRef.current + 1;
-            if (nextIndex >= shuffledQuestions.length) {
-              navigate('/results', { state: { total: shuffledQuestions.length, score: 0, results: [] } });
-            } else {
-              currentIndexRef.current = nextIndex;
-              setCurrentIndex(nextIndex);
-              questionStartTime.current = Date.now();
-              setTimeout(() => startAutoPlay(), 50);
-            }
           }
         }
-      };
+      }
+    }, 1000);
 
-      autoPlayTimerRef.current = setInterval(tick, 1000);
-    };
-
-    startAutoPlay();
+    autoPlayTimerRef.current = timer;
 
     return () => {
       if (autoPlayTimerRef.current) {
@@ -222,7 +227,7 @@ export default function QuizScreen() {
         autoPlayTimerRef.current = null;
       }
     };
-  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval]);
+  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length, navigate]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -1274,8 +1279,8 @@ export default function QuizScreen() {
               ? shuffledQuestions[currentIndex].question
               : (shuffledQuestions[currentIndex].descriptiveAnswer
                 || (shuffledQuestions[currentIndex].answerType === 'truefalse'
-                  ? (shuffledQuestions[currentIndex].correctAnswer ? '○' : '✕')
-                  : shuffledQuestions[currentIndex].options?.[shuffledQuestions[currentIndex].correctAnswer as number] || '')
+                  ? (shuffledQuestions[currentIndex].trueFalseAnswer ? '○' : '✕')
+                  : shuffledQuestions[currentIndex].multipleChoice?.options?.[shuffledQuestions[currentIndex].multipleChoice.correctAnswer] || '')
               )
             }
           </Text>
