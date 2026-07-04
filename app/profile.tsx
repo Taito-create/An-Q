@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
@@ -8,6 +8,7 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
+import { updateProfile } from 'firebase/auth';
 
 interface UserProfile {
   username: string;
@@ -66,7 +67,15 @@ export default function ProfileScreen() {
       const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
       const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';
       const questions = JSON.parse(questionsRaw);
-      const username = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
+      
+      // Firebase AuthのdisplayNameを最優先で使用
+      let username = 'An-Q Learner';
+      if (user?.displayName) {
+        username = user.displayName;
+      } else {
+        username = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
+      }
+      
       const bio = await AsyncStorage.getItem('user_bio') || '';
       const profileImage = await AsyncStorage.getItem('user_profile_image') || null;
 
@@ -123,6 +132,16 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem('user_profile_image', editProfileImage);
       }
 
+      // Firebase AuthのdisplayNameも更新
+      if (user) {
+        try {
+          await updateProfile(user, { displayName: editUsername });
+          console.log('Firebase profile updated');
+        } catch (error) {
+          console.error('Failed to update Firebase profile:', error);
+        }
+      }
+
       setProfile(prev => ({
         ...prev,
         username: editUsername,
@@ -164,25 +183,42 @@ export default function ProfileScreen() {
               style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
               onPress={async () => {
                 SoundManager.play('decide');
-                Alert.alert(
-                  locale === 'ja' ? 'ログアウト' : 'Logout',
-                  locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
-                  [
-                    { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-                    {
-                      text: locale === 'ja' ? 'ログアウト' : 'Logout',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await logout();
-                          navigate('/login');
-                        } catch (error) {
-                          console.error('Logout failed:', error);
-                        }
-                      }
-                    }
-                  ]
-                );
+                
+                // Webとネイティブでダイアログを使い分け
+                const confirmLogout = Platform.OS === 'web' 
+                  ? window.confirm(locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?')
+                  : new Promise<boolean>((resolve) => {
+                      Alert.alert(
+                        locale === 'ja' ? 'ログアウト' : 'Logout',
+                        locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
+                        [
+                          { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                          {
+                            text: locale === 'ja' ? 'ログアウト' : 'Logout',
+                            style: 'destructive',
+                            onPress: () => resolve(true)
+                          }
+                        ]
+                      );
+                    });
+
+                const shouldLogout = await confirmLogout;
+                
+                if (shouldLogout) {
+                  try {
+                    // ローカルストレージのユーザーデータを削除
+                    await AsyncStorage.multiRemove(['user_username', 'user_bio', 'user_profile_image']);
+                    
+                    // Firebase Authからログアウト
+                    await logout();
+                    
+                    // ログイン画面へ遷移
+                    navigate('/login');
+                  } catch (error) {
+                    console.error('Logout failed:', error);
+                    Alert.alert('エラー', 'ログアウトに失敗しました。');
+                  }
+                }
               }}
             >
               <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>

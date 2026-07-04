@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../../src/config/firebase';
 import { SoundManager } from '../sound';
 import { useTheme } from '../theme';
 import { useAuth } from './AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const { colors, onPrimary } = useTheme();
@@ -14,6 +15,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
 
@@ -62,6 +64,12 @@ export default function LoginScreen() {
       return;
     }
 
+    // 新規登録モードの場合はユーザー名もチェック
+    if (isRegisterMode && !username.trim()) {
+      Alert.alert('入力エラー', 'ユーザー名を入力してください。');
+      return;
+    }
+
     if (loading) return;
 
     try {
@@ -73,6 +81,15 @@ export default function LoginScreen() {
         // 新規登録
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
         console.log('Registration successful:', userCredential.user.uid);
+
+        // Firebase AuthにdisplayNameを保存
+        await updateProfile(userCredential.user, { displayName: username.trim() });
+        console.log('Firebase displayName updated:', username.trim());
+
+        // ローカルストレージにもユーザー名を保存
+        await AsyncStorage.setItem('user_username', username.trim());
+        console.log('Username cached locally');
+
         Alert.alert('登録完了', 'アカウントを作成しました。ホームへ移動します。');
       } else {
         // ログイン
@@ -97,6 +114,22 @@ export default function LoginScreen() {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>学習データを安全に保存して、どこでも続きから学べます。</Text>
+
+        {/* 新規登録モード時のみユーザー名入力欄を表示 */}
+        {isRegisterMode && (
+          <>
+            <Text style={[styles.label, { color: colors.text }]}>ユーザー名</Text>
+            <TextInput
+              value={username}
+              onChangeText={setUsername}
+              placeholder="ニックネーム"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
+              placeholderTextColor={colors.textSecondary}
+            />
+          </>
+        )}
 
         <Text style={[styles.label, { color: colors.text }]}>メールアドレス</Text>
         <TextInput
