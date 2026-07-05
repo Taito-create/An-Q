@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
+import { db } from '../src/config/firebase';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
-import { updateProfile } from 'firebase/auth';
 
 interface UserProfile {
   username: string;
@@ -56,42 +58,45 @@ export default function ProfileScreen() {
   const [editBio, setEditBio] = useState('');
   const [editProfileImage, setEditProfileImage] = useState<string | null>(null);
 
-  // トリミング用のState
+  // --- 🎥 トリミングモーダル用State群 ---
   const [showCropModal, setShowCropModal] = useState(false);
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1.0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [user]);
 
   const loadProfile = async () => {
     try {
+      let username = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
+      let bio = await AsyncStorage.getItem('user_bio') || '';
+      let profileImage = await AsyncStorage.getItem('user_profile_image') || null;
+
+      // ★ Firestoreからクラウド上の最新プロファイルを最優先で同期
+      if (user) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          username = data.username || username;
+          profileImage = data.profileImage || profileImage;
+          bio = data.bio || bio;
+          
+          // キャッシュ更新
+          await AsyncStorage.setItem('user_username', username);
+          await AsyncStorage.setItem('user_profile_image', profileImage || '');
+          await AsyncStorage.setItem('user_bio', bio);
+        }
+      }
+
       const level = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
       const xp = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
       const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';
       const questions = JSON.parse(questionsRaw);
-      
-      // Firebase Authの情報を最優先で使用
-      let username = 'An-Q Learner';
-      if (user?.displayName) {
-        username = user.displayName;
-      } else {
-        username = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
-      }
-      
-      let profileImage = await AsyncStorage.getItem('user_profile_image') || null;
-      if (user?.photoURL) {
-        profileImage = user.photoURL;
-      }
-      
-      const bio = await AsyncStorage.getItem('user_bio') || '';
 
       const stats = await loadStats();
       const resultsRaw = await AsyncStorage.getItem('quizResults') || '[]';
@@ -127,115 +132,84 @@ export default function ProfileScreen() {
     }
   };
 
+  // 画像ファイル選択時：トリミング用モーダルを起動
   const handleProfileImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const imageData = e.target?.result as string;
-        setOriginalImage(imageData);
-        setZoom(1);
-        setDragPosition({ x: 0, y: 0 });
+        setRawImageSrc(e.target?.result as string);
+        setZoom(1.0);
+        setDragPos({ x: 0, y: 0 });
         setShowCropModal(true);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // マウスドラッグ処理
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // --- 🐁 マウス/タッチドラッグ処理群 ---
+  const handleStart = (clientX: number, clientY: number) => {
     setIsDragging(true);
-    setDragStart({ x: e.clientX - dragPosition.x, y: e.clientY - dragPosition.y });
+    setDragStart({ x: clientX - dragPos.x, y: clientY - dragPos.y });
   };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDragging) {
-      setDragPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      });
-    }
+  const handleMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    setDragPos({ x: clientX - dragStart.x, y: clientY - dragStart.y });
   };
+  const handleEnd = () => setIsDragging(false);
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // 画像切り抜き処理（150x150px、JPEG圧縮0.6）
-  const handleCrop = () => {
-    if (!originalImage || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
+  // --- 📐 Canvasを使用した超軽量150pxトリミングロジック ---
+  const executeCrop = () => {
+    if (!rawImageSrc) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 150;
+    canvas.height = 150;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
 
-    const img = new Image();
-    img.onload = () => {
-      // キャンバスのサイズを150x150ピクセルに設定（超軽量）
-      const size = 150;
-      canvas.width = size;
-      canvas.height = size;
+    if (ctx) {
+      const img = new Image();
+      img.src = rawImageSrc;
+      img.onload = () => {
+        ctx.clearRect(0, 0, 150, 150);
+        const baseWidth = 200; // UI上のプレビュー幅基準値
+        const finalScale = 150 / baseWidth; // 最終サイズ(150px)へのスケール比
 
-      // 画像の元のサイズ
-      const imgWidth = img.width;
-      const imgHeight = img.height;
+        ctx.save();
+        ctx.translate(75, 75); // 中心点をキャンバス中央へ
+        ctx.translate(dragPos.x * finalScale, dragPos.y * finalScale);
+        ctx.scale(zoom * finalScale, zoom * finalScale);
 
-      // ズームとドラッグを考慮して描画
-      const scaledWidth = imgWidth * zoom;
-      const scaledHeight = imgHeight * zoom;
+        const displayWidth = baseWidth;
+        const displayHeight = (img.height / img.width) * displayWidth;
 
-      // 中心位置を計算（ドラッグ位置を考慮）
-      const centerX = size / 2 - dragPosition.x;
-      const centerY = size / 2 - dragPosition.y;
+        ctx.drawImage(img, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
+        ctx.restore();
 
-      // クリッピング（円形）
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-      ctx.clip();
-
-      // 画像を描画
-      ctx.drawImage(
-        img,
-        centerX - scaledWidth / 2,
-        centerY - scaledHeight / 2,
-        scaledWidth,
-        scaledHeight
-      );
-
-      // Base64に変換（JPEG圧縮0.6でデータサイズを削減）
-      const croppedImage = canvas.toDataURL('image/jpeg', 0.6);
-      setEditProfileImage(croppedImage);
-      setShowCropModal(false);
-    };
-    img.src = originalImage;
+        // JPEGかつ画質0.6に落として容量を極限までカット
+        const base64Result = canvas.toDataURL('image/jpeg', 0.6);
+        setEditProfileImage(base64Result);
+        setShowCropModal(false);
+      };
+    }
   };
 
   const saveProfile = async () => {
     try {
+      // 1. ローカルストレージに保存
       await AsyncStorage.setItem('user_username', editUsername);
       await AsyncStorage.setItem('user_bio', editBio);
+      if (editProfileImage) {
+        await AsyncStorage.setItem('user_profile_image', editProfileImage);
+      }
 
-      // Firebase AuthのdisplayNameとphotoURLを直接更新（Firebase Storageは使わない）
+      // 2. ★ Firestoreに保存（容量制限を受けないため確実に同期します）
       if (user) {
-        try {
-          const updateData: { displayName: string; photoURL?: string } = {
-            displayName: editUsername,
-          };
-          
-          // 画像が変更されている場合のみphotoURLを更新
-          if (editProfileImage) {
-            updateData.photoURL = editProfileImage;
-          }
-          
-          await updateProfile(user, updateData);
-          console.log('Firebase profile updated');
-          
-          // ローカルストレージにも保存
-          await AsyncStorage.setItem('user_profile_image', editProfileImage || '');
-        } catch (error) {
-          console.error('Failed to update Firebase profile:', error);
-          Alert.alert('エラー', 'プロフィールの更新に失敗しました。');
-        }
+        await updateDoc(doc(db, 'users', user.uid), {
+          username: editUsername,
+          bio: editBio,
+          profileImage: editProfileImage,
+        });
+        await updateProfile(user, { displayName: editUsername });
       }
 
       setProfile(prev => ({
@@ -247,8 +221,10 @@ export default function ProfileScreen() {
 
       setIsEditing(false);
       SoundManager.play('complete');
+      Alert.alert('成功', 'プロフィールをクラウドに保存しました！');
     } catch (error) {
       console.error('Failed to save profile:', error);
+      Alert.alert('エラー', '保存に失敗しました。');
     }
   };
 
@@ -267,7 +243,7 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
             <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
@@ -276,45 +252,28 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           {user && (
             <TouchableOpacity
-              style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+              style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10 }}
               onPress={async () => {
                 SoundManager.play('decide');
-                
-                // Webとネイティブでダイアログを使い分け
-                const confirmLogout = Platform.OS === 'web' 
-                  ? window.confirm(locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?')
-                  : new Promise<boolean>((resolve) => {
-                      Alert.alert(
-                        locale === 'ja' ? 'ログアウト' : 'Logout',
-                        locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
-                        [
-                          { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                          {
-                            text: locale === 'ja' ? 'ログアウト' : 'Logout',
-                            style: 'destructive',
-                            onPress: () => resolve(true)
-                          }
-                        ]
-                      );
-                    });
-
-                const shouldLogout = await confirmLogout;
-                
-                if (shouldLogout) {
-                  try {
-                    // ローカルストレージのユーザーデータを削除
-                    await AsyncStorage.multiRemove(['user_username', 'user_bio', 'user_profile_image']);
-                    
-                    // Firebase Authからログアウト
-                    await logout();
-                    
-                    // ログイン画面へ遷移
-                    navigate('/login');
-                  } catch (error) {
-                    console.error('Logout failed:', error);
-                    Alert.alert('エラー', 'ログアウトに失敗しました。');
-                  }
-                }
+                Alert.alert(
+                  locale === 'ja' ? 'ログアウト' : 'Logout',
+                  locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
+                  [
+                    { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                    {
+                      text: locale === 'ja' ? 'ログアウト' : 'Logout',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await logout();
+                          navigate('/login');
+                        } catch (error) {
+                          console.error('Logout failed:', error);
+                        }
+                      }
+                    }
+                  ]
+                );
               }}
             >
               <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
@@ -326,70 +285,32 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* プロフィール画像 */}
-        <View style={[{ alignItems: 'center', marginBottom: 24, marginTop: 16 }]}>
+        {/* プロフィール画像表示 */}
+        <View style={{ alignItems: 'center', marginBottom: 24, marginTop: 16 }}>
           {isEditing ? (
             <TouchableOpacity
-              style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 12, overflow: 'hidden' }}
+              style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
               onPress={() => document.getElementById('profile-image-input')?.click()}
             >
               {editProfileImage ? (
                 <img src={editProfileImage} style={{ width: 120, height: 120, borderRadius: 60, objectFit: 'cover' }} alt="" />
               ) : (
-                <Text style={[{ fontSize: 40 }]}>📸</Text>
+                <Text style={{ fontSize: 40 }}>📸</Text>
               )}
             </TouchableOpacity>
           ) : (
-            <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 12, overflow: 'hidden' }}>
+            <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               {profile.profileImage ? (
                 <img src={profile.profileImage} style={{ width: 120, height: 120, borderRadius: 60, objectFit: 'cover' }} alt="" />
               ) : (
-                <View style={{ 
-                  width: 120, 
-                  height: 120, 
-                  borderRadius: 60, 
-                  backgroundColor: colors.primary + '40',
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  borderWidth: 3,
-                  borderColor: colors.primary + '60'
-                }}>
-                  <View style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 30,
-                    backgroundColor: 'transparent',
-                    borderWidth: 3,
-                    borderColor: '#FFFFFF',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative'
-                  }}>
-                    {/* 頭 */}
-                    <View style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: '#FFFFFF',
-                      position: 'absolute',
-                      top: 8
-                    }} />
-                    {/* 体 */}
-                    <View style={{
-                      width: 40,
-                      height: 28,
-                      borderRadius: 20,
-                      backgroundColor: '#FFFFFF',
-                      position: 'absolute',
-                      bottom: 4
-                    }} />
-                  </View>
+                <View style={{ width: 120, height: 120, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#ffffff', fontSize: 44 }}>👤</Text>
                 </View>
               )}
             </View>
           )}
           {isEditing && (
-            <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
+            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 6 }}>
               {locale === 'ja' ? 'タップして画像を変更' : 'Tap to change image'}
             </Text>
           )}
@@ -397,193 +318,133 @@ export default function ProfileScreen() {
 
         {/* ユーザー名 */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }]}>
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>
             {locale === 'ja' ? 'ユーザー名' : 'Username'}
           </Text>
           {isEditing ? (
             <TextInput
-              style={[{ borderBottomWidth: 1, borderBottomColor: colors.border, padding: 8, color: colors.text, fontSize: 16 }]}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.border, padding: 8, color: colors.text, fontSize: 16 }}
               value={editUsername}
               onChangeText={setEditUsername}
-              placeholder={locale === 'ja' ? 'ユーザー名' : 'Username'}
-              placeholderTextColor={colors.textSecondary}
             />
           ) : (
-            <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text }]}>{profile.username}</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>{profile.username}</Text>
           )}
         </View>
 
         {/* 自己紹介 */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }]}>
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>
             {locale === 'ja' ? '自己紹介' : 'Bio'}
           </Text>
           {isEditing ? (
             <TextInput
-              style={[{ borderBottomWidth: 1, borderBottomColor: colors.border, padding: 8, color: colors.text, fontSize: 14, minHeight: 60 }]}
+              style={{ borderBottomWidth: 1, borderBottomColor: colors.border, padding: 8, color: colors.text, fontSize: 14, minHeight: 60 }}
               value={editBio}
               onChangeText={setEditBio}
-              placeholder={locale === 'ja' ? '自己紹介を入力' : 'Enter bio'}
-              placeholderTextColor={colors.textSecondary}
               multiline
             />
           ) : (
-            <Text style={[{ fontSize: 14, color: colors.text, lineHeight: 20 }]}>
+            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>
               {profile.bio || (locale === 'ja' ? '未設定' : 'Not set')}
             </Text>
           )}
         </View>
 
-        {/* レベル */}
+        {/* レベル・統計・その他UI */}
         <View style={[styles.card, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={[{ fontSize: 24, fontWeight: '700', color: colors.primary }]}>Lv. {profile.level}</Text>
-            <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
-              {profile.currentXP} / {profile.nextLevelXP} XP
-            </Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: colors.primary }}>Lv. {profile.level}</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>{profile.currentXP} / {profile.nextLevelXP} XP</Text>
           </View>
           <View style={{ backgroundColor: colors.primary + '40', borderRadius: 8, height: 12, overflow: 'hidden' }}>
             <View style={{ height: '100%', width: `${xpProgress}%`, backgroundColor: colors.primary, borderRadius: 8 }} />
           </View>
         </View>
 
-        {/* 通貨 */}
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
           <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>✨ Qコイン</Text>
-            <Text style={[{ fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: 4 }]}>{profile.totalCoins}</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>✨ Qコイン</Text>
+            <Text style={{ fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: 4 }}>{profile.totalCoins}</Text>
           </View>
           <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>⚡ XP</Text>
-            <Text style={[{ fontSize: 28, fontWeight: '700', color: colors.success || '#4CAF50', marginTop: 4 }]}>{profile.currentXP}</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>⚡ XP</Text>
+            <Text style={{ fontSize: 28, fontWeight: '700', color: colors.success || '#4CAF50', marginTop: 4 }}>{profile.currentXP}</Text>
           </View>
         </View>
 
-        {/* 統計 */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }]}>
-            📊 {locale === 'ja' ? '統計' : 'Stats'}
-          </Text>
-          <View style={styles.statRow}><Text style={[{ color: colors.text }]}>{locale === 'ja' ? '作成した問題' : 'Problems Created'}</Text><Text style={[{ color: colors.primary, fontWeight: '700' }]}>{profile.totalQuestionsCreated}</Text></View>
-          <View style={styles.statRow}><Text style={[{ color: colors.text }]}>{locale === 'ja' ? 'クイズ実施' : 'Quizzes Played'}</Text><Text style={[{ color: colors.primary, fontWeight: '700' }]}>{profile.totalQuizzesPlayed}</Text></View>
-          <View style={styles.statRow}><Text style={[{ color: colors.text }]}>{locale === 'ja' ? '正答率' : 'Correct Rate'}</Text><Text style={[{ color: colors.success || '#4CAF50', fontWeight: '700' }]}>{profile.correctRate}%</Text></View>
-          <View style={styles.statRow}><Text style={[{ color: colors.text }]}>{locale === 'ja' ? 'ストリーク' : 'Streak'}</Text><Text style={[{ color: colors.primary, fontWeight: '700' }]}>🔥 {profile.streakDays}</Text></View>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>📊 {locale === 'ja' ? '統計' : 'Stats'}</Text>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '作成した問題' : 'Problems Created'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuestionsCreated}</Text></View>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'クイズ実施' : 'Quizzes Played'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuizzesPlayed}</Text></View>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '正答率' : 'Correct Rate'}</Text><Text style={{ color: colors.success || '#4CAF50', fontWeight: '700' }}>{profile.correctRate}%</Text></View>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'ストリーク' : 'Streak'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>🔥 {profile.streakDays}</Text></View>
         </View>
 
-        {/* 称号 */}
         {profile.achievements.length > 0 && (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }]}>
-              🏆 {locale === 'ja' ? '称号' : 'Achievements'}
-            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>🏆 {locale === 'ja' ? '称号' : 'Achievements'}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {profile.achievements.map((achievement, i) => (
                 <View key={i} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                  <Text style={[{ color: colors.primary, fontSize: 12, fontWeight: '600' }]}>{achievement}</Text>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{achievement}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
-
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} style={{ display: 'none' }} aria-label={locale === 'ja' ? 'プロフィール画像をアップロード' : 'Upload profile image'} />
+      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} style={{ display: 'none' }} aria-label="アップロード" />
 
-      {/* トリミングモーダル */}
-      {showCropModal && (
+      {/* 🎬 ==================== YouTube風トリミングモーダル UI ==================== */}
+      {showCropModal && rawImageSrc && (
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 16 }]}>
-              {locale === 'ja' ? '画像をトリミング' : 'Crop Image'}
-            </Text>
-
-            {/* トリミングエリア */}
-            <View style={styles.cropContainer}>
-              <div
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>画像をトリミング</Text>
+            
+            {/* ドラッグ操作可能な円形プレビュー枠 */}
+            <div 
+              style={{ width: 200, height: 200, borderRadius: 100, overflow: 'hidden', backgroundColor: '#000', position: 'relative', cursor: 'move', margin: '20px auto', boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)' }}
+              onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
+              onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
+              onMouseUp={handleEnd}
+              onMouseLeave={handleEnd}
+              onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
+              onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
+              onTouchEnd={handleEnd}
+            >
+              <img 
+                src={rawImageSrc} 
                 style={{
-                  width: 300,
-                  height: 300,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  cursor: isDragging ? 'grabbing' : 'grab',
-                  borderRadius: 150,
-                }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-              >
-                {originalImage && (
-                  <img
-                    src={originalImage}
-                    style={{
-                      position: 'absolute',
-                      width: 300 * zoom,
-                      height: 'auto',
-                      left: 150 - (150 * zoom) + dragPosition.x,
-                      top: 150 - (150 * zoom) + dragPosition.y,
-                      userSelect: 'none',
-                      pointerEvents: 'none',
-                    }}
-                    alt=""
-                    draggable={false}
-                  />
-                )}
-                {/* マスク */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderRadius: 150,
-                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
-                  pointerEvents: 'none',
-                }} />
-              </div>
-            </View>
+                  position: 'absolute', left: '50%', top: '50%', width: 200, height: 'auto',
+                  transform: `translate(-50%, -50%) translate(${dragPos.x}px, ${dragPos.y}px) scale(${zoom})`,
+                  userSelect: 'none', pointerEvents: 'none'
+                }} 
+                alt="" 
+              />
+            </div>
 
             {/* ズームスライダー */}
-            <View style={{ width: 300, marginVertical: 16 }}>
-              <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }]}>
-                {locale === 'ja' ? 'ズーム' : 'Zoom'}: {zoom.toFixed(1)}x
-              </Text>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.1"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                style={{ width: '100%' }}
-                aria-label={locale === 'ja' ? 'ズームレベル' : 'Zoom level'}
+            <View style={{ width: '100%', paddingHorizontal: 20, marginBottom: 20 }}>
+              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>ズーム: {zoom.toFixed(1)}x</Text>
+              <input 
+                type="range" min="1.0" max="3.0" step="0.1" value={zoom} 
+                onChange={(e) => setZoom(parseFloat(e.target.value))} 
+                style={{ width: '100%', cursor: 'pointer' }} 
               />
             </View>
 
-            {/* ボタン */}
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 12, backgroundColor: colors.border, borderRadius: 10, alignItems: 'center' }}
-                onPress={() => setShowCropModal(false)}
-              >
-                <Text style={{ color: colors.text, fontWeight: '700' }}>
-                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
-                </Text>
+            {/* ボタンコンテナ */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', gap: 12 }}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#e0e0e0' }]} onPress={() => setShowCropModal(false)}>
+                <Text style={{ color: '#333', fontWeight: '700' }}>キャンセル</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center' }}
-                onPress={handleCrop}
-              >
-                <Text style={{ color: onPrimary, fontWeight: '700' }}>
-                  {locale === 'ja' ? '切り抜き' : 'Crop'}
-                </Text>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={executeCrop}>
+                <Text style={{ color: onPrimary, fontWeight: '700' }}>切り抜き</Text>
               </TouchableOpacity>
             </View>
-
-            {/* 隠しcanvas（150x150px、JPEG圧縮0.6） */}
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
           </View>
         </View>
       )}
@@ -598,30 +459,9 @@ const styles = StyleSheet.create({
   content: { padding: 16, flex: 1 },
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  button: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  buttonText: { fontWeight: '700', fontSize: 16 },
-  modalOverlay: {
-    position: 'fixed' as any,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modalContent: {
-    borderRadius: 20,
-    padding: 24,
-    maxWidth: 400,
-    width: '90%',
-    alignItems: 'center',
-  },
-  cropContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 16,
-  },
+  // モーダル用スタイル
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
+  modalContent: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '90%', maxWidth: 320, alignItems: 'center', overflow: 'hidden' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+  modalButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }
 });

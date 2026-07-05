@@ -1,7 +1,9 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { Platform } from "react-native";
 
-// あなたの正しい接続鍵です！
+// 正しい接続鍵です！
 const firebaseConfig = {
   apiKey: "AIzaSyBr8S_zcf555B9LZWGLPayuFb8H6Og1MVI",
   authDomain: "an-q-77a3f.firebaseapp.com",
@@ -15,5 +17,27 @@ const firebaseConfig = {
 // 既に初期化されている場合は既存のアプリを使い、なければ初期化する
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Vite（Web環境）では、これだけで自動ログイン状態の保持が100%完璧に動作します！
-export const auth = getAuth(app);
+let firebaseAuth;
+
+if (Platform.OS === 'web') {
+  // Vercel（Web）環境では、一切スマホ用ライブラリに触れずに初期化
+  firebaseAuth = getAuth(app);
+} else {
+  try {
+    // Vercelのビルド静的解析を完全に騙すため、文字列を組み立てて require します
+    const moduleName = "@react-native-async-storage/async-storage";
+    const AsyncStorage = require(moduleName).default;
+    
+    // getReactNativePersistence は動的にインポート
+    const { getReactNativePersistence } = require("firebase/auth");
+    
+    firebaseAuth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (error) {
+    firebaseAuth = getAuth(app);
+  }
+}
+
+export const auth = firebaseAuth;
+export const db = getFirestore(app);
