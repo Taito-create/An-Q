@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -281,18 +281,26 @@ export default function ProfileScreen() {
               style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10 }}
               onPress={() => {
                 SoundManager.play('decide');
-                Alert.alert(
-                  locale === 'ja' ? 'ログアウト' : 'Logout',
-                  locale === 'ja' ? 'ログアウトしますか？' : 'Are you sure you want to logout?',
-                  [
-                    { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-                    {
-                      text: locale === 'ja' ? 'ログアウト' : 'Logout',
-                      style: 'destructive',
-                      onPress: handleLogout
-                    }
-                  ]
-                );
+
+                if (Platform.OS === 'web') {
+                  // 🌐 Web環境（Vercel）ではブラウザ標準の確実なダイアログを使用
+                  const confirmed = window.confirm(
+                    locale === 'ja' ? '本当にログアウトしますか？' : 'Are you sure you want to log out?'
+                  );
+                  if (confirmed) {
+                    handleLogout(); // OKが押されたら確実にログアウト関数を実行！
+                  }
+                } else {
+                  // 📱 スマホ環境（iOS/Android）では既存のAlertを使用
+                  Alert.alert(
+                    locale === 'ja' ? 'ログアウト' : 'Log Out',
+                    locale === 'ja' ? '本当にログアウトしますか？' : 'Are you sure you want to log out?',
+                    [
+                      { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                      { text: locale === 'ja' ? 'ログアウト' : 'Log Out', onPress: handleLogout }
+                    ]
+                  );
+                }
               }}
             >
               <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
