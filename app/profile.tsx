@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../src/config/firebase';
 import { useTheme } from './theme';
@@ -158,24 +158,24 @@ export default function ProfileScreen() {
   };
   const handleEnd = () => setIsDragging(false);
 
-  // --- 📐 Canvasを使用した超軽量150pxトリミングロジック ---
+  // --- 📐 Canvasを使用した高画質320pxトリミングロジック ---
   const executeCrop = () => {
     if (!rawImageSrc) return;
     const canvas = document.createElement('canvas');
-    canvas.width = 150;
-    canvas.height = 150;
+    canvas.width = 320;
+    canvas.height = 320;
     const ctx = canvas.getContext('2d');
 
     if (ctx) {
       const img = new Image();
       img.src = rawImageSrc;
       img.onload = () => {
-        ctx.clearRect(0, 0, 150, 150);
+        ctx.clearRect(0, 0, 320, 320);
         const baseWidth = 200; // UI上のプレビュー幅基準値
-        const finalScale = 150 / baseWidth; // 最終サイズ(150px)へのスケール比
+        const finalScale = 320 / baseWidth; // 最終サイズ(320px)へのスケール比
 
         ctx.save();
-        ctx.translate(75, 75); // 中心点をキャンバス中央へ
+        ctx.translate(160, 160); // 中心点をキャンバス中央へ
         ctx.translate(dragPos.x * finalScale, dragPos.y * finalScale);
         ctx.scale(zoom * finalScale, zoom * finalScale);
 
@@ -185,8 +185,8 @@ export default function ProfileScreen() {
         ctx.drawImage(img, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
         ctx.restore();
 
-        // JPEGかつ画質0.6に落として容量を極限までカット
-        const base64Result = canvas.toDataURL('image/jpeg', 0.6);
+        // JPEGかつ画質0.85で高画質を維持
+        const base64Result = canvas.toDataURL('image/jpeg', 0.85);
         setEditProfileImage(base64Result);
         setShowCropModal(false);
       };
@@ -204,11 +204,11 @@ export default function ProfileScreen() {
 
       // 2. ★ Firestoreに保存（容量制限を受けないため確実に同期します）
       if (user) {
-        await updateDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'users', user.uid), {
           username: editUsername,
           bio: editBio,
           profileImage: editProfileImage,
-        });
+        }, { merge: true });
         await updateProfile(user, { displayName: editUsername });
       }
 

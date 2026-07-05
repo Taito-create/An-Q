@@ -31,7 +31,7 @@ export default function LoginScreen() {
   const isRegisterMode = mode === 'register';
   const title = isRegisterMode ? '新規登録' : 'ログイン';
 
-  // 簡易画像選択（登録時は容量削減のため自動で小さく圧縮）
+  // 簡易画像選択（登録時は高画質320pxに圧縮）
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -41,15 +41,15 @@ export default function LoginScreen() {
         img.src = e.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = 150;
-          canvas.height = 150;
+          canvas.width = 320;
+          canvas.height = 320;
           const ctx = canvas.getContext('2d');
           // 中央部分を正方形に簡易切り抜きして描画
           const size = Math.min(img.width, img.height);
           const sx = (img.width - size) / 2;
           const sy = (img.height - size) / 2;
-          ctx?.drawImage(img, sx, sy, size, size, 0, 0, 150, 150);
-          setProfileImage(canvas.toDataURL('image/jpeg', 0.6));
+          ctx?.drawImage(img, sx, sy, size, size, 0, 0, 320, 320);
+          setProfileImage(canvas.toDataURL('image/jpeg', 0.85));
         };
       };
       reader.readAsDataURL(file);
