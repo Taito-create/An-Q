@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -20,6 +20,9 @@ export default function LoginScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(''); // 🌐 画面表示用エラー
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // ✂️ 切り抜き前の画像
+  const [showCropModal, setShowCropModal] = useState(false); // 📦 クロップモーダルの表示フラグ
 
   // 既にログイン済みの場合はホームへリダイレクト
   React.useEffect(() => {
@@ -31,28 +34,48 @@ export default function LoginScreen() {
   const isRegisterMode = mode === 'register';
   const title = isRegisterMode ? '新規登録' : 'ログイン';
 
-  // 簡易画像選択（登録時は高画質320pxに圧縮）
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  // 📸 画像ファイルが選択された時の処理 (Web用)
+  const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 320;
-          const ctx = canvas.getContext('2d');
-          // 中央部分を正方形に簡易切り抜きして描画
-          const size = Math.min(img.width, img.height);
-          const sx = (img.width - size) / 2;
-          const sy = (img.height - size) / 2;
-          ctx?.drawImage(img, sx, sy, size, size, 0, 0, 320, 320);
-          setProfileImage(canvas.toDataURL('image/jpeg', 0.85));
-        };
+      reader.onload = () => {
+        setSelectedImage(reader.result as string);
+        setShowCropModal(true); // トリミングモーダルを開く
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // ✂️ Canvasを使って画像を正方形に切り抜く処理
+  const executeCrop = () => {
+    if (selectedImage) {
+      const img = window.document.createElement('img');
+      img.src = selectedImage;
+      img.onload = () => {
+        const canvas = window.document.createElement('canvas');
+        const size = Math.min(img.width, img.height);
+        canvas.width = 200;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // 画像の中央を200x200の正方形に切り抜き
+          ctx.drawImage(
+            img,
+            (img.width - size) / 2,
+            (img.height - size) / 2,
+            size,
+            size,
+            0,
+            0,
+            200,
+            200
+          );
+          setProfileImage(canvas.toDataURL('image/jpeg')); // アカウント作成用のStateにセット
+        }
+        setShowCropModal(false);
+        setSelectedImage(null);
+      };
     }
   };
 
@@ -77,7 +100,7 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      SoundManager.play('decide');
+      setErrorMessage(''); // 🌟 新しい試みの前に古いエラーを消す
 
       if (isRegisterMode) {
         // 1. 新規登録アカウント作成
@@ -128,9 +151,21 @@ export default function LoginScreen() {
         Alert.alert('ログイン成功', 'ようこそ。学習を始めましょう。');
         navigate('/');
       }
-    } catch (e: any) {
-      console.error('Auth error:', e);
-      Alert.alert('認証エラー', '入力内容を確認してもう一度お試しください。');
+    } catch (error: any) {
+      console.error('Auth error:', error);
+
+      // 🔍 Firebaseのエラーコードに応じて親切な日本語に変換
+      if (error.code === 'auth/email-already-in-use') {
+        setErrorMessage('そのメールアドレスはすでに使用されています。');
+      } else if (error.code === 'auth/weak-password') {
+        setErrorMessage('パスワードは6文字以上で入力してください。');
+      } else if (error.code === 'auth/invalid-email') {
+        setErrorMessage('正しいメールアドレスの形式で入力してください。');
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setErrorMessage('メールアドレスまたはパスワードが間違っています。');
+      } else {
+        setErrorMessage('認証エラーが発生しました。もう一度お試しください。');
+      }
     } finally {
       setLoading(false);
     }
@@ -145,19 +180,43 @@ export default function LoginScreen() {
         {isRegisterMode && (
           <>
             {/* アイコン選択を新規登録画面に統合 */}
-            <Text style={[styles.label, { color: colors.text, marginBottom: 8 }]}>プロフィール画像 (必須)</Text>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <TouchableOpacity
-                style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: colors.background, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-                onPress={() => document.getElementById('register-image-input')?.click()}
+              <TouchableOpacity 
+                onPress={() => {
+                  if (Platform.OS === 'web') {
+                    window.document.getElementById('register-image-input')?.click();
+                  }
+                }}
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: '#f0f0f0',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  overflow: 'hidden',
+                  borderWidth: 2,
+                  borderColor: colors.primary,
+                }}
               >
                 {profileImage ? (
-                  <img src={profileImage} style={{ width: 90, height: 90, borderRadius: 45, objectFit: 'cover' }} alt="" />
+                  <Image source={{ uri: profileImage }} style={{ width: '100%', height: '100%' }} />
                 ) : (
-                  <Text style={{ fontSize: 28 }}>📸</Text>
+                  <Text style={{ fontSize: 11, color: '#666', textAlign: 'center', padding: 4 }}>
+                    画像を追加
+                  </Text>
                 )}
               </TouchableOpacity>
-              <input id="register-image-input" type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} aria-label="画像アップロード" />
+
+              <input
+                id="register-image-input"
+                type="file"
+                accept="image/*"
+                onChange={handleProfileImageSelect}
+                style={{ display: 'none' }}
+                aria-label="プロフィール画像をアップロード"
+                title="プロフィール画像"
+              />
             </View>
 
             <Text style={[styles.label, { color: colors.text }]}>ユーザー名</Text>
@@ -195,6 +254,12 @@ export default function LoginScreen() {
           placeholderTextColor={colors.textSecondary}
         />
 
+        {errorMessage ? (
+          <Text style={{ color: '#ff4d4f', fontSize: 13, fontWeight: '600', marginBottom: 12, textAlign: 'center' }}>
+            ⚠️ {errorMessage}
+          </Text>
+        ) : null}
+
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
@@ -213,7 +278,10 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setMode((m) => (m === 'login' ? 'register' : 'login'))}
+          onPress={() => {
+            setMode((m) => (m === 'login' ? 'register' : 'login'));
+            setErrorMessage(''); // モードを切り替えたらエラーを綺麗に消す
+          }}
           style={styles.toggleButton}
         >
           <Text style={[styles.toggleText, { color: colors.primary }]}>
@@ -221,6 +289,48 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* ✂️ トリミング用モーダル (Web環境用) */}
+      {showCropModal && selectedImage && Platform.OS === 'web' && (
+        <View style={styles.modalOverlay}>
+          <View style={{
+            backgroundColor: '#fff',
+            padding: 24,
+            borderRadius: 20,
+            width: '90%',
+            maxWidth: 360,
+            alignItems: 'center',
+          }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 16, color: '#333' }}>
+              プロフィールの切り抜き
+            </Text>
+
+            {/* 丸型のプレビュー枠 */}
+            <View style={{ width: 160, height: 160, marginBottom: 24, overflow: 'hidden', borderRadius: 80, borderWidth: 1, borderColor: '#ddd' }}>
+              <img src={selectedImage} alt="Crop preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity 
+                style={{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', alignItems: 'center' }}
+                onPress={() => {
+                  setShowCropModal(false);
+                  setSelectedImage(null);
+                }}
+              >
+                <Text style={{ color: '#333', fontWeight: '700' }}>キャンセル</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' }}
+                onPress={executeCrop}
+              >
+                <Text style={{ color: onPrimary, fontWeight: '700' }}>切り抜き</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -237,4 +347,16 @@ const styles = StyleSheet.create({
   toggleButton: { alignItems: 'center', paddingTop: 14, paddingBottom: 2 },
   toggleText: { fontSize: 14, fontWeight: '600' },
   loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  // モーダル用スタイル
+  modalOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    zIndex: 9999 
+  },
 });
