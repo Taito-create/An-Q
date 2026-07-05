@@ -95,6 +95,22 @@ export default function LoginScreen() {
         // ログイン
         userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
         console.log('Login successful:', userCredential.user.uid);
+
+        // Firebase Authのユーザー情報をローカルストレージに同期
+        const firebaseUser = userCredential.user;
+        
+        // displayNameを同期
+        if (firebaseUser.displayName) {
+          await AsyncStorage.setItem('user_username', firebaseUser.displayName);
+          console.log('Synced displayName to local storage:', firebaseUser.displayName);
+        }
+        
+        // photoURLを同期
+        if (firebaseUser.photoURL) {
+          await AsyncStorage.setItem('user_profile_image', firebaseUser.photoURL);
+          console.log('Synced photoURL to local storage:', firebaseUser.photoURL);
+        }
+
         Alert.alert('ログイン成功', 'ようこそ。学習を始めましょう。');
       }
 
