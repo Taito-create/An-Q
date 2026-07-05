@@ -1,2 +1,0 @@
-import{U as e}from"./main-yNmXt20w.js";var r={_currentlyFocusedNode:null,currentlyFocusedField(){return document.activeElement!==this._currentlyFocusedNode&&(this._currentlyFocusedNode=null),this._currentlyFocusedNode},focusTextInput(u){u!==null&&(this._currentlyFocusedNode=u,document.activeElement!==u&&e.focus(u))},blurTextInput(u){u!==null&&(this._currentlyFocusedNode=null,document.activeElement===u&&e.blur(u))}};export{r as T};
-//# sourceMappingURL=index-NeGWffVY.js.map

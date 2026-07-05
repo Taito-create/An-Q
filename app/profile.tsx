@@ -230,6 +230,32 @@ export default function ProfileScreen() {
 
   const xpProgress = Math.min((profile.currentXP / profile.nextLevelXP) * 100, 100);
 
+  const handleLogout = async () => {
+    SoundManager.play('decide');
+    try {
+      // 1. Firebaseの認証から完全にログアウトする
+      await logout();
+
+      // 2. ローカルストレージのデータを削除する（既存の処理）
+      await AsyncStorage.multiRemove([
+        'user_stats',
+        'quiz_history',
+        'daily_streak',
+        'last_played_date'
+      ]);
+
+      // 3. ログアウト完了後、強制的にログイン画面（/login）へ切り替える！
+      navigate('/login');
+
+    } catch (error) {
+      console.error('Error during logout:', error);
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? 'ログアウトに失敗しました' : 'Failed to log out'
+      );
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
@@ -253,7 +279,7 @@ export default function ProfileScreen() {
           {user && (
             <TouchableOpacity
               style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.error || '#DC2626', borderRadius: isCyberpunk ? 0 : 10 }}
-              onPress={async () => {
+              onPress={() => {
                 SoundManager.play('decide');
                 Alert.alert(
                   locale === 'ja' ? 'ログアウト' : 'Logout',
@@ -263,14 +289,7 @@ export default function ProfileScreen() {
                     {
                       text: locale === 'ja' ? 'ログアウト' : 'Logout',
                       style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await logout();
-                          navigate('/login');
-                        } catch (error) {
-                          console.error('Logout failed:', error);
-                        }
-                      }
+                      onPress: handleLogout
                     }
                   ]
                 );
@@ -432,7 +451,9 @@ export default function ProfileScreen() {
               <input 
                 type="range" min="1.0" max="3.0" step="0.1" value={zoom} 
                 onChange={(e) => setZoom(parseFloat(e.target.value))} 
-                style={{ width: '100%', cursor: 'pointer' }} 
+                style={{ width: '100%', cursor: 'pointer' }}
+                aria-label={locale === 'ja' ? 'ズームレベル' : 'Zoom level'}
+                title={locale === 'ja' ? 'ズーム' : 'Zoom'}
               />
             </View>
 
