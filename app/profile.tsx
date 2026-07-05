@@ -233,10 +233,10 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     SoundManager.play('decide');
     try {
-      // 1. Firebaseの認証から完全にログアウトする
+      // 1. Firebaseの認証から完全にログアウトする（最重要！）
       await logout();
 
-      // 2. ローカルストレージのデータを削除する（既存の処理）
+      // 2. アプリ内のローカルデータを削除する
       await AsyncStorage.multiRemove([
         'user_stats',
         'quiz_history',
@@ -244,9 +244,9 @@ export default function ProfileScreen() {
         'last_played_date'
       ]);
 
-      // 3. ログアウト完了後、強制的にログイン画面（/login）へ切り替える！
-      navigate('/login');
-
+      // ※上の「await logout()」によりログイン状態が消えるため、
+      // 自動的に監視機能（useEffect）が働いてログイン画面に切り替わります！
+      
     } catch (error) {
       console.error('Error during logout:', error);
       Alert.alert(
