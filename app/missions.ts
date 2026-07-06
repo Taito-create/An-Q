@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../src/config/firebase';
-import { UserProgressDocument } from '../src/utils/userProgress';
+import { auth, db } from '../src/config/firebase';
+import { UserProgressDocument, normalizeUserProfileDocument } from '../src/utils/userProgress';
 
 // ─────────────────────────────────────────────
 // 型定義
@@ -55,10 +55,10 @@ export interface UserStats {
   calendarEvents: number;
   maxStreak: number;
   totalBooks: number;
+  currentTitle: string;
   firstLoginDate: string;
   lastLoginDate: string;
   unlockedTitles: string[];
-  equippedTitle: string;
   currentCorrectStreak: number;  // 現在の連続正解数
   maxCorrectStreak: number;       // 最大連続正解数
   tagStats: Record<string, { correct: number; total: number }>; // タグ別成績
@@ -126,10 +126,10 @@ export const DEFAULT_STATS: UserStats = {
   calendarEvents: 0,
   maxStreak: 0,
   totalBooks: 0,
+  currentTitle: 'apprentice',
   firstLoginDate: new Date().toISOString().split('T')[0],
   lastLoginDate: new Date().toISOString().split('T')[0],
   unlockedTitles: [],
-  equippedTitle: '',
   currentCorrectStreak: 0,
   maxCorrectStreak: 0,
   tagStats: {},
@@ -149,7 +149,29 @@ const PROGRESS_KEY = 'MISSION_PROGRESS';
 export async function loadStats(): Promise<UserStats> {
   try {
     const raw = await AsyncStorage.getItem(STATS_KEY);
-    if (raw) return { ...DEFAULT_STATS, ...JSON.parse(raw) };
+    const localStats = raw ? { ...DEFAULT_STATS, ...JSON.parse(raw) } : { ...DEFAULT_STATS };
+
+    if (auth.currentUser?.uid) {
+      const remoteStats = await loadStatsFromFirestore(auth.currentUser.uid);
+      if (remoteStats) {
+        const merged = {
+          ...localStats,
+          ...remoteStats,
+          quizPlayed: Math.max(localStats.quizPlayed, remoteStats.quizPlayed),
+          questionsCreated: Math.max(localStats.questionsCreated, remoteStats.questionsCreated),
+          correctAnswers: Math.max(localStats.correctAnswers, remoteStats.correctAnswers),
+          loginDays: Math.max(localStats.loginDays, remoteStats.loginDays),
+          maxStreak: Math.max(localStats.maxStreak, remoteStats.maxStreak),
+          totalBooks: Math.max(localStats.totalBooks, remoteStats.totalBooks),
+          unlockedTitles: Array.from(new Set([...(localStats.unlockedTitles || []), ...(remoteStats.unlockedTitles || [])])),
+          currentTitle: remoteStats.currentTitle || localStats.currentTitle,
+        };
+        await saveStats(merged);
+        return merged;
+      }
+    }
+
+    if (raw) return localStats;
   } catch {}
   return { ...DEFAULT_STATS };
 }
@@ -161,7 +183,7 @@ export async function loadStatsFromFirestore(userId: string): Promise<UserStats 
     const snapshot = await getDoc(docRef);
     if (!snapshot.exists()) return null;
     
-    const data = snapshot.data() as Partial<UserProgressDocument>;
+    const data = normalizeUserProfileDocument(snapshot.data() as Partial<UserProgressDocument> & Record<string, any>);
     return {
       quizPlayed: data.totalQuizzesPlayed || 0,
       questionsCreated: data.totalQuestionsCreated || 0,
@@ -170,11 +192,11 @@ export async function loadStatsFromFirestore(userId: string): Promise<UserStats 
       perfectQuiz: 0, // Firestoreにはないのでローカルから読み込み
       calendarEvents: 0, // Firestoreにはないのでローカルから読み込み
       maxStreak: data.streakDays || 0,
-      totalBooks: 0, // ミッションシステム内で管理
+      totalBooks: data.totalBooks || 0,
+      currentTitle: data.currentTitle || 'apprentice',
       firstLoginDate: new Date(data.joinDate || Date.now()).toISOString().split('T')[0],
       lastLoginDate: new Date(data.lastLoginDate || Date.now()).toISOString().split('T')[0],
-      unlockedTitles: [],
-      equippedTitle: '',
+      unlockedTitles: data.unlockedTitles || [],
       currentCorrectStreak: 0,
       maxCorrectStreak: 0,
       tagStats: {},
@@ -301,29 +323,17 @@ export async function incrementStatInFirestore(
   amount: number = 1
 ): Promise<void> {
   try {
-    const { awardQuestionCreation, awardQuizCompletion } = await import('../src/utils/userProgress');
+    const { awardQuestionCreation, recordQuizPlayed, recordCorrectAnswer } = await import('../src/utils/userProgress');
     
     switch (key) {
       case 'quizPlayed':
-        // quizPlayedはawardQuizCompletionで更新
-        await awardQuizCompletion(userId, {
-          correctCount: 0,
-          questionCount: 0,
-          bonusXP: 0,
-          bonusCoins: 0,
-        });
+        await recordQuizPlayed(userId);
         break;
       case 'questionsCreated':
         await awardQuestionCreation(userId);
         break;
       case 'correctAnswers':
-        // correctAnswersはawardQuizCompletionで更新
-        await awardQuizCompletion(userId, {
-          correctCount: amount,
-          questionCount: amount,
-          bonusXP: 0,
-          bonusCoins: 0,
-        });
+        await recordCorrectAnswer(userId, amount);
         break;
       case 'loginDays':
         // loginDaysはsyncLoginStreakで更新

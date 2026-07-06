@@ -12,16 +12,19 @@ import { SoundManager } from './sound';
 import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
 import ImageCropper from '../src/components/ImageCropper';
-import { normalizeUserProfileDocument } from '../src/utils/userProgress';
+import { equipTitle, getTitleDisplay, normalizeUserProfileDocument, resolveTitleDefinition, TITLE_LIBRARY } from '../src/utils/userProgress';
 
 interface UserProfile {
   username: string;
   bio: string;
   profileImage: string | null;
+  currentTitle: string;
+  unlockedTitles: string[];
   level: number;
   currentXP: number;
   nextLevelXP: number;
   totalCoins: number;
+  totalBooks: number;
   totalQuestionsCreated: number;
   totalQuizzesPlayed: number;
   totalCorrectAnswers: number;
@@ -44,10 +47,13 @@ export default function ProfileScreen() {
     username: 'An-Q Learner',
     bio: '',
     profileImage: null,
+    currentTitle: 'apprentice',
+    unlockedTitles: ['apprentice', 'memory-monk'],
     level: 1,
     currentXP: 0,
     nextLevelXP: 100,
     totalCoins: 0,
+    totalBooks: 0,
     totalQuestionsCreated: 0,
     totalQuizzesPlayed: 0,
     totalCorrectAnswers: 0,
@@ -63,6 +69,7 @@ export default function ProfileScreen() {
   const [editUsername, setEditUsername] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editProfileImage, setEditProfileImage] = useState<string | null>(null);
+  const [showTitleModal, setShowTitleModal] = useState(false);
 
   // --- 🎥 トリミングモーダル用State群 ---
   const [showCropModal, setShowCropModal] = useState(false);
@@ -87,9 +94,12 @@ export default function ProfileScreen() {
       let profileImage = storedProfileImage;
       let username = storedUsername;
       let bio = storedBio;
+      let currentTitle = 'apprentice';
+      let unlockedTitles = ['apprentice', 'memory-monk'];
       let level = storedLevel;
       let xp = storedXP;
       let coins = storedCoins;
+      let books = 0;
       let streakCount = storedStreak;
       let joinDate = storedJoinDate;
       let lastLoginDate = storedLastLoginDate;
@@ -123,10 +133,13 @@ export default function ProfileScreen() {
             username: data.username || username,
             bio: data.bio || bio,
             profileImage: data.profileImage ?? profileImage,
+            currentTitle: data.currentTitle ?? currentTitle,
+            unlockedTitles: data.unlockedTitles ?? unlockedTitles,
             level: Math.max(data.level ?? 0, level),
             currentXP: Math.max(data.currentXP ?? 0, xp),
             nextLevelXP: Math.max(data.nextLevelXP ?? 0, level * 100),
             totalCoins: Math.max(data.totalCoins ?? 0, coins),
+            totalBooks: Math.max(data.totalBooks ?? 0, books),
             totalQuestionsCreated: Math.max(data.totalQuestionsCreated ?? 0, totalQuestionsCreated),
             totalQuizzesPlayed: Math.max(data.totalQuizzesPlayed ?? 0, totalQuizzesPlayed),
             totalCorrectAnswers: Math.max(data.totalCorrectAnswers ?? 0, totalCorrectAnswers),
@@ -145,9 +158,12 @@ export default function ProfileScreen() {
           username = mergedProfile.username;
           bio = mergedProfile.bio;
           profileImage = mergedProfile.profileImage;
+          currentTitle = mergedProfile.currentTitle;
+          unlockedTitles = mergedProfile.unlockedTitles;
           level = mergedProfile.level;
           xp = mergedProfile.currentXP;
           coins = mergedProfile.totalCoins;
+          books = mergedProfile.totalBooks;
           streakCount = mergedProfile.streakDays;
           joinDate = mergedProfile.joinDate;
           lastLoginDate = mergedProfile.lastLoginDate;
@@ -161,9 +177,12 @@ export default function ProfileScreen() {
           await AsyncStorage.setItem('user_username', username);
           await AsyncStorage.setItem('user_profile_image', profileImage || '');
           await AsyncStorage.setItem('user_bio', bio);
+          await AsyncStorage.setItem('user_current_title', currentTitle);
+          await AsyncStorage.setItem('user_unlocked_titles', JSON.stringify(unlockedTitles));
           await AsyncStorage.setItem('user_level', level.toString());
           await AsyncStorage.setItem('user_xp', xp.toString());
           await AsyncStorage.setItem('user_coins', coins.toString());
+          await AsyncStorage.setItem('user_books', books.toString());
           await AsyncStorage.setItem('streakCount', streakCount.toString());
           await AsyncStorage.setItem('join_date', joinDate.toString());
           await AsyncStorage.setItem('lastLoginDate', lastLoginDate.toString());
@@ -174,10 +193,13 @@ export default function ProfileScreen() {
         username,
         bio,
         profileImage,
+        currentTitle,
+        unlockedTitles,
         level,
         currentXP: xp,
         nextLevelXP: level * 100,
         totalCoins: coins,
+        totalBooks: books,
         totalQuestionsCreated,
         totalQuizzesPlayed,
         totalCorrectAnswers,
@@ -204,8 +226,6 @@ export default function ProfileScreen() {
       const reader = new FileReader();
       reader.onload = (e) => {
         setRawImageSrc(e.target?.result as string);
-        setZoom(1.0);
-        setDragPos({ x: 0, y: 0 });
         setShowCropModal(true);
       };
       reader.readAsDataURL(file);
@@ -217,6 +237,8 @@ export default function ProfileScreen() {
       // 1. ローカルストレージに保存
       await AsyncStorage.setItem('user_username', editUsername);
       await AsyncStorage.setItem('user_bio', editBio);
+      await AsyncStorage.setItem('user_current_title', profile.currentTitle);
+      await AsyncStorage.setItem('user_unlocked_titles', JSON.stringify(profile.unlockedTitles));
       if (editProfileImage) {
         await AsyncStorage.setItem('user_profile_image', editProfileImage);
       }
@@ -227,6 +249,8 @@ export default function ProfileScreen() {
           username: editUsername,
           bio: editBio,
           profileImage: editProfileImage,
+          currentTitle: profile.currentTitle,
+          unlockedTitles: profile.unlockedTitles,
         }, { merge: true });
         await updateProfile(user, { displayName: editUsername });
       }
@@ -245,6 +269,22 @@ export default function ProfileScreen() {
       console.error('Failed to save profile:', error);
       Alert.alert('エラー', '保存に失敗しました。');
     }
+  };
+
+  const handleEquipTitle = async (titleId: string) => {
+    setProfile((prev) => ({ ...prev, currentTitle: titleId }));
+    await AsyncStorage.setItem('user_current_title', titleId);
+
+    if (user) {
+      await equipTitle(user.uid, titleId);
+      await setDoc(doc(db, 'users', user.uid), {
+        currentTitle: titleId,
+        unlockedTitles: profile.unlockedTitles,
+      }, { merge: true });
+    }
+
+    setShowTitleModal(false);
+    SoundManager.play('complete');
   };
 
   const xpProgress = Math.min((profile.currentXP / profile.nextLevelXP) * 100, 100);
@@ -397,6 +437,30 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>
+            {locale === 'ja' ? '称号' : 'Title'}
+          </Text>
+          <TouchableOpacity
+            style={{
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.primary,
+              backgroundColor: colors.primary + '12',
+            }}
+            onPress={() => setShowTitleModal(true)}
+          >
+            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '700' }}>
+              {getTitleDisplay(profile.currentTitle, locale)}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+              {locale === 'ja' ? 'タップして装備する称号を変更' : 'Tap to equip a different title'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* レベル・統計・その他UI */}
         <View style={[styles.card, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -460,6 +524,55 @@ export default function ProfileScreen() {
           setShowCropModal(false);
         }}
       />
+
+      {showTitleModal && (
+        <View style={styles.titleModalOverlay}>
+          <View style={[styles.titleModalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 12 }}>
+              {locale === 'ja' ? '称号を選択' : 'Choose a Title'}
+            </Text>
+            <ScrollView style={{ maxHeight: 360, width: '100%' }} contentContainerStyle={{ gap: 10 }}>
+              {TITLE_LIBRARY.map((title) => {
+                const unlocked = profile.unlockedTitles.includes(title.id);
+                const isActive = profile.currentTitle === title.id;
+                return (
+                  <TouchableOpacity
+                    key={title.id}
+                    disabled={!unlocked}
+                    style={[
+                      styles.titleItem,
+                      {
+                        backgroundColor: isActive ? colors.primary + '20' : colors.background,
+                        borderColor: isActive ? colors.primary : colors.border,
+                        opacity: unlocked ? 1 : 0.35,
+                      },
+                    ]}
+                    onPress={() => handleEquipTitle(title.id)}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>
+                      {title.icon} {locale === 'ja' ? title.titleJa : title.titleEn}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                      {locale === 'ja' ? title.descriptionJa : title.descriptionEn}
+                    </Text>
+                    {!unlocked && (
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6 }}>
+                        {locale === 'ja' ? '未解放' : 'Locked'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={{ marginTop: 12, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: colors.primary }}
+              onPress={() => setShowTitleModal(false)}
+            >
+              <Text style={{ color: onPrimary, fontWeight: '700' }}>{locale === 'ja' ? '閉じる' : 'Close'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -472,4 +585,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   modalButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }
+  ,titleModalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: 20 },
+  titleModalCard: { width: '100%', maxWidth: 420, borderRadius: 20, borderWidth: 1, padding: 20 },
+  titleItem: { borderWidth: 1, borderRadius: 14, padding: 14 },
 });

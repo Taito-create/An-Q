@@ -59,7 +59,7 @@ export default function LoadingScreen({ variant = 'load3' }: Props) {
         <View style={[styles.bubble, { backgroundColor: colors.primary }]}>
           <Text style={[styles.bubbleText, { color: onPrimary }]}>{loadingText}</Text>
         </View>
-        <img src={`/${variant}.webp`} width={100} height={100} style={{ objectFit: 'contain' }} />
+        <img src={`/${variant}.webp`} alt="Loading character" width={100} height={100} style={{ objectFit: 'contain' }} />
       </View>
 
       {/* スピナーのCSS */}

@@ -82,10 +82,10 @@ export default function LoginScreen() {
 
         // 3. 無料のFirestoreデータベースにユーザー情報を直接保存（容量制限なし）
         await setDoc(doc(db, 'users', uid), {
+          ...buildInitialUserProfile(username.trim(), profileImage),
           username: username.trim(),
           profileImage: profileImage,
           bio: '',
-          ...buildInitialUserProfile(username.trim(), profileImage),
         });
 
         // 4. ローカルストレージにもキャッシュ

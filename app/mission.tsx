@@ -3,6 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
+import { useAuth } from './auth/AuthContext';
+import { addBooks } from '../src/utils/userProgress';
 import {
   MISSIONS, Mission, MissionPeriod,
   loadStats, loadProgress, saveStats, saveProgress,
@@ -15,6 +17,7 @@ export default function MissionScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
+  const { user } = useAuth();
   const fs = (n: number) => Math.round(n * scale);
 
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -43,6 +46,9 @@ export default function MissionScreen() {
     setStats(updatedStats);
     await saveProgress(updatedProgress);
     await saveStats(updatedStats);
+    if (user?.uid) {
+      await addBooks(user.uid, mission.reward);
+    }
     SoundManager.play('complete');
     setClaimMessage(locale === 'ja' ? `📚 ${mission.reward}冊の本を獲得！` : `📚 Got ${mission.reward} books!`);
     setTimeout(() => setClaimMessage(''), 2500);

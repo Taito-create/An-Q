@@ -16,7 +16,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucide-react';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 import { useAuth } from './auth/AuthContext';
-import { readUserProfileDocument } from '../src/utils/userProgress';
+import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -47,6 +47,8 @@ const HomeScreen = () => {
   const { user } = useAuth();
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
+  const [profile, setProfile] = useState<any>(null);
+  const [xpProgress, setXpProgress] = useState(0);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -192,10 +194,13 @@ const HomeScreen = () => {
   const loadUserProgress = async () => {
     try {
       if (user?.uid) {
-        const profile = await readUserProfileDocument(user.uid);
-        if (profile) {
-          setUserLevel(profile.level);
-          setUserCoins(profile.totalCoins);
+        const userProfile = await readUserProfileDocument(user.uid);
+        if (userProfile) {
+          setUserLevel(userProfile.level);
+          setUserCoins(userProfile.totalCoins);
+          setProfile(userProfile);
+          const progress = Math.min((userProfile.currentXP / userProfile.nextLevelXP) * 100, 100);
+          setXpProgress(progress);
         }
       } else {
         // Fallback to local storage
@@ -636,8 +641,11 @@ const HomeScreen = () => {
     </View>
   );
 
-  // ヘッダー
-  const renderHeader = () => (
+  // ヘッダー（ゲーム風UI）
+  const renderHeader = () => {
+    const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '👑 見習い暗記人';
+    
+    return (
     <View style={[
       styles.header,
       screenType === 'desktop' && { 
@@ -647,36 +655,47 @@ const HomeScreen = () => {
       }
     ]}>
       <View style={{ flex: 1 }}>
-        <Text style={[
-          styles.appTitle,
-          {
-            fontSize: screenType === 'desktop' ? 32 : screenType === 'tablet' ? 28 : 24,
-            fontWeight: 'bold',
-            color: colors.primary,
-          }
-        ]}>An-Q</Text>
-        <Text style={[
-          styles.appSubtitle,
-          {
-            fontSize: screenType === 'desktop' ? 13 : screenType === 'tablet' ? 12 : 11,
-            color: colors.textSecondary,
-            marginTop: 4,
-          }
-        ]}>
-          {currentLocale === 'ja' ? '覚えるな、脳にインストールせよ' : "Don't memorize, install into your brain"}
-        </Text>
-      </View>
+        {/* 1段目：称号 + コイン・本 */}
+        <View style={[styles.headerRow, { justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }]}>
+          <View style={[styles.titleBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+            <Text style={[styles.titleText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 16 : 14) }]}>
+              {titleDisplay}
+            </Text>
+          </View>
+          <View style={[styles.currencyContainer, { gap: 8 }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning }]}>
+              <Text style={[styles.currencyText, { color: colors.warning, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
+                🪙 {userCoins}
+              </Text>
+            </View>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.success + '20', borderColor: colors.success }]}>
+              <Text style={[styles.currencyText, { color: colors.success, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
+                📚 {profile?.totalBooks || 0}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-      {/* レベルとコイン表示 */}
-      <View style={[styles.statusBadges, { gap: 8 }]}>
-        <View style={[styles.levelBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-          <Text style={[styles.levelText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 14 : 12) }]}>
-            Lv. {userLevel}
+        {/* 2段目：ユーザー名 */}
+        <View style={{ marginBottom: 6 }}>
+          <Text style={[styles.usernameText, { color: colors.text, fontSize: fs(screenType === 'desktop' ? 18 : 16) }]}>
+            👤 {profile?.username || 'An-Q Learner'}
           </Text>
         </View>
-        <View style={[styles.coinBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning }]}>
-          <Text style={[styles.coinText, { color: colors.warning, fontSize: fs(screenType === 'desktop' ? 14 : 12) }]}>
-            🪙 {userCoins}
+
+        {/* 3段目：レベル + プログレスバー */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={[styles.levelText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
+            Lv. {userLevel}
+          </Text>
+          <View style={[styles.xpBarContainer, { backgroundColor: colors.border, flex: 1 }]}>
+            <View style={[styles.xpBarFill, { 
+              width: `${xpProgress}%`, 
+              backgroundColor: colors.primary 
+            }]} />
+          </View>
+          <Text style={[styles.xpText, { color: colors.textSecondary, fontSize: fs(screenType === 'desktop' ? 11 : 10) }]}>
+            {profile?.currentXP || 0} / {profile?.nextLevelXP || 100} XP
           </Text>
         </View>
       </View>
@@ -744,6 +763,7 @@ const HomeScreen = () => {
       </View>
     </View>
   );
+};
 
   // モバイル用：正答率のみ（本日の学習時間削除）
   const renderMobileInfoSections = () => {
@@ -880,28 +900,48 @@ const styles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
   },
-  statusBadges: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
   },
-  levelBadge: {
+  titleBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
   },
-  levelText: {
+  titleText: {
     fontWeight: '700',
   },
-  coinBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+  currencyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  currencyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
     borderWidth: 1,
   },
-  coinText: {
+  currencyText: {
     fontWeight: '700',
+  },
+  usernameText: {
+    fontWeight: '600',
+  },
+  xpBarContainer: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  xpText: {
+    fontWeight: '600',
+    minWidth: 70,
+    textAlign: 'right',
   },
   iconButton: {
     backgroundColor: 'transparent',
@@ -1064,4 +1104,8 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+const HomeScreenWrapper = () => {
+  return <HomeScreen />;
+};
+
+export default HomeScreenWrapper;
