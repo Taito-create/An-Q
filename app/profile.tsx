@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Platform, Image } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -11,6 +11,8 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
+import ImageCropper from '../src/components/ImageCropper';
+import { normalizeUserProfileDocument } from '../src/utils/userProgress';
 
 interface UserProfile {
   username: string;
@@ -23,9 +25,11 @@ interface UserProfile {
   totalQuestionsCreated: number;
   totalQuizzesPlayed: number;
   totalCorrectAnswers: number;
+  totalQuestionsAnswered: number;
   correctRate: number;
   streakDays: number;
   joinDate: number;
+  lastLoginDate: number;
   achievements: string[];
 }
 
@@ -47,9 +51,11 @@ export default function ProfileScreen() {
     totalQuestionsCreated: 0,
     totalQuizzesPlayed: 0,
     totalCorrectAnswers: 0,
+    totalQuestionsAnswered: 0,
     correctRate: 0,
     streakDays: 0,
     joinDate: Date.now(),
+    lastLoginDate: Date.now(),
     achievements: [],
   });
 
@@ -61,10 +67,6 @@ export default function ProfileScreen() {
   // --- 🎥 トリミングモーダル用State群 ---
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1.0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     loadProfile();
@@ -72,40 +74,101 @@ export default function ProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      let username = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
-      let bio = await AsyncStorage.getItem('user_bio') || '';
-      let profileImage = await AsyncStorage.getItem('user_profile_image') || null;
+      const storedUsername = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
+      const storedBio = await AsyncStorage.getItem('user_bio') || '';
+      const storedProfileImage = await AsyncStorage.getItem('user_profile_image') || null;
+      const storedLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
+      const storedXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
+      const storedCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
+      const storedStreak = parseInt(await AsyncStorage.getItem('streakCount') || '1', 10);
+      const storedJoinDate = parseInt(await AsyncStorage.getItem('join_date') || Date.now().toString(), 10);
+      const storedLastLoginDate = parseInt(await AsyncStorage.getItem('lastLoginDate') || Date.now().toString(), 10);
+
+      let profileImage = storedProfileImage;
+      let username = storedUsername;
+      let bio = storedBio;
+      let level = storedLevel;
+      let xp = storedXP;
+      let coins = storedCoins;
+      let streakCount = storedStreak;
+      let joinDate = storedJoinDate;
+      let lastLoginDate = storedLastLoginDate;
+      let totalQuestionsCreated = 0;
+      let totalQuizzesPlayed = 0;
+      let totalCorrectAnswers = 0;
+      let totalQuestionsAnswered = 0;
+      let correctRate = 0;
+
+      const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';
+      const questions = JSON.parse(questionsRaw);
+      const stats = await loadStats();
+      const resultsRaw = await AsyncStorage.getItem('quizResults') || '[]';
+      let results = [];
+      try { results = JSON.parse(resultsRaw); } catch(e) {}
+      const resultsArr = Array.isArray(results) ? results : results.results || [];
+      const localCorrectCount = resultsArr.filter((r: any) => r.isCorrect).length;
+      const localAnsweredCount = resultsArr.length;
+      totalCorrectAnswers = localCorrectCount;
+      totalQuestionsAnswered = localAnsweredCount;
+      correctRate = localAnsweredCount > 0 ? Math.round((localCorrectCount / localAnsweredCount) * 100) : 0;
+      totalQuestionsCreated = questions.length;
+      totalQuizzesPlayed = stats?.quizPlayed || 0;
 
       // ★ Firestoreからクラウド上の最新プロファイルを最優先で同期
       if (user) {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          username = data.username || username;
-          profileImage = data.profileImage || profileImage;
-          bio = data.bio || bio;
-          
+          const mergedProfile = normalizeUserProfileDocument({
+            username: data.username || username,
+            bio: data.bio || bio,
+            profileImage: data.profileImage ?? profileImage,
+            level: Math.max(data.level ?? 0, level),
+            currentXP: Math.max(data.currentXP ?? 0, xp),
+            nextLevelXP: Math.max(data.nextLevelXP ?? 0, level * 100),
+            totalCoins: Math.max(data.totalCoins ?? 0, coins),
+            totalQuestionsCreated: Math.max(data.totalQuestionsCreated ?? 0, totalQuestionsCreated),
+            totalQuizzesPlayed: Math.max(data.totalQuizzesPlayed ?? 0, totalQuizzesPlayed),
+            totalCorrectAnswers: Math.max(data.totalCorrectAnswers ?? 0, totalCorrectAnswers),
+            totalQuestionsAnswered: Math.max(data.totalQuestionsAnswered ?? 0, totalQuestionsAnswered),
+            correctRate: 0,
+            streakDays: Math.max(data.streakDays ?? 0, streakCount),
+            joinDate: Math.min(data.joinDate ?? joinDate, joinDate),
+            lastLoginDate: Math.max(data.lastLoginDate ?? 0, lastLoginDate),
+            achievements: data.achievements ?? [],
+          });
+
+          mergedProfile.correctRate = mergedProfile.totalQuestionsAnswered > 0
+            ? Math.round((mergedProfile.totalCorrectAnswers / mergedProfile.totalQuestionsAnswered) * 100)
+            : correctRate;
+
+          username = mergedProfile.username;
+          bio = mergedProfile.bio;
+          profileImage = mergedProfile.profileImage;
+          level = mergedProfile.level;
+          xp = mergedProfile.currentXP;
+          coins = mergedProfile.totalCoins;
+          streakCount = mergedProfile.streakDays;
+          joinDate = mergedProfile.joinDate;
+          lastLoginDate = mergedProfile.lastLoginDate;
+          totalQuestionsCreated = mergedProfile.totalQuestionsCreated;
+          totalQuizzesPlayed = mergedProfile.totalQuizzesPlayed;
+          totalCorrectAnswers = mergedProfile.totalCorrectAnswers;
+          totalQuestionsAnswered = mergedProfile.totalQuestionsAnswered;
+          correctRate = mergedProfile.correctRate;
+
           // キャッシュ更新
           await AsyncStorage.setItem('user_username', username);
           await AsyncStorage.setItem('user_profile_image', profileImage || '');
           await AsyncStorage.setItem('user_bio', bio);
+          await AsyncStorage.setItem('user_level', level.toString());
+          await AsyncStorage.setItem('user_xp', xp.toString());
+          await AsyncStorage.setItem('user_coins', coins.toString());
+          await AsyncStorage.setItem('streakCount', streakCount.toString());
+          await AsyncStorage.setItem('join_date', joinDate.toString());
+          await AsyncStorage.setItem('lastLoginDate', lastLoginDate.toString());
         }
       }
-
-      const level = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
-      const xp = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
-      const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
-      const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';
-      const questions = JSON.parse(questionsRaw);
-
-      const stats = await loadStats();
-      const resultsRaw = await AsyncStorage.getItem('quizResults') || '[]';
-      let results = [];
-      try { results = JSON.parse(resultsRaw); } catch(e) {}
-      const resultsArr = Array.isArray(results) ? results : results.results || [];
-      const correctCount = resultsArr.filter((r: any) => r.isCorrect).length;
-      const correctRate = resultsArr.length > 0 ? Math.round((correctCount / resultsArr.length) * 100) : 0;
-      const streakCount = parseInt(await AsyncStorage.getItem('streakCount') || '0', 10);
 
       setProfile({
         username,
@@ -115,12 +178,14 @@ export default function ProfileScreen() {
         currentXP: xp,
         nextLevelXP: level * 100,
         totalCoins: coins,
-        totalQuestionsCreated: questions.length,
-        totalQuizzesPlayed: stats?.quizPlayed || 0,
-        totalCorrectAnswers: correctCount,
+        totalQuestionsCreated,
+        totalQuizzesPlayed,
+        totalCorrectAnswers,
+        totalQuestionsAnswered,
         correctRate,
         streakDays: streakCount,
-        joinDate: parseInt(await AsyncStorage.getItem('join_date') || Date.now().toString(), 10),
+        joinDate,
+        lastLoginDate,
         achievements: JSON.parse(await AsyncStorage.getItem('achievements') || '[]'),
       });
 
@@ -144,52 +209,6 @@ export default function ProfileScreen() {
         setShowCropModal(true);
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  // --- 🐁 マウス/タッチドラッグ処理群 ---
-  const handleStart = (clientX: number, clientY: number) => {
-    setIsDragging(true);
-    setDragStart({ x: clientX - dragPos.x, y: clientY - dragPos.y });
-  };
-  const handleMove = (clientX: number, clientY: number) => {
-    if (!isDragging) return;
-    setDragPos({ x: clientX - dragStart.x, y: clientY - dragStart.y });
-  };
-  const handleEnd = () => setIsDragging(false);
-
-  // --- 📐 Canvasを使用した高画質320pxトリミングロジック ---
-  const executeCrop = () => {
-    if (!rawImageSrc) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 320;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-      const img = new Image();
-      img.src = rawImageSrc;
-      img.onload = () => {
-        ctx.clearRect(0, 0, 320, 320);
-        const baseWidth = 200; // UI上のプレビュー幅基準値
-        const finalScale = 320 / baseWidth; // 最終サイズ(320px)へのスケール比
-
-        ctx.save();
-        ctx.translate(160, 160); // 中心点をキャンバス中央へ
-        ctx.translate(dragPos.x * finalScale, dragPos.y * finalScale);
-        ctx.scale(zoom * finalScale, zoom * finalScale);
-
-        const displayWidth = baseWidth;
-        const displayHeight = (img.height / img.width) * displayWidth;
-
-        ctx.drawImage(img, -displayWidth / 2, -displayHeight / 2, displayWidth, displayHeight);
-        ctx.restore();
-
-        // JPEGかつ画質0.85で高画質を維持
-        const base64Result = canvas.toDataURL('image/jpeg', 0.85);
-        setEditProfileImage(base64Result);
-        setShowCropModal(false);
-      };
     }
   };
 
@@ -311,7 +330,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} scrollEnabled={!showCropModal}>
         {/* プロフィール画像表示 */}
         <View style={{ alignItems: 'center', marginBottom: 24, marginTop: 16 }}>
           {isEditing ? (
@@ -320,7 +339,7 @@ export default function ProfileScreen() {
               onPress={() => document.getElementById('profile-image-input')?.click()}
             >
               {editProfileImage ? (
-                <img src={editProfileImage} style={{ width: 120, height: 120, borderRadius: 60, objectFit: 'cover' }} alt="" />
+                <Image source={{ uri: editProfileImage }} style={{ width: 120, height: 120, borderRadius: 60 }} alt="" />
               ) : (
                 <Text style={{ fontSize: 40 }}>📸</Text>
               )}
@@ -328,7 +347,7 @@ export default function ProfileScreen() {
           ) : (
             <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               {profile.profileImage ? (
-                <img src={profile.profileImage} style={{ width: 120, height: 120, borderRadius: 60, objectFit: 'cover' }} alt="" />
+                <Image source={{ uri: profile.profileImage }} style={{ width: 120, height: 120, borderRadius: 60 }} alt="" />
               ) : (
                 <View style={{ width: 120, height: 120, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#ffffff', fontSize: 44 }}>👤</Text>
@@ -423,60 +442,24 @@ export default function ProfileScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} style={{ display: 'none' }} aria-label="アップロード" />
+      <input id="profile-image-input" type="file" accept="image/*" onChange={handleProfileImageSelect} className="hidden-file-input" aria-label="アップロード" />
 
-      {/* 🎬 ==================== YouTube風トリミングモーダル UI ==================== */}
-      {showCropModal && rawImageSrc && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>画像をトリミング</Text>
-            
-            {/* ドラッグ操作可能な円形プレビュー枠 */}
-            <div 
-              style={{ width: 200, height: 200, borderRadius: 100, overflow: 'hidden', backgroundColor: '#000', position: 'relative', cursor: 'move', margin: '20px auto', boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)' }}
-              onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
-              onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
-              onMouseUp={handleEnd}
-              onMouseLeave={handleEnd}
-              onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
-              onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
-              onTouchEnd={handleEnd}
-            >
-              <img 
-                src={rawImageSrc} 
-                style={{
-                  position: 'absolute', left: '50%', top: '50%', width: 200, height: 'auto',
-                  transform: `translate(-50%, -50%) translate(${dragPos.x}px, ${dragPos.y}px) scale(${zoom})`,
-                  userSelect: 'none', pointerEvents: 'none'
-                }} 
-                alt="" 
-              />
-            </div>
-
-            {/* ズームスライダー */}
-            <View style={{ width: '100%', paddingHorizontal: 20, marginBottom: 20 }}>
-              <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>ズーム: {zoom.toFixed(1)}x</Text>
-              <input 
-                type="range" min="1.0" max="3.0" step="0.1" value={zoom} 
-                onChange={(e) => setZoom(parseFloat(e.target.value))} 
-                style={{ width: '100%', cursor: 'pointer' }}
-                aria-label={locale === 'ja' ? 'ズームレベル' : 'Zoom level'}
-                title={locale === 'ja' ? 'ズーム' : 'Zoom'}
-              />
-            </View>
-
-            {/* ボタンコンテナ */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', gap: 12 }}>
-              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#e0e0e0' }]} onPress={() => setShowCropModal(false)}>
-                <Text style={{ color: '#333', fontWeight: '700' }}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={executeCrop}>
-                <Text style={{ color: onPrimary, fontWeight: '700' }}>切り抜き</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+      <ImageCropper
+        visible={showCropModal && !!rawImageSrc && Platform.OS === 'web'}
+        imageUri={rawImageSrc}
+        title="画像をトリミング"
+        confirmLabel="切り抜き"
+        cancelLabel="キャンセル"
+        confirmButtonColor={colors.primary}
+        confirmTextColor={onPrimary}
+        cancelButtonColor="#e0e0e0"
+        cancelTextColor="#333333"
+        onCancel={() => setShowCropModal(false)}
+        onConfirm={(croppedImage) => {
+          setEditProfileImage(croppedImage);
+          setShowCropModal(false);
+        }}
+      />
     </View>
   );
 }
@@ -488,9 +471,5 @@ const styles = StyleSheet.create({
   content: { padding: 16, flex: 1 },
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  // モーダル用スタイル
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 },
-  modalContent: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '90%', maxWidth: 320, alignItems: 'center', overflow: 'hidden' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
   modalButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }
 });

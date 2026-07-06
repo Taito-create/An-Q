@@ -16,6 +16,9 @@ import { useTheme } from './theme';
 import { loadStats, incrementStat } from './missions';
 import { useQuestions } from './hooks/useQuestions';
 import { Question, ImageAnnotation } from './types/question';
+import { useAuth } from './auth/AuthContext';
+import { awardQuestionCreation } from '../src/utils/userProgress';
+import './create.css';
 
 export default function CreateQuestionScreen() {
   const navigate = useNavigate();
@@ -23,6 +26,7 @@ export default function CreateQuestionScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const { questions, saveQuestions } = useQuestions();
+  const { user } = useAuth();
   const cpR: number | undefined = isCyberpunk ? 0 : undefined;
   const cpB: number | undefined = isCyberpunk ? 2 : undefined;
 
@@ -99,6 +103,9 @@ export default function CreateQuestionScreen() {
       };
       await saveQuestions([...questions, newQuestion]);
       await incrementStat('questionsCreated', 1);
+      if (user?.uid) {
+        await awardQuestionCreation(user.uid);
+      }
       return true;
     } catch (error) {
       console.error('Save question error:', error);
@@ -195,7 +202,7 @@ export default function CreateQuestionScreen() {
         ) : (
           <View>
             <View style={[styles.imagePreview, { backgroundColor: colors.background, borderRadius: cpR ?? 8, overflow: 'hidden', marginBottom: 12 }]}>
-              <img src={selectedImage} alt="preview" style={{ width: '100%', height: 'auto', maxHeight: 300 }} />
+              <img src={selectedImage} alt="preview" className="question-image-preview" />
               {imageAnnotations.map((annotation) => (<View key={annotation.id} style={{ position: 'absolute', left: annotation.x, top: annotation.y, width: annotation.width, height: annotation.height, backgroundColor: annotation.color, opacity: annotation.opacity, borderWidth: 1, borderColor: 'rgba(0,0,0,0.3)', borderRadius: 4 }} />))}
             </View>
             <TouchableOpacity style={[styles.button, { backgroundColor: colors.error, borderRadius: cpR ?? 8, marginBottom: 12 }]} onPress={() => { setSelectedImage(null); setImageAnnotations([]); }}>
@@ -212,7 +219,7 @@ export default function CreateQuestionScreen() {
                 </View>
                 <View style={[{ flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
                   <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>{locale === 'ja' ? '透明度' : 'Opacity'}</Text>
-                  <input type="range" min="0" max="100" value={annotationOpacity} onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))} style={{ flex: 1, height: 6, borderRadius: 3, accentColor: colors.primary }} aria-label={locale === 'ja' ? '透明度を調整' : 'Adjust opacity'} />
+                  <input type="range" min="0" max="100" value={annotationOpacity} onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))} className="crop-range" aria-label={locale === 'ja' ? '透明度を調整' : 'Adjust opacity'} />
                 </View>
                 <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary, borderRadius: cpR ?? 8 }]} onPress={addAnnotation}>
                   <Text style={[styles.buttonText, { color: onPrimary, fontSize: 13 }]}>＋ {locale === 'ja' ? 'ボックスを追加' : 'Add Box'}</Text>
@@ -221,7 +228,7 @@ export default function CreateQuestionScreen() {
             </View>
           </View>
         )}
-        <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} aria-label={locale === 'ja' ? '画像をアップロード' : 'Upload image'} />
+        <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} className="hidden-file-input" aria-label={locale === 'ja' ? '画像をアップロード' : 'Upload image'} />
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>

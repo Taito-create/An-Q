@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
@@ -8,6 +8,8 @@ import { SoundManager } from '../sound';
 import { useTheme } from '../theme';
 import { useAuth } from './AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ImageCropper from '../../src/components/ImageCropper';
+import { buildInitialUserProfile, syncLoginStreak } from '../../src/utils/userProgress';
 
 export default function LoginScreen() {
   const { colors, onPrimary } = useTheme();
@@ -47,38 +49,6 @@ export default function LoginScreen() {
     }
   };
 
-  // ✂️ Canvasを使って画像を正方形に切り抜く処理
-  const executeCrop = () => {
-    if (selectedImage) {
-      const img = window.document.createElement('img');
-      img.src = selectedImage;
-      img.onload = () => {
-        const canvas = window.document.createElement('canvas');
-        const size = Math.min(img.width, img.height);
-        canvas.width = 200;
-        canvas.height = 200;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          // 画像の中央を200x200の正方形に切り抜き
-          ctx.drawImage(
-            img,
-            (img.width - size) / 2,
-            (img.height - size) / 2,
-            size,
-            size,
-            0,
-            0,
-            200,
-            200
-          );
-          setProfileImage(canvas.toDataURL('image/jpeg')); // アカウント作成用のStateにセット
-        }
-        setShowCropModal(false);
-        setSelectedImage(null);
-      };
-    }
-  };
-
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('入力エラー', 'メールアドレスとパスワードを入力してください。');
@@ -115,7 +85,7 @@ export default function LoginScreen() {
           username: username.trim(),
           profileImage: profileImage,
           bio: '',
-          joinDate: Date.now()
+          ...buildInitialUserProfile(username.trim(), profileImage),
         });
 
         // 4. ローカルストレージにもキャッシュ
@@ -123,6 +93,7 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('user_profile_image', profileImage || '');
         await AsyncStorage.setItem('user_bio', '');
         await AsyncStorage.setItem('join_date', Date.now().toString());
+        await AsyncStorage.setItem('lastLoginDate', Date.now().toString());
 
         // 5. 自動ログインを解除して、ログイン画面へ強制遷移
         await signOut(auth);
@@ -147,6 +118,8 @@ export default function LoginScreen() {
           if (data.profileImage) await AsyncStorage.setItem('user_profile_image', data.profileImage);
           if (data.bio) await AsyncStorage.setItem('user_bio', data.bio);
         }
+
+        await syncLoginStreak(uid);
 
         Alert.alert('ログイン成功', 'ようこそ。学習を始めましょう。');
         navigate('/');
@@ -213,7 +186,7 @@ export default function LoginScreen() {
                 type="file"
                 accept="image/*"
                 onChange={handleProfileImageSelect}
-                style={{ display: 'none' }}
+                className="hidden-file-input"
                 aria-label="プロフィール画像をアップロード"
                 title="プロフィール画像"
               />
@@ -290,47 +263,26 @@ export default function LoginScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ✂️ トリミング用モーダル (Web環境用) */}
-      {showCropModal && selectedImage && Platform.OS === 'web' && (
-        <View style={styles.modalOverlay}>
-          <View style={{
-            backgroundColor: '#fff',
-            padding: 24,
-            borderRadius: 20,
-            width: '90%',
-            maxWidth: 360,
-            alignItems: 'center',
-          }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 16, color: '#333' }}>
-              プロフィールの切り抜き
-            </Text>
-
-            {/* 丸型のプレビュー枠 */}
-            <View style={{ width: 160, height: 160, marginBottom: 24, overflow: 'hidden', borderRadius: 80, borderWidth: 1, borderColor: '#ddd' }}>
-              <img src={selectedImage} alt="Crop preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity 
-                style={{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#f5f5f5', alignItems: 'center' }}
-                onPress={() => {
-                  setShowCropModal(false);
-                  setSelectedImage(null);
-                }}
-              >
-                <Text style={{ color: '#333', fontWeight: '700' }}>キャンセル</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={{ flex: 1, padding: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center' }}
-                onPress={executeCrop}
-              >
-                <Text style={{ color: onPrimary, fontWeight: '700' }}>切り抜き</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+      <ImageCropper
+        visible={showCropModal && !!selectedImage && Platform.OS === 'web'}
+        imageUri={selectedImage}
+        title="画像をトリミング"
+        confirmLabel="切り抜き"
+        cancelLabel="キャンセル"
+        confirmButtonColor={colors.primary}
+        confirmTextColor={onPrimary}
+        cancelButtonColor="#e0e0e0"
+        cancelTextColor="#333333"
+        onCancel={() => {
+          setShowCropModal(false);
+          setSelectedImage(null);
+        }}
+        onConfirm={(croppedImage) => {
+          setProfileImage(croppedImage);
+          setShowCropModal(false);
+          setSelectedImage(null);
+        }}
+      />
     </View>
   );
 }
@@ -359,4 +311,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     zIndex: 9999 
   },
+  cropPreview: { width: 200, height: 200, borderRadius: 100, overflow: 'hidden', backgroundColor: '#000', position: 'relative', marginVertical: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 0, elevation: 0 },
+  modalContent: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '90%', maxWidth: 320, alignItems: 'center', overflow: 'hidden' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+  modalButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 });

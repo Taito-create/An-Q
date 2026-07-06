@@ -14,6 +14,8 @@ import { useQuestions } from './hooks/useQuestions';
 import { getAnswerText } from './utils/answerUtils';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
+import { useAuth } from './auth/AuthContext';
+import { awardQuizCompletion } from '../src/utils/userProgress';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -60,6 +62,7 @@ export default function QuizScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
+  const { user } = useAuth();
   const screenWidth = Dimensions.get('window').width;
 
   // クイズ全体の状態
@@ -625,21 +628,22 @@ export default function QuizScreen() {
     }));
 
     try {
-      await updateStreak();
       const answers = finalResults.map(r => ({
         isCorrect: r.isCorrect,
         tags: shuffledQuestions.find(q => q.id === r.questionId)?.tags ?? [],
       }));
       await recordQuizAnswers(answers);
       
-      let xpReward = finalScore * 5;
-      let coinReward = finalScore;  // 1問正解 = 1コイン
+      const baseXP = finalScore * 20;
+      const baseCoins = finalScore * 10;
+      let totalXPReward = baseXP;
+      let totalCoinReward = baseCoins;
       let bookReward = 0;
 
       // 全問正解ボーナス
       const isPerfect = finalScore === totalQuestions;
       if (isPerfect) {
-        coinReward += 10;  // ボーナス +10コイン
+        totalCoinReward += 10;
       }
 
       // チャレンジモードの処理
@@ -648,9 +652,9 @@ export default function QuizScreen() {
         challengeBet = parseInt(await AsyncStorage.getItem('challenge_bet') || '0', 10);
 
         if (isPerfect) {
-          // ✅ 全問正解: 賭け金返還 + 報酬2倍
-          xpReward *= 2;
-          coinReward *= 2;
+          totalXPReward *= 2;
+          totalCoinReward *= 2;
+          totalCoinReward += challengeBet;
           // 賭け金は後で加算（すでに消費済みのため戻す）
         }
         // 失敗時は賭け金没収（すでに消費済みのため何もしない）
@@ -660,22 +664,13 @@ export default function QuizScreen() {
       const quizMode = await AsyncStorage.getItem('quiz_mode');
       const isBossMode = quizMode === 'weak';
       if (isBossMode) {
-        xpReward = Math.floor(xpReward * 1.5);
+        totalXPReward = Math.floor(totalXPReward * 1.5);
         await AsyncStorage.removeItem('quiz_mode');
       }
 
       // サドンデス: 連続正解ボーナス
       if (suddenDeathMode && maxCombo > 0) {
-        coinReward += Math.floor(maxCombo / 2);
-      }
-
-      const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
-      const currentXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
-      
-      // コイン計算（賭け金返還を含む）
-      let newCoins = currentCoins + coinReward;
-      if (challengeMode && isPerfect && challengeBet > 0) {
-        newCoins += challengeBet;  // 賭け金返還
+        totalCoinReward += Math.floor(maxCombo / 2);
       }
 
       // チャレンジモード成功時は本の報酬
@@ -691,38 +686,27 @@ export default function QuizScreen() {
         await AsyncStorage.removeItem('challenge_bet');
       }
 
-      await AsyncStorage.setItem('user_coins', newCoins.toString());
-      
-      // レベルアップ処理
-      const currentLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
-      const nextLevelThresh = currentLevel * 100;
-      const newXP = currentXP + xpReward;
-      
-      let levelUpMessage = '';
-      if (newXP >= nextLevelThresh) {
-        const newLevel = currentLevel + 1;
-        const remainingXP = newXP - nextLevelThresh;
-        await AsyncStorage.setItem('user_level', newLevel.toString());
-        await AsyncStorage.setItem('user_xp', remainingXP.toString());
-        
-        // レベルアップコインボーナス（レベル × 20）
-        const coinBonus = newLevel * 20;
-        const coinsAfterLevelUp = newCoins + coinBonus;
-        await AsyncStorage.setItem('user_coins', coinsAfterLevelUp.toString());
-        newCoins = coinsAfterLevelUp;
-        
-        levelUpMessage = locale === 'ja' 
-          ? `\n🎉 レベルアップ！ Lv.${newLevel} (+${coinBonus}コインボーナス！)`
-          : `\n🎉 Level Up! Lv.${newLevel} (+${coinBonus} coin bonus!)`;
-      } else {
-        await AsyncStorage.setItem('user_xp', newXP.toString());
-      }
+      const rewardResult = user?.uid
+        ? await awardQuizCompletion(user.uid, {
+            correctCount: finalScore,
+            questionCount: totalQuestions,
+            bonusXP: totalXPReward - baseXP,
+            bonusCoins: totalCoinReward - baseCoins,
+          })
+        : null;
+
+      const levelUpMessage = rewardResult && rewardResult.leveledUp > 0
+        ? locale === 'ja'
+          ? `\n🎉 レベルアップ！ +${rewardResult.levelUpCoins}コイン`
+          : `\n🎉 Level Up! +${rewardResult.levelUpCoins} coins`
+        : '';
 
       // 統計更新（missions 経由）
       try {
         const { loadStats: loadStats3, saveStats: saveStats3 } = await import('./missions');
         const stats = await loadStats3();
-        stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + coinReward;
+        const levelUpCoins = rewardResult?.levelUpCoins || 0;
+        stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + totalCoinReward + levelUpCoins;
         await saveStats3(stats);
       } catch (e) {
         console.error('Failed to update coin stats:', e);
@@ -730,8 +714,8 @@ export default function QuizScreen() {
       
       // 報酬メッセージを表示
       let rewardMessage = locale === 'ja' 
-        ? `${finalScore}/${totalQuestions} 正解\n⚡ +${xpReward} XP\n✨ +${coinReward} Qコイン${levelUpMessage}`
-        : `${finalScore}/${totalQuestions} correct\n⚡ +${xpReward} XP\n✨ +${coinReward} Q Coins${levelUpMessage}`;
+        ? `${finalScore}/${totalQuestions} 正解\n⚡ +${totalXPReward} XP\n✨ +${totalCoinReward} Qコイン${levelUpMessage}`
+        : `${finalScore}/${totalQuestions} correct\n⚡ +${totalXPReward} XP\n✨ +${totalCoinReward} Q Coins${levelUpMessage}`;
       
       if (challengeMode && isPerfect) {
         rewardMessage += locale === 'ja'
@@ -772,30 +756,6 @@ export default function QuizScreen() {
     });
   };
 
-  const updateStreak = async () => {
-    try {
-      const today = new Date().toDateString();
-      const lastStudy = await AsyncStorage.getItem('lastStudyDate');
-      const streakRaw = await AsyncStorage.getItem('streakCount');
-      let streak = parseInt(streakRaw || '0');
-
-      if (lastStudy === today) return;
-
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      if (lastStudy === yesterday.toDateString()) {
-        streak += 1;
-      } else {
-        streak = 1;
-      }
-
-      await AsyncStorage.setItem('streakCount', String(streak));
-      await AsyncStorage.setItem('lastStudyDate', today);
-    } catch (e) {
-      console.error('updateStreak error:', e);
-    }
-  };
   const timerColor = timeLeft > timerLimit * 0.4 ? colors.success : timeLeft > timerLimit * 0.2 ? colors.warning : colors.error;
   const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);

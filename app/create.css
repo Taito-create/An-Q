@@ -1,0 +1,15 @@
+.hidden-file-input {
+  display: none;
+}
+
+.crop-range {
+  width: 100%;
+  cursor: pointer;
+}
+
+.question-image-preview {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  display: block;
+}

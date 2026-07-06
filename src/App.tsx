@@ -5,6 +5,10 @@ import LoadingScreen from '../app/LoadingScreen';
 import RootLayout from './RootLayout';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from '../app/auth/ProtectedRoute';
+import { CURRENT_APP_VERSION } from './config/version';
+import { auth } from './config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { syncLoginStreak } from './utils/userProgress';
 
 // Lazy load all screens for better performance
 const HomeScreen = lazy(() => import('../app/index'));
@@ -54,17 +58,26 @@ export default function App() {
       };
     }
 
-    const CURRENT_VERSION = '1.0.0';
     const cachedVersion = localStorage.getItem('app_version');
 
-    if (cachedVersion && cachedVersion !== CURRENT_VERSION) {
+    if (cachedVersion && cachedVersion !== CURRENT_APP_VERSION) {
       localStorage.clear();
       sessionStorage.clear();
-      localStorage.setItem('app_version', CURRENT_VERSION);
+      localStorage.setItem('app_version', CURRENT_APP_VERSION);
       window.location.reload();
     } else if (!cachedVersion) {
-      localStorage.setItem('app_version', CURRENT_VERSION);
+      localStorage.setItem('app_version', CURRENT_APP_VERSION);
     }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser?.uid) {
+        void syncLoginStreak(currentUser.uid);
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   return (
