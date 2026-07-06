@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../src/config/firebase';
+import { UserProgressDocument } from '../src/utils/userProgress';
 
 // ─────────────────────────────────────────────
 // 型定義
@@ -151,6 +154,42 @@ export async function loadStats(): Promise<UserStats> {
   return { ...DEFAULT_STATS };
 }
 
+// Firestoreからユーザー統計を読み込む（userProgress.tsと同期）
+export async function loadStatsFromFirestore(userId: string): Promise<UserStats | null> {
+  try {
+    const docRef = doc(db, 'users', userId);
+    const snapshot = await getDoc(docRef);
+    if (!snapshot.exists()) return null;
+    
+    const data = snapshot.data() as Partial<UserProgressDocument>;
+    return {
+      quizPlayed: data.totalQuizzesPlayed || 0,
+      questionsCreated: data.totalQuestionsCreated || 0,
+      correctAnswers: data.totalCorrectAnswers || 0,
+      loginDays: data.streakDays || 0,
+      perfectQuiz: 0, // Firestoreにはないのでローカルから読み込み
+      calendarEvents: 0, // Firestoreにはないのでローカルから読み込み
+      maxStreak: data.streakDays || 0,
+      totalBooks: 0, // ミッションシステム内で管理
+      firstLoginDate: new Date(data.joinDate || Date.now()).toISOString().split('T')[0],
+      lastLoginDate: new Date(data.lastLoginDate || Date.now()).toISOString().split('T')[0],
+      unlockedTitles: [],
+      equippedTitle: '',
+      currentCorrectStreak: 0,
+      maxCorrectStreak: 0,
+      tagStats: {},
+      totalCoins: data.totalCoins || 0,
+      totalCoinsEarned: 0,
+      totalCoinsSpent: 0,
+      dailyLoginBonusClaimed: '',
+      loginStreak: data.streakDays || 0,
+    };
+  } catch (error) {
+    console.error('Failed to load stats from Firestore:', error);
+    return null;
+  }
+}
+
 export async function saveStats(stats: UserStats): Promise<void> {
   await AsyncStorage.setItem(STATS_KEY, JSON.stringify(stats));
 }
@@ -253,6 +292,50 @@ export async function incrementStat(
   await saveProgress(updatedProgress);
 
   return { newBooks, completedMissions };
+}
+
+// Firestoreのユーザー統計を更新（userProgress.tsと同期）
+export async function incrementStatInFirestore(
+  userId: string,
+  key: StatKey,
+  amount: number = 1
+): Promise<void> {
+  try {
+    const { awardQuestionCreation, awardQuizCompletion } = await import('../src/utils/userProgress');
+    
+    switch (key) {
+      case 'quizPlayed':
+        // quizPlayedはawardQuizCompletionで更新
+        await awardQuizCompletion(userId, {
+          correctCount: 0,
+          questionCount: 0,
+          bonusXP: 0,
+          bonusCoins: 0,
+        });
+        break;
+      case 'questionsCreated':
+        await awardQuestionCreation(userId);
+        break;
+      case 'correctAnswers':
+        // correctAnswersはawardQuizCompletionで更新
+        await awardQuizCompletion(userId, {
+          correctCount: amount,
+          questionCount: amount,
+          bonusXP: 0,
+          bonusCoins: 0,
+        });
+        break;
+      case 'loginDays':
+        // loginDaysはsyncLoginStreakで更新
+        const { syncLoginStreak } = await import('../src/utils/userProgress');
+        await syncLoginStreak(userId);
+        break;
+      default:
+        break;
+    }
+  } catch (error) {
+    console.error('Failed to increment stat in Firestore:', error);
+  }
 }
 
 // ログイン処理

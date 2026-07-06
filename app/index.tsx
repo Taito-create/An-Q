@@ -15,6 +15,8 @@ import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucide-react';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
+import { useAuth } from './auth/AuthContext';
+import { readUserProfileDocument } from '../src/utils/userProgress';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -42,6 +44,9 @@ const HomeScreen = () => {
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
+  const { user } = useAuth();
+  const [userLevel, setUserLevel] = useState(1);
+  const [userCoins, setUserCoins] = useState(0);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -160,6 +165,7 @@ const HomeScreen = () => {
     loadExamCountdown();
     loadQuickReviewQuestions();
     updateTimerDisplay();
+    loadUserProgress();
 
     // リアルタイム監視（500ms ごと）
     const interval = setInterval(() => {
@@ -180,6 +186,26 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('Failed to update timer:', error);
+    }
+  };
+
+  const loadUserProgress = async () => {
+    try {
+      if (user?.uid) {
+        const profile = await readUserProfileDocument(user.uid);
+        if (profile) {
+          setUserLevel(profile.level);
+          setUserCoins(profile.totalCoins);
+        }
+      } else {
+        // Fallback to local storage
+        const level = await AsyncStorage.getItem('user_level');
+        const coins = await AsyncStorage.getItem('user_coins');
+        if (level) setUserLevel(parseInt(level, 10));
+        if (coins) setUserCoins(parseInt(coins, 10));
+      }
+    } catch (error) {
+      console.error('Failed to load user progress:', error);
     }
   };
 
@@ -641,6 +667,20 @@ const HomeScreen = () => {
         </Text>
       </View>
 
+      {/* レベルとコイン表示 */}
+      <View style={[styles.statusBadges, { gap: 8 }]}>
+        <View style={[styles.levelBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+          <Text style={[styles.levelText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 14 : 12) }]}>
+            Lv. {userLevel}
+          </Text>
+        </View>
+        <View style={[styles.coinBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning }]}>
+          <Text style={[styles.coinText, { color: colors.warning, fontSize: fs(screenType === 'desktop' ? 14 : 12) }]}>
+            🪙 {userCoins}
+          </Text>
+        </View>
+      </View>
+
       {/* 右側：アイコンボタン */}
       <View style={[
         styles.topButtons,
@@ -839,6 +879,29 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     alignItems: 'center',
+  },
+  statusBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  levelBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  levelText: {
+    fontWeight: '700',
+  },
+  coinBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  coinText: {
+    fontWeight: '700',
   },
   iconButton: {
     backgroundColor: 'transparent',
