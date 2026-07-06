@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { View } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
@@ -37,6 +37,36 @@ const GachaScreen = lazy(() => import('../app/gacha'));
 const Loading = () => <LoadingScreen />;
 
 export default function App() {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.update();
+      });
+
+      const handleControllerChange = () => {
+        window.location.reload();
+      };
+
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+      return () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      };
+    }
+
+    const CURRENT_VERSION = '1.0.0';
+    const cachedVersion = localStorage.getItem('app_version');
+
+    if (cachedVersion && cachedVersion !== CURRENT_VERSION) {
+      localStorage.clear();
+      sessionStorage.clear();
+      localStorage.setItem('app_version', CURRENT_VERSION);
+      window.location.reload();
+    } else if (!cachedVersion) {
+      localStorage.setItem('app_version', CURRENT_VERSION);
+    }
+  }, []);
+
   return (
     <RootLayout>
       <Suspense fallback={<Loading />}>
