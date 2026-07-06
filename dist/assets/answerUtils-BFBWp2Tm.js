@@ -1,0 +1,2 @@
+import"./main-kcEeczxa.js";const p=e=>{var r,t;switch(e.answerType){case"truefalse":return e.trueFalseAnswer?"○":"✕";case"multiple":const c=((r=e.multipleChoice)==null?void 0:r.correctAnswer)??0,s=((t=e.multipleChoice)==null?void 0:t.options[c])||"";return`${c+1}. ${s}`;case"descriptive":return e.descriptiveAnswer||"";default:return""}};export{p as g};
+//# sourceMappingURL=answerUtils-BFBWp2Tm.js.map

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeAuth, getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { Platform } from "react-native";
 
 // 正しい接続鍵です！
@@ -41,3 +41,14 @@ if (Platform.OS === 'web') {
 
 export const auth = firebaseAuth;
 export const db = getFirestore(app);
+
+// Firestore オフライン永続性を有効化（Web環境のみ）
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore persistence failed: Multiple tabs open');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence not available in this browser');
+    }
+  });
+}

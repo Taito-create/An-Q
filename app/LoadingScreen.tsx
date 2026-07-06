@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 
 interface Props {
   variant?: 'load1' | 'load2' | 'load3' | 'load4';
+  onRetry?: () => void;
+  error?: string | null;
 }
 
-export default function LoadingScreen({ variant = 'load3' }: Props) {
+export default function LoadingScreen({ variant = 'load3', onRetry, error }: Props) {
   const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const [dotCount, setDotCount] = useState(0);
@@ -19,6 +21,9 @@ export default function LoadingScreen({ variant = 'load3' }: Props) {
 
   const dots = '.'.repeat(dotCount);
   const loadingText = locale === 'ja' ? `読み込み中${dots}` : `Now Loading${dots}`;
+  
+  const errorText = error || (locale === 'ja' ? '通信環境が良い場所で再度お試しください' : 'Please try again in a better network environment');
+  const retryText = locale === 'ja' ? '再試行' : 'Retry';
 
   // 8つのドットを生成（角度とサイズを計算）
   const dotsArray = Array.from({ length: 8 }, (_, i) => {
@@ -57,9 +62,23 @@ export default function LoadingScreen({ variant = 'load3' }: Props) {
       {/* 右下Qくん */}
       <View style={styles.qArea}>
         <View style={[styles.bubble, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.bubbleText, { color: onPrimary }]}>{loadingText}</Text>
+          <Text style={[styles.bubbleText, { color: onPrimary }]}>
+            {error ? errorText : loadingText}
+          </Text>
         </View>
         <img src={`/${variant}.webp`} alt="Loading character" width={100} height={100} style={{ objectFit: 'contain' }} />
+        
+        {/* エラー時の再試行ボタン */}
+        {error && onRetry && (
+          <TouchableOpacity 
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={onRetry}
+          >
+            <Text style={[styles.retryButtonText, { color: onPrimary }]}>
+              {retryText}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* スピナーのCSS */}
@@ -115,5 +134,17 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
