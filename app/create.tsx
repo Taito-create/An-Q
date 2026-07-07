@@ -36,11 +36,12 @@ export default function CreateQuestionScreen() {
   
   const [question, setQuestion] = useState('');
   const [answerType, setAnswerType] = useState<'descriptive' | 'truefalse' | 'multiple'>('descriptive');
-  const [descriptiveAnswer, setDescriptiveAnswer] = useState('');
+  const [descriptiveAnswers, setDescriptiveAnswers] = useState<string[]>(['']);
   const [trueFalseAnswer, setTrueFalseAnswer] = useState(true);
+  const [wrongReason, setWrongReason] = useState('');
   const [multipleChoice, setMultipleChoice] = useState({
     options: ['', '', '', ''],
-    correctAnswer: 0
+    correctAnswers: [0] as number[]
   });
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -122,20 +123,22 @@ export default function CreateQuestionScreen() {
     }
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
-      if (!descriptiveAnswer.trim()) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
-      dataToSave.descriptiveAnswer = descriptiveAnswer.trim();
+      if (!descriptiveAnswers[0]?.trim()) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
+      dataToSave.descriptiveAnswers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
+      dataToSave.wrongReason = trueFalseAnswer ? '' : wrongReason.trim();
     } else if (answerType === 'multiple') {
       if (multipleChoice.options.some(opt => !opt.trim())) { SoundManager.play('select'); Alert.alert(t.error, t.fillAllOptions); return; }
-      dataToSave.multipleChoice = multipleChoice;
+      if (multipleChoice.correctAnswers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, locale === 'ja' ? '正解を選択してください' : 'Please select at least one correct answer'); return; }
+      dataToSave.multipleChoice = { options: multipleChoice.options, correctAnswers: multipleChoice.correctAnswers };
     }
     const success = await saveQuestion(dataToSave);
     if (success) {
       SoundManager.play('complete');
       Alert.alert(t.success, t.questionSaved);
-      setQuestion(''); setDescriptiveAnswer(''); setTags([]); setTagInput(''); setAnswerType('descriptive');
-      setTrueFalseAnswer(true); setMultipleChoice({ options: ['', '', '', ''], correctAnswer: 0 });
+      setQuestion(''); setDescriptiveAnswers(['']); setTags([]); setTagInput(''); setAnswerType('descriptive');
+      setTrueFalseAnswer(true); setWrongReason(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
       setSelectedImage(null); setImageAnnotations([]);
     }
   };
@@ -173,20 +176,105 @@ export default function CreateQuestionScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
-        {answerType === 'descriptive' && (<TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={descriptiveAnswer} onChangeText={setDescriptiveAnswer} placeholder={t.answer} placeholderTextColor={colors.textSecondary} multiline />)}
+        {answerType === 'descriptive' && (
+          <View>
+            {descriptiveAnswers.map((answer, index) => (
+              <View key={index} style={styles.descriptiveAnswerRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
+                  value={answer}
+                  onChangeText={(text) => {
+                    const newAnswers = [...descriptiveAnswers];
+                    newAnswers[index] = text;
+                    setDescriptiveAnswers(newAnswers);
+                  }}
+                  placeholder={locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`}
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                />
+                {index > 0 && (
+                  <TouchableOpacity
+                    style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
+                    onPress={() => {
+                      const newAnswers = descriptiveAnswers.filter((_, i) => i !== index);
+                      setDescriptiveAnswers(newAnswers.length > 0 ? newAnswers : ['']);
+                    }}
+                  >
+                    <Text style={[styles.removeAnswerButtonText, { color: '#fff' }]}>×</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+            <TouchableOpacity
+              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+              onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
+            >
+              <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
+                + {locale === 'ja' ? '正解候補を追加' : 'Add Answer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {answerType === 'truefalse' && (
-          <View style={styles.trueFalseContainer}>
-            <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(true); }}><Text style={[styles.trueFalseText, { color: colors.text }, trueFalseAnswer && { color: onPrimary }]}>O</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, !trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(false); }}><Text style={[styles.trueFalseText, { color: colors.text }, !trueFalseAnswer && { color: onPrimary }]}>×</Text></TouchableOpacity>
+          <View>
+            <View style={styles.trueFalseContainer}>
+              <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(true); }}><Text style={[styles.trueFalseText, { color: colors.text }, trueFalseAnswer && { color: onPrimary }]}>O</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, !trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(false); }}><Text style={[styles.trueFalseText, { color: colors.text }, !trueFalseAnswer && { color: onPrimary }]}>×</Text></TouchableOpacity>
+            </View>
+            {!trueFalseAnswer && (
+              <TextInput
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+                value={wrongReason}
+                onChangeText={setWrongReason}
+                placeholder={locale === 'ja' ? '備考（どこが違うのか・解説）' : 'Note (explanation)'}
+                placeholderTextColor={colors.textSecondary}
+                multiline
+              />
+            )}
           </View>
         )}
         {answerType === 'multiple' && (
-          <>{multipleChoice.options.map((option, index) => (<TextInput key={index} style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={option} onChangeText={(text) => { const newOptions = [...multipleChoice.options]; newOptions[index] = text; setMultipleChoice({...multipleChoice, options: newOptions}); }} placeholder={`${t.options} ${index + 1}`} placeholderTextColor={colors.textSecondary} />))}
+          <View>
+            {multipleChoice.options.map((option, index) => (
+              <TextInput
+                key={index}
+                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
+                value={option}
+                onChangeText={(text) => {
+                  const newOptions = [...multipleChoice.options];
+                  newOptions[index] = text;
+                  setMultipleChoice({...multipleChoice, options: newOptions});
+                }}
+                placeholder={`${t.options} ${index + 1}`}
+                placeholderTextColor={colors.textSecondary}
+              />
+            ))}
             <View style={styles.correctAnswerContainer}>
               <Text style={[styles.correctAnswerLabel, { color: colors.text }]}>{t.correctAnswer}:</Text>
-              {[0, 1, 2, 3].map((i) => (<TouchableOpacity key={i} style={[styles.correctAnswerButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, multipleChoice.correctAnswer === i && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setMultipleChoice({...multipleChoice, correctAnswer: i}); }}><Text style={[styles.correctAnswerText, { color: colors.text }, multipleChoice.correctAnswer === i && { color: onPrimary }]}>{i + 1}</Text></TouchableOpacity>))}
+              <View style={styles.correctAnswerButtonsRow}>
+                {[0, 1, 2, 3].map((i) => {
+                  const isSelected = multipleChoice.correctAnswers.includes(i);
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.correctAnswerButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      onPress={() => {
+                        SoundManager.play('decide');
+                        if (isSelected) {
+                          const newAnswers = multipleChoice.correctAnswers.filter(a => a !== i);
+                          setMultipleChoice({...multipleChoice, correctAnswers: newAnswers.length > 0 ? newAnswers : [0]});
+                        } else {
+                          setMultipleChoice({...multipleChoice, correctAnswers: [...multipleChoice.correctAnswers, i]});
+                        }
+                      }}
+                    >
+                      <Text style={[styles.correctAnswerText, { color: colors.text }, isSelected && { color: onPrimary }]}>{i + 1}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </>
+          </View>
         )}
         <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: onPrimary }]}>{t.createQuestion}</Text></TouchableOpacity>
       </View>
@@ -265,6 +353,12 @@ const styles = StyleSheet.create({
   correctAnswerLabel: { fontSize: 14, fontWeight: 'bold' },
   correctAnswerButton: { padding: 10, minWidth: 40, alignItems: 'center' },
   correctAnswerText: { fontWeight: 'bold', fontSize: 14 },
+  correctAnswerButtonsRow: { flexDirection: 'row', gap: 10 },
+  descriptiveAnswerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  removeAnswerButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  removeAnswerButtonText: { fontSize: 20, fontWeight: 'bold' },
+  addAnswerButton: { padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center', marginTop: 8 },
+  addAnswerButtonText: { fontSize: 14, fontWeight: '600' },
   tagInputContainer: { flexDirection: 'row', gap: 10, marginBottom: 15 },
   tagInput: { flex: 1, borderWidth: 1, padding: 10 },
   addTagButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

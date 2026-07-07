@@ -49,6 +49,7 @@ const HomeScreen = () => {
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [xpProgress, setXpProgress] = useState(0);
+  const [showMenu, setShowMenu] = useState(false);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -700,66 +701,83 @@ const HomeScreen = () => {
         </View>
       </View>
 
-      {/* 右側：アイコンボタン */}
-      <View style={[
-        styles.topButtons,
-        screenType === 'desktop' && { gap: 12 }
-      ]}>
-        {/* マルチボタン */}
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
-          borderColor: colors.primary,
-          borderWidth: cpB ?? 1,
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/multi'); }} label={t.multiShare || 'Multi Share'}>
-          <Share2 size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
+      {/* 右側：設定ボタン + ドロップダウンメニュー */}
+      <View style={[styles.topButtons, screenType === 'desktop' && { gap: 12 }]}>
+        <View style={{ position: 'relative' }}>
+          <TooltipButton 
+            style={[styles.iconButton, { 
+              width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+              height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
+              borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+              borderColor: colors.primary,
+              borderWidth: cpB ?? 1,
+            }]} 
+            onPress={() => { 
+              SoundManager.play('decide'); 
+              setShowMenu(!showMenu); 
+            }} 
+            label={t.appSettings}
+          >
+            <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
+          </TooltipButton>
 
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
-          borderColor: colors.primary,
-          borderWidth: cpB ?? 1,
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/settings'); }} label={t.themeSetting}>
-          <Palette size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
+          {/* ドロップダウンメニュー */}
+          {showMenu && (
+            <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity 
+                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  SoundManager.play('decide');
+                  navigate('/settings');
+                  setShowMenu(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                  {locale === 'ja' ? '🎨 テーマ設定' : '🎨 Theme Settings'}
+                </Text>
+              </TouchableOpacity>
 
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
-          borderColor: colors.primary,
-          borderWidth: cpB ?? 1,
-        }]} onPress={toggleLanguage} label={t.language}>
-          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <Globe size={screenType === 'desktop' ? 14 : 12} color={colors.primary} />
-            <Text style={[styles.languageText, { color: colors.primary, fontSize: screenType === 'desktop' ? 10 : 9, marginTop: 1 }]}>
-              {currentLocale === 'ja' ? 'JP' : 'EN'}
-            </Text>
-          </View>
-        </TooltipButton>
+              <TouchableOpacity 
+                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  SoundManager.play('decide');
+                  navigate('/music');
+                  setShowMenu(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                  {locale === 'ja' ? '🎵 音楽設定' : '🎵 Music Settings'}
+                </Text>
+              </TouchableOpacity>
 
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
-          borderColor: colors.primary,
-          borderWidth: cpB ?? 1,
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/music'); }} label={t.musicSettings}>
-          <Music size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
+              <TouchableOpacity 
+                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  SoundManager.play('decide');
+                  navigate('/multi');
+                  setShowMenu(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                  {locale === 'ja' ? '📤 マルチ共有' : '📤 Multi Share'}
+                </Text>
+              </TouchableOpacity>
 
-        <TooltipButton style={[styles.iconButton, { 
-          width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-          borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
-          borderColor: colors.primary,
-          borderWidth: cpB ?? 1,
-        }]} onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }} label={t.appSettings}>
-          <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-        </TooltipButton>
+              <TouchableOpacity 
+                style={styles.dropdownItem}
+                onPress={() => {
+                  SoundManager.play('decide');
+                  navigate('/appSettings');
+                  setShowMenu(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                  {locale === 'ja' ? '⚙️ 全般' : '⚙️ General'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -952,6 +970,9 @@ const styles = StyleSheet.create({
   languageText: {
     fontWeight: 'bold',
   },
+  levelText: {
+    fontWeight: '600',
+  },
   todayCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12 },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   todayEmoji: { fontSize: 16 },
@@ -1101,6 +1122,30 @@ const styles = StyleSheet.create({
   },
   statBlockLabel: {
     marginTop: 4,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 8,
+    minWidth: 200,
+    borderRadius: 12,
+    borderWidth: 1,
+    zIndex: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  dropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
