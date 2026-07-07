@@ -10,33 +10,46 @@ import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { syncLoginStreak } from './utils/userProgress';
 
+// キャッシュ不整合によるChunkLoadErrorを自動検知してリロードする安全なlazy loading
+const safeLazy = (importFn: () => Promise<any>) => {
+  return lazy(() =>
+    importFn().catch((error) => {
+      if (error.name === 'ChunkLoadError' || error.message?.includes('Loading chunk')) {
+        console.log('古いキャッシュを検知したため、最新版に自動リロードします。');
+        window.location.reload();
+      }
+      throw error;
+    })
+  );
+};
+
 // Lazy load all screens for better performance
-const HomeScreen = lazy(() => import('../app/index'));
-const BrowseQuestionsScreen = lazy(() => import('../app/browse'));
-const CalendarScreen = lazy(() => import('../app/calendar'));
-const CreateQuestionScreen = lazy(() => import('../app/create'));
-const CreditsScreen = lazy(() => import('../app/credits'));
-const InboxScreen = lazy(() => import('../app/inbox'));
-const DevModeScreen = lazy(() => import('../app/devmode'));
-const FeedbackScreen = lazy(() => import('../app/feedback'));
-const ManageTimerScreen = lazy(() => import('../app/manage'));
-const MissionScreen = lazy(() => import('../app/mission'));
-const MissionDetailScreen = lazy(() => import('../app/missionScreen'));
-const MissionsScreen = lazy(() => import('../app/mission'));
-const MultiScreen = lazy(() => import('../app/multi'));
-const MusicScreen = lazy(() => import('../app/music'));
-const ProfileScreen = lazy(() => import('../app/profile'));
-const StatisticsScreen = lazy(() => import('../app/statistics'));
-const QuizScreen = lazy(() => import('../app/quiz'));
-const LoginScreen = lazy(() => import('../app/auth/loginScreen'));
-const ReorderConfirmScreen = lazy(() => import('../app/reorderConfirm'));
-const ResultsScreen = lazy(() => import('../app/results'));
-const SettingsScreen = lazy(() => import('../app/settings'));
-const ShopScreen = lazy(() => import('../app/shop'));
-const TitleScreen = lazy(() => import('../app/title'));
-const TitleListScreen = lazy(() => import('../app/titleScreen'));
-const AppSettingsScreen = lazy(() => import('../app/appSettings'));
-const GachaScreen = lazy(() => import('../app/gacha'));
+const HomeScreen = safeLazy(() => import('../app/index'));
+const BrowseQuestionsScreen = safeLazy(() => import('../app/browse'));
+const CalendarScreen = safeLazy(() => import('../app/calendar'));
+const CreateQuestionScreen = safeLazy(() => import('../app/create'));
+const CreditsScreen = safeLazy(() => import('../app/credits'));
+const InboxScreen = safeLazy(() => import('../app/inbox'));
+const DevModeScreen = safeLazy(() => import('../app/devmode'));
+const FeedbackScreen = safeLazy(() => import('../app/feedback'));
+const ManageTimerScreen = safeLazy(() => import('../app/manage'));
+const MissionScreen = safeLazy(() => import('../app/mission'));
+const MissionDetailScreen = safeLazy(() => import('../app/missionScreen'));
+const MissionsScreen = safeLazy(() => import('../app/mission'));
+const MultiScreen = safeLazy(() => import('../app/multi'));
+const MusicScreen = safeLazy(() => import('../app/music'));
+const ProfileScreen = safeLazy(() => import('../app/profile'));
+const StatisticsScreen = safeLazy(() => import('../app/statistics'));
+const QuizScreen = safeLazy(() => import('../app/quiz'));
+const LoginScreen = safeLazy(() => import('../app/auth/loginScreen'));
+const ReorderConfirmScreen = safeLazy(() => import('../app/reorderConfirm'));
+const ResultsScreen = safeLazy(() => import('../app/results'));
+const SettingsScreen = safeLazy(() => import('../app/settings'));
+const ShopScreen = safeLazy(() => import('../app/shop'));
+const TitleScreen = safeLazy(() => import('../app/title'));
+const TitleListScreen = safeLazy(() => import('../app/titleScreen'));
+const AppSettingsScreen = safeLazy(() => import('../app/appSettings'));
+const GachaScreen = safeLazy(() => import('../app/gacha'));
 
 const Loading = () => <LoadingScreen />;
 
