@@ -649,6 +649,10 @@ const HomeScreen = () => {
     return (
     <View style={[
       styles.header,
+      { 
+        zIndex: 1000,
+        position: 'relative',
+      },
       screenType === 'desktop' && { 
         paddingBottom: 20,
         borderBottomWidth: 1,
@@ -702,7 +706,7 @@ const HomeScreen = () => {
       </View>
 
       {/* 右側：設定ボタン + ドロップダウンメニュー */}
-      <View style={[styles.topButtons, screenType === 'desktop' && { gap: 12 }]}>
+      <View style={[styles.topButtons, { zIndex: 1001 }, screenType === 'desktop' && { gap: 12 }]}>
         <View style={{ position: 'relative' }}>
           <TooltipButton 
             style={[styles.iconButton, { 

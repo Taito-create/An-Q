@@ -245,22 +245,6 @@ export default function ResultsScreen() {
         ))}
       </View>
 
-      {/* History Graph */}
-      {history.length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          <Text style={[styles.sectionTitle, { color: colors.text }]}> 📊 {t.progressHistory}</Text>
-          {history.map((h, i) => (
-            <View key={i} style={styles.historyRow}>
-              <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{h.date}</Text>
-              <View style={styles.historyBar}>
-                <View style={[styles.historyFill, { width: `${h.percentage}%`, backgroundColor: colors.primary }]} />
-              </View>
-              <Text style={styles.historyPct}>{h.percentage}%</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
       {/* アクションボタン */}
       <View style={styles.actions}>
         <TouchableOpacity 
@@ -284,19 +268,6 @@ export default function ResultsScreen() {
         >
           <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
         </TouchableOpacity>
-        
-        {/* フィードバックボタン */}
-      <TouchableOpacity 
-        style={[styles.feedbackBtn, { backgroundColor: colors.warning || '#FF9500' }]} 
-        onPress={() => {
-          SoundManager.play('decide');
-          navigate('/feedback');
-        }}
-      >
-        <Text style={[styles.feedbackBtnText, { color: onPrimary }]}>
-          📝 {locale === 'ja' ? 'フィードバックを送る' : 'Send Feedback'}
-        </Text>
-      </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -350,11 +321,6 @@ const styles = StyleSheet.create({
   resultWrong: {},
   resultQuestion: { fontSize: 14, color: '#334155', lineHeight: 21, marginBottom: 4 },
   resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  historyDate: { fontSize: 10, width: 80 },
-  historyBar: { flex: 1, height: 8, backgroundColor: '#EEF2F6', borderRadius: 999, overflow: 'hidden', marginHorizontal: 10 },
-  historyFill: { height: '100%' },
-  historyPct: { fontSize: 12, fontWeight: 'bold', width: 35 },
   actions: { gap: 14, paddingTop: 4 },
   primaryBtn: { paddingVertical: 16, paddingHorizontal: 18, borderRadius: 16, alignItems: 'center', minHeight: 54 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
@@ -362,17 +328,4 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
   dangerBtnText: { color: '#FF3B30', fontSize: 13 },
-  feedbackBtn: {
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 2,
-    minHeight: 54,
-  },
-  feedbackBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
 });

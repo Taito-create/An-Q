@@ -614,7 +614,6 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   const finishQuizWithResults = async (finalResults: QuizResult[]) => {
     setIsTimerActive(false);
-    setShowReview(true);
 
     const totalQuestions = shuffledQuestions.length;
     const finalScore = finalResults.filter(r => r.isCorrect).length;
