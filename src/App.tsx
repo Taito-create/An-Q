@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { View } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
 import RootLayout from './RootLayout';
 import NotFound from './pages/NotFound';
@@ -54,6 +54,8 @@ const GachaScreen = safeLazy(() => import('../app/gacha'));
 const Loading = () => <LoadingScreen />;
 
 export default function App() {
+  const [showUpdatePrompt, setShowUpdatePrompt] = React.useState(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
@@ -66,8 +68,18 @@ export default function App() {
 
       navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
+      // Service Workerからの更新メッセージをリッスン
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+          setShowUpdatePrompt(true);
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+
       return () => {
         navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
       };
     }
 
@@ -82,6 +94,10 @@ export default function App() {
       localStorage.setItem('app_version', CURRENT_APP_VERSION);
     }
   }, []);
+
+  const handleUpdate = () => {
+    window.location.reload();
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -215,6 +231,72 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+
+      {/* 更新通知モーダル */}
+      {showUpdatePrompt && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }}>
+          <View style={{
+            backgroundColor: '#fff',
+            borderRadius: 20,
+            padding: 32,
+            width: '90%',
+            maxWidth: 400,
+            alignItems: 'center',
+          }}>
+            <Text style={{
+              fontSize: 48,
+              marginBottom: 16,
+            }}>🎉</Text>
+            <Text style={{
+              fontSize: 22,
+              fontWeight: 'bold',
+              color: '#1A1A1A',
+              marginBottom: 12,
+              textAlign: 'center',
+            }}>
+              新しいバージョンがあります
+            </Text>
+            <Text style={{
+              fontSize: 15,
+              color: '#666',
+              marginBottom: 24,
+              textAlign: 'center',
+              lineHeight: 22,
+            }}>
+              最新版をダウンロードしました。<br/>ボタンをタップして更新してください。
+            </Text>
+            <TouchableOpacity
+              onPress={handleUpdate}
+              style={{
+                backgroundColor: '#007AFF',
+                paddingVertical: 16,
+                paddingHorizontal: 32,
+                borderRadius: 12,
+                width: '100%',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{
+                color: '#fff',
+                fontSize: 16,
+                fontWeight: 'bold',
+              }}>
+                今すぐ更新
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </RootLayout>
   );
 }
