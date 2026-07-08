@@ -41,6 +41,12 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // POSTなどの非GETリクエストはキャッシュしない
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   // キャッシュ優先からネットワーク優先に変更
   event.respondWith(
     fetch(event.request)

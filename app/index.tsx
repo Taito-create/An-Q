@@ -9,6 +9,7 @@ import TooltipButton from './tooltipButton';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import PatternBackground from './patternBackground';
+import LoadingScreen from './LoadingScreen';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -50,6 +51,7 @@ const HomeScreen = () => {
   const [profile, setProfile] = useState<any>(null);
   const [xpProgress, setXpProgress] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -163,12 +165,23 @@ const HomeScreen = () => {
   const [quickReviewQuestions, setQuickReviewQuestions] = useState<any[]>([]);
 
   useEffect(() => {
-    loadSettings();
-    SoundManager.initialize();
-    loadExamCountdown();
-    loadQuickReviewQuestions();
-    updateTimerDisplay();
-    loadUserProgress();
+    const initializeData = async () => {
+      setIsLoading(true);
+      try {
+        await loadSettings();
+        SoundManager.initialize();
+        await loadExamCountdown();
+        await loadQuickReviewQuestions();
+        await updateTimerDisplay();
+        await loadUserProgress();
+      } catch (error) {
+        console.error('Failed to initialize home screen:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
 
     // リアルタイム監視（500ms ごと）
     const interval = setInterval(() => {
@@ -818,6 +831,10 @@ const HomeScreen = () => {
       </View>
     );
   };
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, minHeight: '100%' }}>
