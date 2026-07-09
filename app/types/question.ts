@@ -29,6 +29,7 @@ export interface Question {
   sharedMark?: string;
   mistakeCount?: number;
   createdAt?: number;
+  explanation?: string;  // 正解時の解説（備考）
 }
 
 export interface Folder {

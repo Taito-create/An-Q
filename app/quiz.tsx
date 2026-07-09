@@ -84,6 +84,10 @@ export default function QuizScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // 解説表示
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [explanationText, setExplanationText] = useState('');
+
   // 自動再生モード
   const [autoPlayMode, setAutoPlayMode] = useState(false);
   const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
@@ -578,35 +582,61 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-    // タイムアタックモードのタイマー停止
-    if (timeAttackMode) {
+    // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
+    if (correct && !timeAttackMode && (currentQuestion.answerType === 'truefalse' || currentQuestion.answerType === 'multiple') && currentQuestion.explanation) {
       setIsTimerActive(false);
-    }
+      setShowExplanation(true);
+      setExplanationText(currentQuestion.explanation);
 
-    const delay = correct ? 1000 : 2500;
+      // 3秒後に解説を閉じてタイマーを再開し、次へ進む
+      setTimeout(async () => {
+        setShowExplanation(false);
+        setExplanationText('');
+        setIsTimerActive(true); // タイマーを再開
 
-    setTimeout(async () => {
-      const finalResults = [...results, newResult];
-      setResults(finalResults);
+        const finalResults = [...results, newResult];
+        setResults(finalResults);
 
-      if (currentIndex + 1 >= shuffledQuestions.length) {
-        setIsTimerActive(false);
-        setAnswered(false);
-        setShowFeedback(false);
-        await finishQuizWithResults(finalResults);
-      } else {
-        setCurrentIndex(prev => prev + 1);
-        setShowFeedback(false);
-        setAnswered(false);
-        setUserDescriptiveAnswer('');
-        questionStartTime.current = Date.now();
-        // タイムアタックモードの場合、タイマーを再開
-        if (timeAttackMode) {
-          setIsTimerActive(true);
+        if (currentIndex + 1 >= shuffledQuestions.length) {
+          setIsTimerActive(false);
+          setAnswered(false);
+          setShowFeedback(false);
+          await finishQuizWithResults(finalResults);
+        } else {
+          setCurrentIndex(prev => prev + 1);
+          setShowFeedback(false);
+          setAnswered(false);
+          setUserDescriptiveAnswer('');
+          questionStartTime.current = Date.now();
+          SoundManager.play('question');
         }
-        SoundManager.play('question');
-      }
-    }, delay);
+      }, 3000);
+    } else {
+      const delay = correct ? 1000 : 2500;
+
+      setTimeout(async () => {
+        const finalResults = [...results, newResult];
+        setResults(finalResults);
+
+        if (currentIndex + 1 >= shuffledQuestions.length) {
+          setIsTimerActive(false);
+          setAnswered(false);
+          setShowFeedback(false);
+          await finishQuizWithResults(finalResults);
+        } else {
+          setCurrentIndex(prev => prev + 1);
+          setShowFeedback(false);
+          setAnswered(false);
+          setUserDescriptiveAnswer('');
+          questionStartTime.current = Date.now();
+          // タイムアタックモードの場合、タイマーを再開
+          if (timeAttackMode) {
+            setIsTimerActive(true);
+          }
+          SoundManager.play('question');
+        }
+      }, delay);
+    }
   };
 
   // ──────────────────────────────────────────────
@@ -1512,6 +1542,23 @@ export default function QuizScreen() {
         </View>
       )}
 
+      {/* 備考（解説）の表示エリア */}
+      {showExplanation && (
+        <View style={[styles.explanationContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+          <Text style={[styles.explanationTitle, { color: colors.primary }]}>
+            💡 {locale === 'ja' ? '解説・備考' : 'Explanation'}
+          </Text>
+          <ScrollView style={{ maxHeight: 150 }}>
+            <Text style={[styles.explanationText, { color: colors.text }]}>
+              {explanationText}
+            </Text>
+          </ScrollView>
+          <Text style={[styles.explanationTimer, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '3秒後に次の問題へ...' : 'Next question in 3 seconds...'}
+          </Text>
+        </View>
+      )}
+
       {/* 誤答時のフルスクリーンモーダル（長文対応） */}
       <Modal visible={showFeedback && !isCorrect && !!feedbackMessage} transparent animationType="fade">
         <View style={styles.fullScreenFeedback}>
@@ -1679,6 +1726,30 @@ const styles = StyleSheet.create({
   reviewQuestionNumber: { fontSize: 16, fontWeight: 'bold', color: '#64748B' },
   reviewResult: { fontSize: 14, fontWeight: 'bold' },
   reviewQuestionText: { fontSize: 16, color: '#1A1A1A', marginBottom: 12, lineHeight: 24 },
+  explanationContainer: {
+    marginHorizontal: 18,
+    marginVertical: 12,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  explanationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  explanationText: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  explanationTimer: {
+    fontSize: 13,
+    marginTop: 8,
+    fontWeight: '600',
+  },
   fullScreenFeedback: {
     position: 'absolute',
     top: 0,
