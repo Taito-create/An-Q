@@ -1238,32 +1238,29 @@ export default function QuizScreen() {
 
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
-      {/* スクロールしないヘッダー部分 */}
+      {/* 最上部：中断ボタン */}
       {!autoPlayMode && (
         <View style={styles.topBar}>
-          <Text style={[styles.timer, { color: timerColor }]}>
-            {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
-          </Text>
           <TouchableOpacity 
             style={[
-              styles.pauseBtn, 
+              styles.quitBtnTop, 
               { 
-                backgroundColor: isPaused ? colors.success : colors.border,
-                borderWidth: isPaused ? 2 : 0,
-                borderColor: isPaused ? '#fff' : 'transparent',
+                backgroundColor: colors.error,
+                paddingVertical: 10, 
+                paddingHorizontal: 20, 
+                borderRadius: 20,
+                alignItems: 'center',
               }
             ]} 
             onPress={() => {
               SoundManager.play('decide');
-              setIsPaused(!isPaused);
-              setIsTimerActive(isPaused);
+              setShowConfirmModal(true);
             }}
           >
-            <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
-              {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+            <Text style={[styles.quitBtnTopText, { color: '#fff', fontWeight: 'bold', fontSize: 14 }]}>
+              {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz'}
             </Text>
           </TouchableOpacity>
-          <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>{currentIndex + 1} / {shuffledQuestions.length}</Text>
         </View>
       )}
 
@@ -1324,6 +1321,15 @@ export default function QuizScreen() {
         style={{ flex: 1 }}
       >
         <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
+          {/* 問題数カウンターを右上に配置 */}
+          {!autoPlayMode && (
+            <View style={styles.questionCounterBadge}>
+              <Text style={[styles.questionCounterText, { color: colors.primary }]}>
+                {currentIndex + 1} / {shuffledQuestions.length}
+              </Text>
+            </View>
+          )}
+          
           {currentQuestion.topic && <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>}
           
           {currentQuestion.image && (
@@ -1660,7 +1666,12 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     flexGrow: 1,
   },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 2 },
+  topBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12, paddingHorizontal: 2 },
+  quitBtnTop: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quitBtnTopText: { fontSize: 14, fontWeight: '600' },
   timer: { fontSize: 20, fontWeight: 'bold', minWidth: 72, letterSpacing: 0.2 },
   pauseBtn: {
     paddingHorizontal: 18,
@@ -1671,6 +1682,21 @@ const styles = StyleSheet.create({
   },
   pauseBtnText: { fontSize: 13, color: '#555', fontWeight: '600' },
   questionCounter: { fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
+  questionCounterBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  questionCounterText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   progressBar: { height: 7, borderRadius: 999, marginTop: 6, marginBottom: 18, overflow: 'hidden' },
   progressFill: { height: 7, backgroundColor: '#007AFF', borderRadius: 999 },
   questionBox: { backgroundColor: '#F0F4FF', borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
@@ -1706,14 +1732,16 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   answerBtn: {
-    flex: 1,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     justifyContent: 'center',
     alignItems: 'center',
   },
   trueBtn: { backgroundColor: '#4CAF50' },
   falseBtn: { backgroundColor: '#F44336' },
   btnDisabled: { opacity: 0.4 },
-  answerBtnText: { color: '#fff', fontSize: 32, fontWeight: 'bold' },
+  answerBtnText: { color: '#fff', fontSize: 48, fontWeight: 'bold' },
   quitBtn: { alignItems: 'center', justifyContent: 'center' },
   bottomButtons: { marginTop: 18, marginBottom: 28, alignItems: 'center' },
   quitBtnText: { color: '#CCC', fontSize: 13 },
