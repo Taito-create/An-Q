@@ -1238,9 +1238,34 @@ export default function QuizScreen() {
 
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
-      {/* 最上部：中断ボタン */}
+      {/* 最上部：タイマー・一時停止・中断ボタン */}
       {!autoPlayMode && (
         <View style={styles.topBar}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={[styles.timer, { color: timerColor }]}>
+              {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
+            </Text>
+            <TouchableOpacity 
+              style={[
+                styles.pauseBtn, 
+                { 
+                  backgroundColor: isPaused ? colors.success : colors.border,
+                  borderWidth: isPaused ? 2 : 0,
+                  borderColor: isPaused ? '#fff' : 'transparent',
+                }
+              ]} 
+              onPress={() => {
+                SoundManager.play('decide');
+                setIsPaused(!isPaused);
+                setIsTimerActive(isPaused);
+              }}
+            >
+              <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
+                {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
           <TouchableOpacity 
             style={[
               styles.quitBtnTop, 
@@ -1379,15 +1404,19 @@ export default function QuizScreen() {
           <View style={styles.answerRow}>
             {currentQuestion.answerType === 'truefalse' && (
               <View style={styles.trueFalseContainer}>
+                {/* @ts-ignore - className for CSS hover effects */}
                 <TouchableOpacity
-                  style={[styles.answerBtn, styles.trueBtn, { backgroundColor: colors.success }]}
+                  className="true-false-btn true-btn"
+                  style={[styles.answerBtn, { backgroundColor: colors.success }]}
                   onPress={() => handleAnswer(true)}
                   disabled={answered || isPaused}
                 >
                   <Text style={styles.answerBtnText}>○</Text>
                 </TouchableOpacity>
+                {/* @ts-ignore - className for CSS hover effects */}
                 <TouchableOpacity
-                  style={[styles.answerBtn, styles.falseBtn, { backgroundColor: colors.error }]}
+                  className="true-false-btn false-btn"
+                  style={[styles.answerBtn, { backgroundColor: colors.error }]}
                   onPress={() => handleAnswer(false)}
                   disabled={answered || isPaused}
                 >
@@ -1451,33 +1480,6 @@ export default function QuizScreen() {
           </View>
         )}
 
-        {!autoPlayMode && (
-          <View style={styles.bottomButtons}>
-            <TouchableOpacity 
-              style={[
-                styles.quitBtn, 
-                { 
-                  backgroundColor: colors.primary,
-                  paddingVertical: 12, 
-                  paddingHorizontal: 24, 
-                  borderRadius: 30,
-                  alignSelf: 'center',
-                  marginTop: 20,
-                  minWidth: 180,
-                  alignItems: 'center',
-                }
-              ]} 
-              onPress={() => {
-                SoundManager.play('decide');
-                setShowConfirmModal(true);
-              }}
-            >
-              <Text style={[styles.quitBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
-                {t.quitQuiz}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
       
       {/* ポーズ時のフルスクリーンモーダル */}
@@ -1666,7 +1668,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     flexGrow: 1,
   },
-  topBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12, paddingHorizontal: 2 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 2 },
   quitBtnTop: {
     alignItems: 'center',
     justifyContent: 'center',
