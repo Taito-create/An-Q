@@ -38,7 +38,7 @@ export default function CreateQuestionScreen() {
   const [answerType, setAnswerType] = useState<'descriptive' | 'truefalse' | 'multiple'>('descriptive');
   const [descriptiveAnswers, setDescriptiveAnswers] = useState<string[]>(['']);
   const [trueFalseAnswer, setTrueFalseAnswer] = useState(true);
-  const [wrongReason, setWrongReason] = useState('');
+  const [explanation, setExplanation] = useState('');
   const [multipleChoice, setMultipleChoice] = useState({
     options: ['', '', '', ''],
     correctAnswers: [0] as number[]
@@ -127,18 +127,19 @@ export default function CreateQuestionScreen() {
       dataToSave.descriptiveAnswers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
-      dataToSave.wrongReason = trueFalseAnswer ? '' : wrongReason.trim();
+      dataToSave.explanation = trueFalseAnswer ? '' : explanation.trim();
     } else if (answerType === 'multiple') {
       if (multipleChoice.options.some(opt => !opt.trim())) { SoundManager.play('select'); Alert.alert(t.error, t.fillAllOptions); return; }
       if (multipleChoice.correctAnswers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, locale === 'ja' ? '正解を選択してください' : 'Please select at least one correct answer'); return; }
       dataToSave.multipleChoice = { options: multipleChoice.options, correctAnswers: multipleChoice.correctAnswers };
+      dataToSave.explanation = explanation.trim();
     }
     const success = await saveQuestion(dataToSave);
     if (success) {
       SoundManager.play('complete');
       Alert.alert(t.success, t.questionSaved);
       setQuestion(''); setDescriptiveAnswers(['']); setTags([]); setTagInput(''); setAnswerType('descriptive');
-      setTrueFalseAnswer(true); setWrongReason(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
+      setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
       setSelectedImage(null); setImageAnnotations([]);
     }
   };
@@ -224,8 +225,8 @@ export default function CreateQuestionScreen() {
             {!trueFalseAnswer && (
               <TextInput
                 style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
-                value={wrongReason}
-                onChangeText={setWrongReason}
+                value={explanation}
+                onChangeText={setExplanation}
                 placeholder={locale === 'ja' ? '備考（どこが違うのか・解説）' : 'Note (explanation)'}
                 placeholderTextColor={colors.textSecondary}
                 multiline
@@ -274,6 +275,16 @@ export default function CreateQuestionScreen() {
                 })}
               </View>
             </View>
+            
+            {/* 4択問題の解説入力欄 */}
+            <TextInput
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+              value={explanation}
+              onChangeText={setExplanation}
+              placeholder={locale === 'ja' ? '備考・解説（任意）' : 'Note / Explanation (optional)'}
+              placeholderTextColor={colors.textSecondary}
+              multiline
+            />
           </View>
         )}
         <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: onPrimary }]}>{t.createQuestion}</Text></TouchableOpacity>

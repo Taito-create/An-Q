@@ -30,6 +30,7 @@ export interface Question {
   mistakeCount?: number;
   createdAt?: number;
   explanation?: string;  // 正解時の解説（備考）
+  wrongReason?: string;  // 後方互換性のため保持（旧データ用）
 }
 
 export interface Folder {

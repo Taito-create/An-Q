@@ -583,10 +583,10 @@ export default function QuizScreen() {
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
     // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
-    if (correct && !timeAttackMode && (currentQuestion.answerType === 'truefalse' || currentQuestion.answerType === 'multiple') && currentQuestion.explanation) {
+    if (correct && !timeAttackMode && (currentQuestion.answerType === 'truefalse' || currentQuestion.answerType === 'multiple') && (currentQuestion.explanation || currentQuestion.wrongReason)) {
       setIsTimerActive(false);
       setShowExplanation(true);
-      setExplanationText(currentQuestion.explanation);
+      setExplanationText(currentQuestion.explanation || currentQuestion.wrongReason || '');
 
       // 3秒後に解説を閉じてタイマーを再開し、次へ進む
       setTimeout(async () => {
