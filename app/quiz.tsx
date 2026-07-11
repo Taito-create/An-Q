@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, TouchableOpacity, Alert,
+  StyleSheet, Pressable, Alert,
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
@@ -1241,40 +1241,38 @@ export default function QuizScreen() {
       {/* 最上部：タイマー・一時停止・中断ボタン */}
       {!autoPlayMode && (
         <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={[styles.timer, { color: timerColor }]}>
-              {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
-            </Text>
-            <TouchableOpacity 
-              style={[
-                styles.pauseBtn, 
-                { 
-                  backgroundColor: isPaused ? colors.success : colors.border,
-                  borderWidth: isPaused ? 2 : 0,
-                  borderColor: isPaused ? '#fff' : 'transparent',
-                }
-              ]} 
-              onPress={() => {
-                SoundManager.play('decide');
-                setIsPaused(!isPaused);
-                setIsTimerActive(isPaused);
-              }}
-            >
-              <Text style={[styles.pauseBtnText, { color: isPaused ? '#fff' : colors.text, fontWeight: 'bold' }]}>
-                {isPaused ? '▶ 再開' : '⏸ 一時停止'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* 左側：タイマー */}
+          <Text style={[styles.timer, { color: timerColor }]}>
+            {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
+          </Text>
           
-          <TouchableOpacity 
-            style={[
+          {/* 中央：一時停止ボタン（絶対配置で中央に） */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.pauseBtn, 
+              { 
+                backgroundColor: isPaused ? colors.success : colors.primary,
+                transform: [{ scale: pressed ? 0.95 : 1 }]
+              }
+            ]} 
+            onPress={() => {
+              SoundManager.play('decide');
+              setIsPaused(!isPaused);
+              setIsTimerActive(isPaused);
+            }}
+          >
+            <Text style={[styles.pauseBtnText, { color: '#fff', fontWeight: 'bold' }]}>
+              {isPaused ? '▶ 再開' : '⏸ 一時停止'}
+            </Text>
+          </Pressable>
+          
+          {/* 右側：中断ボタン（テーマカラー使用） */}
+          <Pressable
+            style={({ pressed }) => [
               styles.quitBtnTop, 
               { 
-                backgroundColor: colors.error,
-                paddingVertical: 10, 
-                paddingHorizontal: 20, 
-                borderRadius: 20,
-                alignItems: 'center',
+                backgroundColor: pressed ? colors.error : colors.primary,
+                transform: [{ scale: pressed ? 0.95 : 1 }]
               }
             ]} 
             onPress={() => {
@@ -1285,7 +1283,7 @@ export default function QuizScreen() {
             <Text style={[styles.quitBtnTopText, { color: '#fff', fontWeight: 'bold', fontSize: 14 }]}>
               {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
 
@@ -1404,24 +1402,32 @@ export default function QuizScreen() {
           <View style={styles.answerRow}>
             {currentQuestion.answerType === 'truefalse' && (
               <View style={styles.trueFalseContainer}>
-                {/* @ts-ignore - className for CSS hover effects */}
-                <TouchableOpacity
-                  className="true-false-btn true-btn"
-                  style={[styles.answerBtn, { backgroundColor: colors.success }]}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.answerBtn,
+                    { 
+                      backgroundColor: colors.success,
+                      transform: [{ scale: pressed ? 0.95 : 1 }]
+                    }
+                  ]}
                   onPress={() => handleAnswer(true)}
                   disabled={answered || isPaused}
                 >
                   <Text style={styles.answerBtnText}>○</Text>
-                </TouchableOpacity>
-                {/* @ts-ignore - className for CSS hover effects */}
-                <TouchableOpacity
-                  className="true-false-btn false-btn"
-                  style={[styles.answerBtn, { backgroundColor: colors.error }]}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.answerBtn,
+                    { 
+                      backgroundColor: colors.error,
+                      transform: [{ scale: pressed ? 0.95 : 1 }]
+                    }
+                  ]}
                   onPress={() => handleAnswer(false)}
                   disabled={answered || isPaused}
                 >
                   <Text style={styles.answerBtnText}>×</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             )}
 
@@ -1668,10 +1674,21 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     flexGrow: 1,
   },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 2 },
+  topBar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 12, 
+    paddingHorizontal: 2,
+    position: 'relative',
+    minHeight: 44,
+  },
   quitBtnTop: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10, 
+    paddingHorizontal: 20, 
+    borderRadius: 20,
   },
   quitBtnTopText: { fontSize: 14, fontWeight: '600' },
   timer: { fontSize: 20, fontWeight: 'bold', minWidth: 72, letterSpacing: 0.2 },
