@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Pressable, Alert,
+  StyleSheet, Pressable, TouchableOpacity, Alert,
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
