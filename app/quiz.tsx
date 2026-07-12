@@ -1637,42 +1637,40 @@ export default function QuizScreen() {
             </Text>
           </View>
           
-          {/* Lottieアニメーション（モーダル内に配置して最前面に表示） */}
+          {/* Lottieアニメーション（モーダル内に右下に配置） */}
           {showErrorLottie && (
             <View style={{
               position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: 9999,
-              backgroundColor: 'transparent',
+              bottom: -10,
+              right: -10,
+              zIndex: 99,
             }} pointerEvents="none">
               <LottieView
                 source={errorJson}
                 autoPlay
                 loop={false}
-                style={{ width: 300, height: 300 }}
+                speed={2}
+                style={{ width: 120, height: 120 }}
               />
             </View>
           )}
         </View>
       </Modal>
 
-      {/* 正解時のLottieアニメーション（モーダルの外側に配置） */}
+      {/* 正解時のLottieアニメーション（カード内の右下に配置） */}
       {showSuccessLottie && (
         <View style={{
           position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          backgroundColor: 'transparent',
+          bottom: -10,
+          right: -10,
+          zIndex: 99,
         }} pointerEvents="none">
           <LottieView
             source={successJson}
             autoPlay
             loop={false}
-            style={{ width: 300, height: 300 }}
+            speed={2}
+            style={{ width: 120, height: 120 }}
           />
         </View>
       )}
