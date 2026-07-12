@@ -3,6 +3,7 @@ import {
   StyleSheet, Pressable, TouchableOpacity, Alert,
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
@@ -87,6 +88,10 @@ export default function QuizScreen() {
   // 解説表示
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanationText, setExplanationText] = useState('');
+
+  // Lottieアニメーション表示制御
+  const [showSuccessLottie, setShowSuccessLottie] = useState(false);
+  const [showErrorLottie, setShowErrorLottie] = useState(false);
 
   // 自動再生モード
   const [autoPlayMode, setAutoPlayMode] = useState(false);
@@ -594,6 +599,15 @@ export default function QuizScreen() {
 
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+    // Lottieアニメーションを再生（正解・不正解時）
+    if (correct) {
+      setShowSuccessLottie(true);
+      setTimeout(() => setShowSuccessLottie(false), 1500);
+    } else {
+      setShowErrorLottie(true);
+      setTimeout(() => setShowErrorLottie(false), 1500);
+    }
 
     // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
     if (correct && !timeAttackMode && (currentQuestion.answerType === 'truefalse' || currentQuestion.answerType === 'multiple') && (currentQuestion.explanation || currentQuestion.wrongReason)) {
@@ -1587,6 +1601,32 @@ export default function QuizScreen() {
         </View>
       )}
 
+      {/* Lottie成功アニメーション */}
+      {showSuccessLottie && (
+        <View style={styles.lottieOverlay}>
+          <LottieView
+            source={require('../assets/animations/success.json')}
+            autoPlay
+            loop={false}
+            style={styles.lottieAnimation}
+            pointerEvents="none"
+          />
+        </View>
+      )}
+
+      {/* Lottie失敗アニメーション */}
+      {showErrorLottie && (
+        <View style={styles.lottieOverlay}>
+          <LottieView
+            source={require('../assets/animations/error.json')}
+            autoPlay
+            loop={false}
+            style={styles.lottieAnimation}
+            pointerEvents="none"
+          />
+        </View>
+      )}
+
       {/* 備考（解説）の表示エリア */}
       {showExplanation && (
         <View style={[styles.explanationContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
@@ -2043,5 +2083,21 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  // Lottieアニメーション用スタイル
+  lottieOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    pointerEvents: 'none',
+  },
+  lottieAnimation: {
+    width: 300,
+    height: 300,
   },
 });
