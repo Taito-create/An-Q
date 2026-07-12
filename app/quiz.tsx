@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Pressable, TouchableOpacity, Alert,
-  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch
+  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigate } from 'react-router-dom';
@@ -1601,11 +1601,15 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* Lottie成功アニメーション */}
-      {showSuccessLottie && (
+      {/* Lottie成功アニメーション（Web環境ではスキップ） */}
+      {showSuccessLottie && Platform.OS !== 'web' && (
         <View style={styles.lottieOverlay}>
           <LottieView
-            source={require('../assets/animations/success.json')}
+            source={Platform.select({
+              ios: require('../assets/animations/success.json'),
+              android: require('../assets/animations/success.json'),
+              default: null,
+            })}
             autoPlay
             loop={false}
             style={styles.lottieAnimation}
@@ -1614,11 +1618,15 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* Lottie失敗アニメーション */}
-      {showErrorLottie && (
+      {/* Lottie失敗アニメーション（Web環境ではスキップ） */}
+      {showErrorLottie && Platform.OS !== 'web' && (
         <View style={styles.lottieOverlay}>
           <LottieView
-            source={require('../assets/animations/error.json')}
+            source={Platform.select({
+              ios: require('../assets/animations/error.json'),
+              android: require('../assets/animations/error.json'),
+              default: null,
+            })}
             autoPlay
             loop={false}
             style={styles.lottieAnimation}

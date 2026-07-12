@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Web環境用のLottieビュー モック
-const LottieView = ({ source, autoPlay, loop, style, pointerEvents, ...props }) => {
+const LottieView = ({ source, autoPlay, loop, style, pointerEvents = 'auto', ...props }) => {
   // Web環境では何も表示しない（または必要に応じてプレースホルダーを表示）
   if (autoPlay && !loop) {
     // 1回だけ再生するアニメーションの場合、非表示
