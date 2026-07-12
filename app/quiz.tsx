@@ -1418,15 +1418,6 @@ export default function QuizScreen() {
           </Text>
         </View>
 
-        {showFeedback && isCorrect && (
-          <Animated.View style={[styles.feedbackContainer, { opacity: fadeAnim, marginVertical: 16 }]}>
-            <View style={[styles.feedbackBox, { backgroundColor: colors.success + '20', padding: 16, borderRadius: 12 }]}>
-              <Text style={[styles.feedbackMain, { color: colors.success, fontSize: 20, fontWeight: 'bold', textAlign: 'center' }]}>
-                ✓ 正解！
-              </Text>
-            </View>
-          </Animated.View>
-        )}
         {!autoPlayMode && (
           <View style={styles.answerRow}>
             {currentQuestion.answerType === 'truefalse' && (
