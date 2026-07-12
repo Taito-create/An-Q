@@ -1603,30 +1603,6 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* Lottie成功アニメーション（Web環境ではスキップ） */}
-      {showSuccessLottie && Platform.OS !== 'web' && (
-        <View style={styles.lottieOverlay}>
-          <LottieView
-            source={require('../assets/animations/success.json')}
-            autoPlay
-            loop={false}
-            style={styles.lottieAnimation}
-          />
-        </View>
-      )}
-
-      {/* Lottie失敗アニメーション（Web環境ではスキップ） */}
-      {showErrorLottie && Platform.OS !== 'web' && (
-        <View style={styles.lottieOverlay}>
-          <LottieView
-            source={require('../assets/animations/error.json')}
-            autoPlay
-            loop={false}
-            style={styles.lottieAnimation}
-          />
-        </View>
-      )}
-
       {/* 備考（解説）の表示エリア */}
       {showExplanation && (
         <View style={[styles.explanationContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
@@ -1668,8 +1644,32 @@ export default function QuizScreen() {
               {locale === 'ja' ? '次の問題へ...' : 'Next question...'}
             </Text>
           </View>
+          
+          {/* Lottieアニメーション（モーダル内に配置して最前面に表示） */}
+          {showErrorLottie && Platform.OS !== 'web' && (
+            <View style={styles.lottieOverlay}>
+              <LottieView
+                source={require('../assets/animations/error.json')}
+                autoPlay
+                loop={false}
+                style={styles.lottieAnimation}
+              />
+            </View>
+          )}
         </View>
       </Modal>
+
+      {/* 正解時のLottieアニメーション（モーダルの外側に配置） */}
+      {showSuccessLottie && Platform.OS !== 'web' && (
+        <View style={styles.lottieOverlay}>
+          <LottieView
+            source={require('../assets/animations/success.json')}
+            autoPlay
+            loop={false}
+            style={styles.lottieAnimation}
+          />
+        </View>
+      )}
     </View>
   );
 }
