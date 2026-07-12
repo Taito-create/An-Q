@@ -4,6 +4,11 @@ import {
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform
 } from 'react-native';
 import LottieView from 'lottie-react-native';
+
+// Lottieアニメーションファイルを事前に読み込み（Web環境ではスキップ）
+const successJson = Platform.OS !== 'web' ? require('../src/assets/animations/success.json') : null;
+const errorJson = Platform.OS !== 'web' ? require('../src/assets/animations/error.json') : null;
+
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
@@ -604,10 +609,10 @@ export default function QuizScreen() {
     if (Platform.OS !== 'web') {
       if (correct) {
         setShowSuccessLottie(true);
-        setTimeout(() => setShowSuccessLottie(false), 2000);
+        setTimeout(() => setShowSuccessLottie(false), 2500);
       } else {
         setShowErrorLottie(true);
-        setTimeout(() => setShowErrorLottie(false), 2000);
+        setTimeout(() => setShowErrorLottie(false), 2500);
       }
     }
 
@@ -1640,10 +1645,10 @@ export default function QuizScreen() {
           {showErrorLottie && Platform.OS !== 'web' && (
             <View style={styles.lottieOverlay}>
               <LottieView
-                source={require('../assets/animations/error.json')}
+                source={errorJson}
                 autoPlay
                 loop={false}
-                style={styles.lottieAnimation}
+                style={{ width: 300, height: 300 }}
               />
             </View>
           )}
@@ -1654,10 +1659,10 @@ export default function QuizScreen() {
       {showSuccessLottie && Platform.OS !== 'web' && (
         <View style={styles.lottieOverlay}>
           <LottieView
-            source={require('../assets/animations/success.json')}
+            source={successJson}
             autoPlay
             loop={false}
-            style={styles.lottieAnimation}
+            style={{ width: 300, height: 300 }}
           />
         </View>
       )}
