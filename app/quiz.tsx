@@ -143,6 +143,19 @@ export default function QuizScreen() {
   // フィードバックアニメ
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // ○×ボタンのバネアニメーション
+  const trueBtnAnim = useRef(new Animated.Value(0)).current;
+  const falseBtnAnim = useRef(new Animated.Value(0)).current;
+
+  const animateButton = (anim: Animated.Value, toValue: number) => {
+    Animated.spring(anim, {
+      toValue,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
   // ──────────────────────────────────────────────
   // 初期ロード
   // ──────────────────────────────────────────────
@@ -1402,32 +1415,50 @@ export default function QuizScreen() {
           <View style={styles.answerRow}>
             {currentQuestion.answerType === 'truefalse' && (
               <View style={styles.trueFalseContainer}>
-                <Pressable
-                  style={({ pressed }) => [
+                <Animated.View
+                  style={[
                     styles.answerBtn,
-                    { 
+                    {
                       backgroundColor: colors.success,
-                      transform: [{ scale: pressed ? 0.95 : 1 }]
+                      transform: [
+                        { scale: trueBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.95] }) },
+                        { translateY: trueBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 4] }) }
+                      ]
                     }
                   ]}
-                  onPress={() => handleAnswer(true)}
-                  disabled={answered || isPaused}
                 >
-                  <Text style={styles.answerBtnText}>○</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
+                  <Pressable
+                    onPress={() => handleAnswer(true)}
+                    disabled={answered || isPaused}
+                    onPressIn={() => animateButton(trueBtnAnim, 1)}
+                    onPressOut={() => animateButton(trueBtnAnim, 0)}
+                    style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <Text style={styles.answerBtnText}>○</Text>
+                  </Pressable>
+                </Animated.View>
+                <Animated.View
+                  style={[
                     styles.answerBtn,
-                    { 
+                    {
                       backgroundColor: colors.error,
-                      transform: [{ scale: pressed ? 0.95 : 1 }]
+                      transform: [
+                        { scale: falseBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.95] }) },
+                        { translateY: falseBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 4] }) }
+                      ]
                     }
                   ]}
-                  onPress={() => handleAnswer(false)}
-                  disabled={answered || isPaused}
                 >
-                  <Text style={styles.answerBtnText}>×</Text>
-                </Pressable>
+                  <Pressable
+                    onPress={() => handleAnswer(false)}
+                    disabled={answered || isPaused}
+                    onPressIn={() => animateButton(falseBtnAnim, 1)}
+                    onPressOut={() => animateButton(falseBtnAnim, 0)}
+                    style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <Text style={styles.answerBtnText}>×</Text>
+                  </Pressable>
+                </Animated.View>
               </View>
             )}
 
