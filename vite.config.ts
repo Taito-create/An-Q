@@ -17,6 +17,7 @@ export default defineConfig({
       'react-native': 'react-native-web',
       'react-native-calendars': '/src/stubs/react-native-calendars.tsx',
       'expo-av': '/src/stubs/empty.js',
+      'lottie-react-native': '/src/stubs/lottie-react-native.js',
     },
   },
   optimizeDeps: {
