@@ -24,45 +24,95 @@ export const useQuestions = () => {
 
   // Firestoreから問題を読み込み
   const loadQuestionsFromFirestore = useCallback(async (): Promise<Question[]> => {
-    if (!user) {
+    if (!user?.uid) {
+      console.log('No user logged in, skipping Firestore load');
       return [];
     }
 
     try {
+      console.log('Loading questions from Firestore for user:', user.uid);
       const docRef = doc(db, 'userQuestions', user.uid);
+      console.log('Document reference created:', docRef.path);
+      
       const docSnap = await getDoc(docRef);
+      console.log('Document snapshot:', docSnap.exists ? 'exists' : 'not found');
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        return data.questions || [];
+        console.log('Document data:', data);
+        const questions = data.questions || [];
+        console.log(`Loaded ${questions.length} questions from Firestore`);
+        return questions;
       }
+      
+      console.log('No questions found in Firestore for user:', user.uid);
       return [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load questions from Firestore:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error);
+      
+      // 権限エラーの場合は詳細を表示
+      if (error.code === 'permission-denied') {
+        Alert.alert(
+          '権限エラー',
+          '問題データの読み込み権限がありません。Firestoreのセキュリティルールを確認してください。'
+        );
+      }
+      
       throw error;
     }
   }, [user]);
 
   // ローカルの問題をFirestoreに移行
   const migrateLocalQuestionsToFirestore = useCallback(async (localQuestions: Question[]): Promise<boolean> => {
-    if (!user || localQuestions.length === 0) {
+    if (!user?.uid || localQuestions.length === 0) {
+      console.log('Skipping migration: no user or no local questions');
       return true;
     }
 
     try {
       setIsMigrating(true);
-      const docRef = doc(db, 'userQuestions', user.uid);
+      console.log(`Starting migration of ${localQuestions.length} questions to Firestore...`);
       
-      await setDoc(docRef, {
+      const docRef = doc(db, 'userQuestions', user.uid);
+      console.log('Migration target document:', docRef.path);
+      
+      const dataToSave = {
         questions: localQuestions,
         updatedAt: serverTimestamp(),
         migratedAt: serverTimestamp()
-      }, { merge: true });
+      };
+      
+      console.log('Data to save:', dataToSave);
+      
+      await setDoc(docRef, dataToSave, { merge: true });
 
-      console.log(`Migrated ${localQuestions.length} questions to Firestore`);
+      console.log(`Successfully migrated ${localQuestions.length} questions to Firestore`);
+      Alert.alert(
+        '同期完了',
+        `${localQuestions.length}件の問題データをクラウドに保存しました。`
+      );
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to migrate questions:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error);
+      
+      // ユーザーに詳細なエラー情報を表示
+      let errorMessage = '問題データのクラウド保存に失敗しました。\n\n';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage += '権限がありません。Firestoreのセキュリティルールを確認してください。';
+      } else if (error.code === 'unavailable') {
+        errorMessage += 'ネットワーク接続を確認してください。';
+      } else {
+        errorMessage += `エラー: ${error.message || '不明なエラー'}`;
+      }
+      
+      Alert.alert('同期エラー', errorMessage);
       return false;
     } finally {
       setIsMigrating(false);
@@ -141,7 +191,7 @@ export const useQuestions = () => {
 
   // Firestoreに保存
   const saveQuestionsToFirestore = useCallback(async (newQuestions: Question[]): Promise<boolean> => {
-    if (!user) {
+    if (!user?.uid) {
       // 未ログイン時はローカルに保存
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(newQuestions));
@@ -153,26 +203,52 @@ export const useQuestions = () => {
     }
 
     try {
+      console.log(`Saving ${newQuestions.length} questions to Firestore for user:`, user.uid);
       const docRef = doc(db, 'userQuestions', user.uid);
-      await setDoc(docRef, {
+      console.log('Save target:', docRef.path);
+      
+      const dataToSave = {
         questions: newQuestions,
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      };
+      
+      await setDoc(docRef, dataToSave, { merge: true });
+      console.log('Successfully saved to Firestore');
       
       // ローカルにもバックアップとして保存
-      await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(newQuestions));
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(newQuestions));
+      } catch (localError) {
+        console.error('Failed to save local backup:', localError);
+      }
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save questions to Firestore:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error);
       
       // エラー時はローカルに保存
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(newQuestions));
+        console.log('Saved to local storage as fallback');
       } catch (localError) {
         console.error('Failed to save questions locally:', localError);
       }
       
+      // ユーザーに通知
+      let errorMessage = '問題データの保存に失敗しました。\n\n';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage += '権限がありません。Firestoreのセキュリティルールを確認してください。';
+      } else if (error.code === 'unavailable') {
+        errorMessage += 'ネットワーク接続を確認してください。オフラインで保存しています。';
+      } else {
+        errorMessage += `エラー: ${error.message || '不明なエラー'}`;
+      }
+      
+      Alert.alert('保存エラー', errorMessage);
       return false;
     }
   }, [user]);
