@@ -15,7 +15,7 @@ import { incrementStat, recordQuizAnswers } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useQuestions } from './hooks/useQuestions';
-import { getAnswerText } from './utils/answerUtils';
+import { checkDescriptiveAnswer, getAnswerText } from './utils/answerUtils';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
@@ -533,11 +533,8 @@ export default function QuizScreen() {
         }
         break;
       case 'descriptive':
-        const userAnswerTrimmed = (answer as string).trim().toLowerCase();
-        const correctAnswerTrimmed = isReverseMode
-          ? currentQuestion.question.trim().toLowerCase()
-          : (currentQuestion.descriptiveAnswer || '').trim().toLowerCase();
-        correct = userAnswerTrimmed === correctAnswerTrimmed;
+        const userAnswerStr = answer as string;
+        correct = checkDescriptiveAnswer(userAnswerStr, currentQuestion);
         actualCorrectAnswer = isReverseMode
           ? currentQuestion.question
           : (currentQuestion.descriptiveAnswer || '');

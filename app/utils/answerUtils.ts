@@ -4,6 +4,35 @@ import { Question } from '../types/question';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
 /**
+ * 記述問題の回答を判定する
+ * @param userAnswer ユーザーの回答
+ * @param question 問題オブジェクト
+ * @returns 正解かどうか
+ */
+export const checkDescriptiveAnswer = (userAnswer: string, question: Question): boolean => {
+  if (!question.descriptiveAnswer) {
+    return false;
+  }
+
+  const userAnswerLower = userAnswer.trim().toLowerCase();
+  const correctAnswerLower = question.descriptiveAnswer.trim().toLowerCase();
+
+  // matchModeが'all'の場合はすべてのキーワードが含まれているかチェック
+  if (question.matchMode === 'all') {
+    // 正解をスペースまたはカンマで区切ってキーワードリストに分解
+    const keywords = correctAnswerLower
+      .split(/[,\s]+/)
+      .filter(kw => kw.length > 0);
+    
+    // すべてのキーワードがユーザー回答に含まれているかチェック
+    return keywords.every(keyword => userAnswerLower.includes(keyword));
+  }
+
+  // デフォルト（matchMode: 'any' または未指定）は完全一致または部分一致
+  return userAnswerLower === correctAnswerLower || userAnswerLower.includes(correctAnswerLower);
+};
+
+/**
  * 問題オブジェクトから回答テキストを取得する
  * @param question 問題オブジェクト
  * @returns 回答テキスト（○/✕、正解選択肢、記述回答など）

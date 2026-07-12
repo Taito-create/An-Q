@@ -31,6 +31,7 @@ export interface Question {
   createdAt?: number;
   explanation?: string;  // 正解時の解説（備考）
   wrongReason?: string;  // 後方互換性のため保持（旧データ用）
+  matchMode?: 'any' | 'all';  // 記述問題の判定モード（any: 別解, all: 両解必須）
 }
 
 export interface Folder {

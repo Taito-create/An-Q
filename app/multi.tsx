@@ -2,41 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, StyleSheet, Share } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import pako from 'pako';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  serverTimestamp
+} from 'firebase/firestore';
+import { db } from '../src/config/firebase';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { STORAGE_KEYS } from './constants/storageKeys';
 
-/**
- * データを圧縮して Base64URL エンコードする（+ / = を排除してコピペ安全に）
- */
-const compressAndEncode = (data: any): string => {
-  const jsonString = JSON.stringify(data);
-  const compressed = pako.deflate(jsonString, { level: 9 });
-  const base64 = btoa(String.fromCharCode(...Array.from(compressed)));
-  // Base64URL: + → - / → _ 末尾の = を除去
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-
-/**
- * Base64URL デコードして解凍する（旧形式の通常 Base64 にも対応）
- */
-const decodeAndDecompress = (code: string): any => {
-  // Base64URL → 通常 Base64 に戻す
-  const base64 = code.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(base64);
-  const bytes = Uint8Array.from([...binary].map(c => c.charCodeAt(0)));
-
-  // pako で解凍を試みる。失敗した場合は旧形式（非圧縮）として扱う
-  try {
-    const decompressed = pako.inflate(bytes, { to: 'string' });
-    return JSON.parse(decompressed);
-  } catch {
-    // 旧形式: UTF-8 バイト列をそのまま文字列にデコード
-    const jsonString = new TextDecoder().decode(bytes);
-    return JSON.parse(jsonString);
+// ランダムな6文字の英数字IDを生成
+const generateShortId = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  return result;
 };
 
 export default function MultiScreen() {
@@ -48,7 +33,7 @@ export default function MultiScreen() {
   const [shareType, setShareType] = useState<'questions' | 'folders'>('questions');
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
-  const [generatedCode, setGeneratedCode] = useState('');  // 送信用コード
+  const [generatedCode, setGeneratedCode] = useState('');  // 送信用コード（短縮ID）
   const [receiveCode, setReceiveCode] = useState('');      // 受信用入力
   const [questions, setQuestions] = useState<any[]>([]);
   const [folders, setFolders] = useState<any[]>([]);
@@ -64,6 +49,7 @@ export default function MultiScreen() {
     setFolders(foldersRaw ? JSON.parse(foldersRaw) : []);
   };
 
+  // Firestoreに共有データを保存して短縮IDを取得
   const generateShareCode = async () => {
     let dataToShare: any;
 
@@ -139,20 +125,30 @@ export default function MultiScreen() {
     if (!dataToShare) return;
 
     try {
-      const code = compressAndEncode(dataToShare);
-      setGeneratedCode(code);
+      // 短縮IDを生成
+      const shortId = generateShortId();
+      
+      // Firestoreに保存
+      const docRef = doc(db, 'sharedQuizzes', shortId);
+      await setDoc(docRef, {
+        data: dataToShare,
+        createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後に期限切れ
+      });
+
+      setGeneratedCode(shortId);
 
       Alert.alert(
         locale === 'ja' ? 'コード生成完了' : 'Code Generated',
         locale === 'ja'
-          ? '以下のコードをコピーして送信してください'
-          : 'Copy and share the code below',
+          ? '以下の短縮コードを送信してください'
+          : 'Share this short code',
         [
           {
             text: locale === 'ja' ? 'コピー' : 'Copy',
             onPress: async () => {
               try {
-                await navigator.clipboard.writeText(code);
+                await navigator.clipboard.writeText(shortId);
                 Alert.alert(
                   locale === 'ja' ? 'コピーしました' : 'Copied',
                   locale === 'ja' ? 'コードを送信してください' : 'Share the code'
@@ -170,10 +166,14 @@ export default function MultiScreen() {
       );
     } catch (error) {
       console.error('Failed to generate share code:', error);
-      Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? 'コード生成に失敗しました' : 'Failed to generate code');
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? 'コード生成に失敗しました' : 'Failed to generate code'
+      );
     }
   };
 
+  // Firestoreから共有データを取得
   const receiveFromCode = async () => {
     if (!receiveCode.trim()) {
       Alert.alert(
@@ -184,9 +184,31 @@ export default function MultiScreen() {
     }
 
     try {
-      // 空白・改行を除去してからデコード＆解凍
-      const cleanCode = receiveCode.trim().replace(/[\s\n\r]/g, '');
-      const receivedData = decodeAndDecompress(cleanCode);
+      const code = receiveCode.trim();
+      
+      // Firestoreから取得
+      const docRef = doc(db, 'sharedQuizzes', code);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        Alert.alert(
+          locale === 'ja' ? 'エラー' : 'Error',
+          locale === 'ja' ? 'コードが見つかりません' : 'Code not found'
+        );
+        return;
+      }
+
+      const docData = docSnap.data();
+      const receivedData = docData.data;
+
+      // 期限切れチェック
+      if (docData.expiresAt && docData.expiresAt.toDate() < new Date()) {
+        Alert.alert(
+          locale === 'ja' ? '期限切れ' : 'Expired',
+          locale === 'ja' ? 'このコードは期限切れです' : 'This code has expired'
+        );
+        return;
+      }
 
       if (!receivedData.version || receivedData.version > 1) {
         Alert.alert(
@@ -197,12 +219,14 @@ export default function MultiScreen() {
       }
 
       if (!receivedData.type || !receivedData.data) {
-        Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? 'コードが無効です' : 'Invalid code');
+        Alert.alert(
+          locale === 'ja' ? 'エラー' : 'Error',
+          locale === 'ja' ? 'コードが無効です' : 'Invalid code'
+        );
         return;
       }
 
       // 受信ボックスに保存
-      const senderId = receiveCode.substring(0, 50);
       let inboxItems: any[] = [];
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
@@ -211,11 +235,11 @@ export default function MultiScreen() {
         inboxItems = [];
       }
 
-      // 重複チェック: 同じ送信者から同じ内容のアイテムを既に受信していないか
-      const itemsToCheck = receivedData.type === 'questions' ? receivedData.data : receivedData.data;
+      // 重複チェック
+      const itemsToCheck = receivedData.data;
       const duplicateItems = itemsToCheck.filter((item: any) => {
         return inboxItems.some(existing =>
-          existing.senderCode === senderId &&
+          existing.senderCode === code &&
           existing.type === (receivedData.type === 'questions' ? 'question' : 'folder') &&
           (receivedData.type === 'questions'
             ? existing.data.question === item.question
@@ -227,8 +251,8 @@ export default function MultiScreen() {
         Alert.alert(
           locale === 'ja' ? '重複受信' : 'Duplicate Received',
           locale === 'ja'
-            ? `送信者「${receiveCode.substring(0, 8)}...」からは既に同じ内容を受信しています。\n受信ボックスで確認してください。`
-            : `Already received from user "${receiveCode.substring(0, 8)}...". Check your inbox.`,
+            ? `このコードからは既に同じ内容を受信しています。\n受信ボックスで確認してください。`
+            : `Already received from this code. Check your inbox.`,
           [{ text: 'OK' }]
         );
         return;
@@ -241,7 +265,7 @@ export default function MultiScreen() {
             type: 'question',
             data: q,
             receivedAt: Date.now(),
-            senderCode: senderId,
+            senderCode: code,
           });
         });
       } else if (receivedData.type === 'folders') {
@@ -251,7 +275,7 @@ export default function MultiScreen() {
             type: 'folder',
             data: f,
             receivedAt: Date.now(),
-            senderCode: senderId,
+            senderCode: code,
           });
         });
       }
@@ -277,12 +301,12 @@ export default function MultiScreen() {
 
       setReceiveCode('');
     } catch (error) {
-      console.error('Failed to decode share code:', error);
+      console.error('Failed to receive share code:', error);
       Alert.alert(
         locale === 'ja' ? 'エラー' : 'Error',
         locale === 'ja'
-          ? 'コードが無効です。正しくコピーされているか確認してください'
-          : 'Invalid code. Check if copied correctly'
+          ? 'コードの取得に失敗しました。正しいコードを入力してください。'
+          : 'Failed to receive code. Check if the code is correct.'
       );
     }
   };
@@ -429,10 +453,10 @@ export default function MultiScreen() {
             {generatedCode && (
               <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginVertical: 12 }}>
                 <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
-                  {locale === 'ja' ? '生成されたコード:' : 'Generated Code:'}
+                  {locale === 'ja' ? '共有コード（6文字）:' : 'Share Code (6 chars):'}
                 </Text>
-                <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: colors.border }}>
-                  <Text style={{ color: colors.text, fontSize: 11, lineHeight: 16, fontFamily: 'monospace' }}>
+                <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+                  <Text style={{ color: colors.primary, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
                     {generatedCode}
                   </Text>
                 </View>
@@ -461,23 +485,23 @@ export default function MultiScreen() {
           <>
             {/* 受信モード */}
             <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>
-              {locale === 'ja' ? 'シェアコードを貼り付け' : 'Paste share code'}
+              {locale === 'ja' ? '共有コード（6文字）を入力' : 'Enter 6-character share code'}
             </Text>
 
             <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-              placeholder={locale === 'ja' ? 'コードを貼り付け' : 'Paste code here'}
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card, fontSize: 18, textAlign: 'center', letterSpacing: 2 }]}
+              placeholder={locale === 'ja' ? '例: Ab3dE9' : 'e.g., Ab3dE9'}
               placeholderTextColor={colors.textSecondary}
               value={receiveCode}
               onChangeText={setReceiveCode}
-              multiline
-              numberOfLines={6}
+              maxLength={6}
+              autoCapitalize="none"
             />
 
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: colors.primary, opacity: !receiveCode ? 0.5 : 1 }]}
+              style={[styles.button, { backgroundColor: colors.primary, opacity: receiveCode.length === 6 ? 1 : 0.5 }]}
               onPress={receiveFromCode}
-              disabled={!receiveCode}
+              disabled={receiveCode.length !== 6}
             >
               <Text style={[styles.buttonText, { color: onPrimary }]}>
                 📥 {locale === 'ja' ? '受け取る' : 'Receive'}
@@ -501,5 +525,5 @@ const styles = StyleSheet.create({
   questionItem: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1 },
   button: { padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 16 },
   buttonText: { fontWeight: '700', fontSize: 15 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, marginBottom: 12, minHeight: 100, textAlignVertical: 'top' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, marginBottom: 12, minHeight: 50, textAlignVertical: 'center' },
 });

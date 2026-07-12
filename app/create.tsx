@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   View,
+  Switch,
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -45,6 +46,7 @@ export default function CreateQuestionScreen() {
   });
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');  // 両解モード
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
@@ -125,6 +127,7 @@ export default function CreateQuestionScreen() {
     if (answerType === 'descriptive') {
       if (!descriptiveAnswers[0]?.trim()) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
       dataToSave.descriptiveAnswers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
+      dataToSave.matchMode = matchMode;  // 両解モードを保存
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
       dataToSave.explanation = trueFalseAnswer ? '' : explanation.trim();
@@ -179,6 +182,40 @@ export default function CreateQuestionScreen() {
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
         {answerType === 'descriptive' && (
           <View>
+            {/* 両解モードスイッチ */}
+            <View style={[styles.matchModeContainer, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: cpR ?? 8, padding: 12, marginBottom: 12 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={[styles.matchModeLabel, { color: colors.text, fontWeight: '600', fontSize: 14 }]}>
+                    {locale === 'ja' ? '両解モード（すべて必須）' : 'All Keywords Required'}
+                  </Text>
+                  <Text style={[styles.matchModeHint, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]}>
+                    {locale === 'ja' 
+                      ? 'すべてのキーワードが含まれている場合のみ正解' 
+                      : 'All keywords must be present to be correct'}
+                  </Text>
+                </View>
+                <Switch
+                  value={matchMode === 'all'}
+                  onValueChange={(value) => setMatchMode(value ? 'all' : 'any')}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="#FFF"
+                />
+              </View>
+              
+              {/* 両解モードON時の説明 */}
+              {matchMode === 'all' && (
+                <View style={[styles.matchModeInfo, { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: 6, padding: 10, marginTop: 10 }]}>
+                  <Text style={[styles.matchModeInfoText, { color: colors.primary, fontSize: 12 }]}>
+                    {locale === 'ja' 
+                      ? '※ 複数の正解キーワードを「スペース」または「カンマ」で区切って入力してください。\n例：織田信長 豊臣秀吉 徳川家康' 
+                      : '※ Enter multiple correct keywords separated by "space" or "comma".\nExample: Oda Nobunaga Toyotomi Hideyoshi Tokugawa Ieyasu'}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* 正解入力欄 */}
             {descriptiveAnswers.map((answer, index) => (
               <View key={index} style={styles.descriptiveAnswerRow}>
                 <TextInput
@@ -189,7 +226,10 @@ export default function CreateQuestionScreen() {
                     newAnswers[index] = text;
                     setDescriptiveAnswers(newAnswers);
                   }}
-                  placeholder={locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`}
+                  placeholder={matchMode === 'all' 
+                    ? (locale === 'ja' ? `キーワード ${index + 1}（スペース/カンマ区切り）` : `Keyword ${index + 1} (space/comma separated)`)
+                    : (locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`)
+                  }
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
@@ -381,4 +421,9 @@ const styles = StyleSheet.create({
   imageUploadBtn: { padding: 24, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   imageUploadText: { fontSize: 15, fontWeight: '600' },
   imagePreview: { position: 'relative', overflow: 'hidden', marginBottom: 12 },
+  matchModeContainer: { marginBottom: 12 },
+  matchModeLabel: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  matchModeHint: { fontSize: 12 },
+  matchModeInfo: { padding: 10, borderWidth: 1, marginTop: 8 },
+  matchModeInfoText: { fontSize: 12, lineHeight: 18 },
 });
