@@ -4,10 +4,8 @@ import {
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform
 } from 'react-native';
 import LottieView from 'lottie-react-native';
-
-// Lottieアニメーションファイルを事前に読み込み（Web環境ではスキップ）
-const successJson = Platform.OS !== 'web' ? require('../src/assets/animations/success.json') : null;
-const errorJson = Platform.OS !== 'web' ? require('../src/assets/animations/error.json') : null;
+import successJson from '../src/assets/animations/success.json';
+import errorJson from '../src/assets/animations/error.json';
 
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
