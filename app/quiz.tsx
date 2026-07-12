@@ -600,13 +600,15 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-    // Lottieアニメーションを再生（正解・不正解時）
-    if (correct) {
-      setShowSuccessLottie(true);
-      setTimeout(() => setShowSuccessLottie(false), 1500);
-    } else {
-      setShowErrorLottie(true);
-      setTimeout(() => setShowErrorLottie(false), 1500);
+    // Lottieアニメーションを再生（正解・不正解時、実機のみ）
+    if (Platform.OS !== 'web') {
+      if (correct) {
+        setShowSuccessLottie(true);
+        setTimeout(() => setShowSuccessLottie(false), 2000);
+      } else {
+        setShowErrorLottie(true);
+        setTimeout(() => setShowErrorLottie(false), 2000);
+      }
     }
 
     // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
@@ -1605,15 +1607,10 @@ export default function QuizScreen() {
       {showSuccessLottie && Platform.OS !== 'web' && (
         <View style={styles.lottieOverlay}>
           <LottieView
-            source={Platform.select({
-              ios: require('../assets/animations/success.json'),
-              android: require('../assets/animations/success.json'),
-              default: null,
-            })}
+            source={require('../assets/animations/success.json')}
             autoPlay
             loop={false}
             style={styles.lottieAnimation}
-            pointerEvents="none"
           />
         </View>
       )}
@@ -1622,15 +1619,10 @@ export default function QuizScreen() {
       {showErrorLottie && Platform.OS !== 'web' && (
         <View style={styles.lottieOverlay}>
           <LottieView
-            source={Platform.select({
-              ios: require('../assets/animations/error.json'),
-              android: require('../assets/animations/error.json'),
-              default: null,
-            })}
+            source={require('../assets/animations/error.json')}
             autoPlay
             loop={false}
             style={styles.lottieAnimation}
-            pointerEvents="none"
           />
         </View>
       )}
