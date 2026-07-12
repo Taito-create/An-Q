@@ -603,15 +603,13 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
 
-    // Lottieアニメーションを再生（正解・不正解時、実機のみ）
-    if (Platform.OS !== 'web') {
-      if (correct) {
-        setShowSuccessLottie(true);
-        setTimeout(() => setShowSuccessLottie(false), 2500);
-      } else {
-        setShowErrorLottie(true);
-        setTimeout(() => setShowErrorLottie(false), 2500);
-      }
+    // Lottieアニメーションを再生（正解・不正解時）
+    if (correct) {
+      setShowSuccessLottie(true);
+      setTimeout(() => setShowSuccessLottie(false), 2500);
+    } else {
+      setShowErrorLottie(true);
+      setTimeout(() => setShowErrorLottie(false), 2500);
     }
 
     // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
@@ -1640,7 +1638,7 @@ export default function QuizScreen() {
           </View>
           
           {/* Lottieアニメーション（モーダル内に配置して最前面に表示） */}
-          {Platform.OS !== 'web' && showErrorLottie && (
+          {showErrorLottie && (
             <View style={{
               position: 'absolute',
               top: 0, left: 0, right: 0, bottom: 0,
@@ -1661,7 +1659,7 @@ export default function QuizScreen() {
       </Modal>
 
       {/* 正解時のLottieアニメーション（モーダルの外側に配置） */}
-      {Platform.OS !== 'web' && showSuccessLottie && (
+      {showSuccessLottie && (
         <View style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
