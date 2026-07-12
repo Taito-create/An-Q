@@ -1640,8 +1640,15 @@ export default function QuizScreen() {
           </View>
           
           {/* Lottieアニメーション（モーダル内に配置して最前面に表示） */}
-          {showErrorLottie && Platform.OS !== 'web' && (
-            <View style={styles.lottieOverlay}>
+          {Platform.OS !== 'web' && showErrorLottie && (
+            <View style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 9999,
+              backgroundColor: 'transparent',
+            }} pointerEvents="none">
               <LottieView
                 source={errorJson}
                 autoPlay
@@ -1654,8 +1661,15 @@ export default function QuizScreen() {
       </Modal>
 
       {/* 正解時のLottieアニメーション（モーダルの外側に配置） */}
-      {showSuccessLottie && Platform.OS !== 'web' && (
-        <View style={styles.lottieOverlay}>
+      {Platform.OS !== 'web' && showSuccessLottie && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          backgroundColor: 'transparent',
+        }} pointerEvents="none">
           <LottieView
             source={successJson}
             autoPlay
