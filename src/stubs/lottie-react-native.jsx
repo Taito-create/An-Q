@@ -12,7 +12,7 @@ const LottieView = ({ source, autoPlay, loop, style, speed = 1, ...props }) => {
       animationData={source}
       autoPlay={autoPlay}
       loop={loop}
-      speed={speed}
+      playSpeed={speed}
       style={style}
       {...props}
     />

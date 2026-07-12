@@ -1373,7 +1373,7 @@ export default function QuizScreen() {
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
       >
-        <View style={[styles.questionBox, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}>
+        <View style={[{ position: 'relative', backgroundColor: colors.primary + '15', borderColor: colors.border, borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1 }]}>
           {/* 問題数カウンターを右上に配置 */}
           {!autoPlayMode && (
             <View style={styles.questionCounterBadge}>
@@ -1417,6 +1417,24 @@ export default function QuizScreen() {
               : currentQuestion.question
             }
           </Text>
+
+          {/* 正解時のLottieアニメーション（カード内の右下に配置） */}
+          {showSuccessLottie && (
+            <View style={{
+              position: 'absolute',
+              bottom: 8,
+              right: 8,
+              zIndex: 99,
+            }} pointerEvents="none">
+              <LottieView
+                source={successJson}
+                autoPlay
+                loop={false}
+                speed={2}
+                style={{ width: 120, height: 120 }}
+              />
+            </View>
+          )}
         </View>
 
         {!autoPlayMode && (
@@ -1641,8 +1659,8 @@ export default function QuizScreen() {
           {showErrorLottie && (
             <View style={{
               position: 'absolute',
-              bottom: -10,
-              right: -10,
+              bottom: 8,
+              right: 8,
               zIndex: 99,
             }} pointerEvents="none">
               <LottieView
@@ -1657,23 +1675,6 @@ export default function QuizScreen() {
         </View>
       </Modal>
 
-      {/* 正解時のLottieアニメーション（カード内の右下に配置） */}
-      {showSuccessLottie && (
-        <View style={{
-          position: 'absolute',
-          bottom: -10,
-          right: -10,
-          zIndex: 99,
-        }} pointerEvents="none">
-          <LottieView
-            source={successJson}
-            autoPlay
-            loop={false}
-            speed={2}
-            style={{ width: 120, height: 120 }}
-          />
-        </View>
-      )}
     </View>
   );
 }
