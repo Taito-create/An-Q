@@ -8,14 +8,20 @@ const LottieView = ({ source, autoPlay, loop, style, speed = 1, ...props }) => {
   }
 
   return (
-    <Lottie
-      animationData={source}
-      autoPlay={autoPlay}
-      loop={loop}
-      playSpeed={speed}
-      style={style}
-      {...props}
-    />
+    <div style={{ position: 'relative', width: style?.width || 300, height: style?.height || 300 }}>
+      <Lottie
+        animationData={source}
+        autoPlay={autoPlay}
+        loop={loop}
+        playSpeed={speed}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          background: 'transparent'
+        }}
+        {...props}
+      />
+    </div>
   );
 };
 

@@ -1431,7 +1431,25 @@ export default function QuizScreen() {
                 autoPlay
                 loop={false}
                 speed={2}
-                style={{ width: 120, height: 120 }}
+                style={{ width: 80, height: 80 }}
+              />
+            </View>
+          )}
+
+          {/* 不正解時のLottieアニメーション（カード内の右下に配置） */}
+          {showErrorLottie && (
+            <View style={{
+              position: 'absolute',
+              bottom: 8,
+              right: 8,
+              zIndex: 99,
+            }} pointerEvents="none">
+              <LottieView
+                source={errorJson}
+                autoPlay
+                loop={false}
+                speed={2}
+                style={{ width: 80, height: 80 }}
               />
             </View>
           )}
@@ -1655,23 +1673,6 @@ export default function QuizScreen() {
             </Text>
           </View>
           
-          {/* Lottieアニメーション（モーダル内に右下に配置） */}
-          {showErrorLottie && (
-            <View style={{
-              position: 'absolute',
-              bottom: 8,
-              right: 8,
-              zIndex: 99,
-            }} pointerEvents="none">
-              <LottieView
-                source={errorJson}
-                autoPlay
-                loop={false}
-                speed={2}
-                style={{ width: 120, height: 120 }}
-              />
-            </View>
-          )}
         </View>
       </Modal>
 
