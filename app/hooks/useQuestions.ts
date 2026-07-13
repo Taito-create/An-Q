@@ -529,21 +529,46 @@ export const useQuestions = () => {
   }, [folders, saveFolders]);
 
   const deleteFolder = useCallback(async (folderId: string): Promise<Folder[]> => {
+    console.log('=== deleteFolder 開始 ===');
+    console.log('folderId:', folderId);
+    console.log('現在のfolders数:', folders.length);
+    
     const updated = folders.filter(f => f.id !== folderId);
-    await saveFolders(updated);
-    return updated;
+    console.log('削除後のfolders数:', updated.length);
+    
+    try {
+      await saveFolders(updated);
+      console.log('deleteFolder 成功');
+      return updated;
+    } catch (error) {
+      console.error('deleteFolder エラー:', error);
+      throw error;
+    }
   }, [folders, saveFolders]);
 
   const addQuestionsToFolder = useCallback(async (folderId: string, questionIds: number[]): Promise<Folder[]> => {
+    console.log('=== addQuestionsToFolder 開始 ===');
+    console.log('folderId:', folderId);
+    console.log('questionIds:', questionIds);
+    console.log('現在のfolders数:', folders.length);
+    
     const updated = folders.map(f => {
       if (f.id === folderId) {
         const newQuestionIds = [...new Set([...f.questionIds, ...questionIds])];
+        console.log(`フォルダ "${f.name}" の問題数: ${f.questionIds.length} → ${newQuestionIds.length}`);
         return { ...f, questionIds: newQuestionIds };
       }
       return f;
     });
-    await saveFolders(updated);
-    return updated;
+    
+    try {
+      await saveFolders(updated);
+      console.log('addQuestionsToFolder 成功');
+      return updated;
+    } catch (error) {
+      console.error('addQuestionsToFolder エラー:', error);
+      throw error;
+    }
   }, [folders, saveFolders]);
 
   const removeQuestionsFromFolder = useCallback(async (folderId: string, questionIds: number[]): Promise<Folder[]> => {

@@ -330,7 +330,18 @@ export default function BrowseQuestionsScreen() {
   };
 
   const handleDeleteFolder = async () => {
-    if (!selectedFolder) return;
+    Alert.alert(
+      'デバッグ',
+      'handleDeleteFolder関数が呼ばれました！'
+    );
+    
+    console.log('=== handleDeleteFolder 開始 ===');
+    console.log('selectedFolder:', selectedFolder);
+    
+    if (!selectedFolder) {
+      console.log('handleDeleteFolder: selectedFolderがnullのため終了');
+      return;
+    }
     
     Alert.alert(
       locale === 'ja' ? '確認' : 'Confirm',
@@ -343,14 +354,26 @@ export default function BrowseQuestionsScreen() {
           text: locale === 'ja' ? '削除' : 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteFolder(selectedFolder.id);
-            setSelectedFolder(null);
-            setFolderQuestions([]);
-            SoundManager.play('complete');
-            Alert.alert(
-              locale === 'ja' ? '削除完了' : 'Deleted',
-              locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
-            );
+            try {
+              console.log('deleteFolder 呼び出し:', selectedFolder.id);
+              await deleteFolder(selectedFolder.id);
+              console.log('deleteFolder 成功');
+              
+              console.log('フォルダ詳細ビューをクリア');
+              setSelectedFolder(null);
+              setFolderQuestions([]);
+              
+              console.log('完了音を再生');
+              SoundManager.play('complete');
+              
+              Alert.alert(
+                locale === 'ja' ? '削除完了' : 'Deleted',
+                locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
+              );
+            } catch (error) {
+              console.error('deleteFolder エラー:', error);
+              Alert.alert('エラー', '削除に失敗しました');
+            }
           }
         }
       ]
@@ -358,13 +381,48 @@ export default function BrowseQuestionsScreen() {
   };
 
   const handleAddQuestionsToFolder = async () => {
-    if (!selectedFolderForAdd || selectedQuestionIdsForAdd.length === 0) return;
+    Alert.alert(
+      'デバッグ',
+      'handleAddQuestionsToFolder関数が呼ばれました！'
+    );
     
-    await addQuestionsToFolder(selectedFolderForAdd.id, selectedQuestionIdsForAdd);
-    setSelectedQuestionIdsForAdd([]);
-    setShowAddToFolderModal(false);
-    SoundManager.play('complete');
-    Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
+    console.log('=== handleAddQuestionsToFolder 開始 ===');
+    console.log('selectedFolderForAdd:', selectedFolderForAdd);
+    console.log('selectedQuestionIdsForAdd:', selectedQuestionIdsForAdd);
+    
+    if (!selectedFolderForAdd) {
+      Alert.alert('ガード節', 'selectedFolderForAddがnullのため終了');
+      console.log('ガード: selectedFolderForAddがnull');
+      return;
+    }
+    
+    if (selectedQuestionIdsForAdd.length === 0) {
+      Alert.alert('ガード節', 'selectedQuestionIdsForAddが空のため終了');
+      console.log('ガード: selectedQuestionIdsForAddが空');
+      return;
+    }
+    
+    try {
+      console.log('addQuestionsToFolder 呼び出し:');
+      console.log('  folderId:', selectedFolderForAdd.id);
+      console.log('  questionIds:', selectedQuestionIdsForAdd);
+      
+      await addQuestionsToFolder(selectedFolderForAdd.id, selectedQuestionIdsForAdd);
+      
+      console.log('addQuestionsToFolder 成功');
+      console.log('UI状態をリセット');
+      
+      setSelectedQuestionIdsForAdd([]);
+      setShowAddToFolderModal(false);
+      
+      console.log('完了音を再生');
+      SoundManager.play('complete');
+      
+      Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
+    } catch (error) {
+      console.error('addQuestionsToFolder エラー:', error);
+      Alert.alert('エラー', '追加に失敗しました');
+    }
   };
 
   return (
@@ -593,17 +651,19 @@ export default function BrowseQuestionsScreen() {
             {selectedFolder ? (
               /* フォルダ詳細ビュー */
               <View style={styles.folderDetailView}>
-                <View style={styles.folderDetailHeader}>
-                  <View style={{ flex: 1 }}>
+                <View style={[styles.folderDetailHeader, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder.name}</Text>
                     <Text style={[styles.folderDetailCount, { color: colors.textSecondary }]}>
                       {folderQuestions.length}{locale === 'ja' ? '問' : ' questions'}
                     </Text>
                   </View>
-                  <View style={styles.folderDetailHeaderActions}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 999, position: 'relative' }}>
                     <TouchableOpacity
                       style={[styles.addQuestionsBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
+                        console.log('★物理クリック発火: 問題追加ボタン');
+                        console.log('selectedFolder:', selectedFolder);
                         setSelectedFolderForAdd(selectedFolder);
                         setShowAddToFolderModal(true);
                       }}
@@ -614,7 +674,10 @@ export default function BrowseQuestionsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
-                      onPress={handleDeleteFolder}
+                      onPress={() => {
+                        console.log('★物理クリック発火: 削除ボタン');
+                        handleDeleteFolder();
+                      }}
                     >
                       <Text style={styles.deleteFolderBtnText}>🗑️</Text>
                     </TouchableOpacity>
@@ -992,7 +1055,15 @@ export default function BrowseQuestionsScreen() {
               )}
             </ScrollView>
             {selectedQuestionIdsForAdd.length > 0 && (
-              <TouchableOpacity style={[styles.addToFolderBar, { backgroundColor: colors.primary }]} onPress={handleAddQuestionsToFolder}>
+              <TouchableOpacity 
+                style={[styles.addToFolderBar, { backgroundColor: colors.primary, zIndex: 999 }]} 
+                onPress={() => {
+                  console.log('★物理クリック発火: 追加確定ボタン');
+                  console.log('ガード節判定直前 - selectedFolderForAdd:', selectedFolderForAdd);
+                  console.log('ガード節判定直前 - selectedQuestionIdsForAdd:', selectedQuestionIdsForAdd);
+                  handleAddQuestionsToFolder();
+                }}
+              >
                 <Text style={styles.addToFolderBarText}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
@@ -1129,7 +1200,7 @@ const styles = StyleSheet.create({
   folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
   folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
   folderDetailCount: { fontSize: 14, fontWeight: '500' },
-  folderDetailHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  folderDetailHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 8, position: 'relative', zIndex: 999 },
   addQuestionsBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, alignItems: 'center' },
   addQuestionsBtnText: { fontSize: 13, fontWeight: 'bold' },
   deleteFolderBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
