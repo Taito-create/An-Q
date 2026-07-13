@@ -7,7 +7,6 @@ import {
   ScrollView,
   Text,
   View,
-  Switch,
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -46,7 +45,15 @@ export default function CreateQuestionScreen() {
   });
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [showTagInput, setShowTagInput] = useState(false);
   const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');  // 両解モード
+
+  // 両解モードがONのとき、回答が2つ未満なら自動的に2つにする
+  useEffect(() => {
+    if (matchMode === 'all' && descriptiveAnswers.length < 2) {
+      setDescriptiveAnswers(['', '']);
+    }
+  }, [matchMode]);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
@@ -125,7 +132,7 @@ export default function CreateQuestionScreen() {
     }
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
-      // 複数の正解をスペース区切りの文字列として保存（両解モード対応）
+      // 複数の正解を配列として保存（両解モード対応）
       const answers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
       if (answers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
       
@@ -151,11 +158,16 @@ export default function CreateQuestionScreen() {
       Alert.alert(t.success, t.questionSaved);
       setQuestion(''); setDescriptiveAnswers(['']); setTags([]); setTagInput(''); setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
-      setSelectedImage(null); setImageAnnotations([]);
+      setSelectedImage(null); setImageAnnotations([]); setShowTagInput(false); setMatchMode('any');
     }
   };
 
-  const addTag = () => { if (tagInput.trim() && !tags.includes(tagInput.trim())) { setTags([...tags, tagInput.trim()]); setTagInput(''); } };
+  const addTag = () => { 
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) { 
+      setTags([...tags, tagInput.trim()]); 
+      setTagInput(''); 
+    } 
+  };
   const removeTag = (tagToRemove: string) => setTags(tags.filter(tag => tag !== tagToRemove));
 
   const addAnnotation = () => {
@@ -169,10 +181,72 @@ export default function CreateQuestionScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
-        <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[
+              styles.headerModeButton,
+              { 
+                borderColor: colors.primary,
+                backgroundColor: matchMode === 'all' ? colors.primary : 'transparent'
+              }
+            ]}
+            onPress={() => {
+              SoundManager.play('decide');
+              setMatchMode(matchMode === 'all' ? 'any' : 'all');
+            }}
+          >
+            <Text style={[
+              styles.headerModeButtonText,
+              { 
+                color: matchMode === 'all' 
+                  ? (isCyberpunk ? '#000000' : '#ffffff') 
+                  : colors.primary
+              }
+            ]}>
+              {locale === 'ja' ? '両解' : 'Multi'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.headerModeButton,
+              { 
+                borderColor: colors.primary,
+                backgroundColor: showTagInput ? colors.primary : 'transparent'
+              }
+            ]}
+            onPress={() => {
+              SoundManager.play('decide');
+              setShowTagInput(!showTagInput);
+            }}
+          >
+            <Text style={[
+              styles.headerModeButtonText,
+              { 
+                color: showTagInput 
+                  ? (isCyberpunk ? '#000000' : '#ffffff') 
+                  : colors.primary
+              }
+            ]}>
+              🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
+            <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* タグ入力エリア（ヘッダー下） */}
+      {showTagInput && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15, marginBottom: 16 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.tags}</Text>
+          <View style={styles.tagInputContainer}>
+            <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={t.enterTag} placeholderTextColor={colors.textSecondary} onSubmitEditing={() => { SoundManager.play('decide'); addTag(); }} />
+            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={() => { SoundManager.play('decide'); addTag(); }}><Text style={styles.addTagText}>+</Text></TouchableOpacity>
+          </View>
+          {tags.length > 0 && (<View style={styles.tagContainer}>{tags.map((tag, index) => (<TouchableOpacity key={index} style={[styles.tag, { backgroundColor: colors.primary + '20', borderRadius: cpR ?? 16 }]} onPress={() => { SoundManager.play('select'); removeTag(tag); }}><Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text><Text style={[styles.removeTagText, { color: colors.primary }]}>×</Text></TouchableOpacity>))}</View>)}
+        </View>
+      )}
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{locale === 'ja' ? '回答形式' : 'Answer Type'}</Text>
@@ -190,40 +264,18 @@ export default function CreateQuestionScreen() {
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
         {answerType === 'descriptive' && (
           <View>
-            {/* 両解モードスイッチ */}
-            <View style={[styles.matchModeContainer, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: cpR ?? 8, padding: 12, marginBottom: 12 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={[styles.matchModeLabel, { color: colors.text, fontWeight: '600', fontSize: 14 }]}>
-                    {locale === 'ja' ? '両解モード（すべて必須）' : 'All Keywords Required'}
-                  </Text>
-                  <Text style={[styles.matchModeHint, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]}>
-                    {locale === 'ja' 
-                      ? 'すべてのキーワードが含まれている場合のみ正解' 
-                      : 'All keywords must be present to be correct'}
-                  </Text>
-                </View>
-                <Switch
-                  value={matchMode === 'all'}
-                  onValueChange={(value) => setMatchMode(value ? 'all' : 'any')}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor="#FFF"
-                />
+            {/* 両解モードON時の説明 */}
+            {matchMode === 'all' && (
+              <View style={[styles.matchModeInfo, { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: 6, padding: 10, marginBottom: 12 }]}>
+                <Text style={[styles.matchModeInfoText, { color: colors.primary, fontSize: 12 }]}>
+                  {locale === 'ja' 
+                    ? '※ 各入力欄に正解を1つずつ入力してください（順不同）' 
+                    : '※ Enter one correct answer in each field (order doesn\'t matter)'}
+                </Text>
               </View>
-              
-              {/* 両解モードON時の説明 */}
-              {matchMode === 'all' && (
-                <View style={[styles.matchModeInfo, { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: 6, padding: 10, marginTop: 10 }]}>
-                  <Text style={[styles.matchModeInfoText, { color: colors.primary, fontSize: 12 }]}>
-                    {locale === 'ja' 
-                      ? '※ 複数の正解キーワードを「スペース」または「カンマ」で区切って入力してください。\n例：織田信長 豊臣秀吉 徳川家康' 
-                      : '※ Enter multiple correct keywords separated by "space" or "comma".\nExample: Oda Nobunaga Toyotomi Hideyoshi Tokugawa Ieyasu'}
-                  </Text>
-                </View>
-              )}
-            </View>
+            )}
 
-            {/* 正解入力欄 */}
+            {/* 動的回答入力欄 */}
             {descriptiveAnswers.map((answer, index) => (
               <View key={index} style={styles.descriptiveAnswerRow}>
                 <TextInput
@@ -234,14 +286,11 @@ export default function CreateQuestionScreen() {
                     newAnswers[index] = text;
                     setDescriptiveAnswers(newAnswers);
                   }}
-                  placeholder={matchMode === 'all' 
-                    ? (locale === 'ja' ? `キーワード ${index + 1}（スペース/カンマ区切り）` : `Keyword ${index + 1} (space/comma separated)`)
-                    : (locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`)
-                  }
+                  placeholder={locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`}
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
-                {index > 0 && (
+                {descriptiveAnswers.length > 1 && (
                   <TouchableOpacity
                     style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
                     onPress={() => {
@@ -254,12 +303,14 @@ export default function CreateQuestionScreen() {
                 )}
               </View>
             ))}
+            
+            {/* 回答追加ボタン */}
             <TouchableOpacity
               style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
               onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
             >
               <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
-                + {locale === 'ja' ? '正解候補を追加' : 'Add Answer'}
+                + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -377,23 +428,17 @@ export default function CreateQuestionScreen() {
         )}
         <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} className="hidden-file-input" aria-label={locale === 'ja' ? '画像をアップロード' : 'Upload image'} />
       </View>
-
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.tags}</Text>
-        <View style={styles.tagInputContainer}>
-          <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={t.enterTag} placeholderTextColor={colors.textSecondary} onSubmitEditing={() => { SoundManager.play('decide'); addTag(); }} />
-          <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={() => { SoundManager.play('decide'); addTag(); }}><Text style={styles.addTagText}>+</Text></TouchableOpacity>
-        </View>
-        {tags.length > 0 && (<View style={styles.tagContainer}>{tags.map((tag, index) => (<TouchableOpacity key={index} style={[styles.tag, { backgroundColor: colors.primary + '20', borderRadius: cpR ?? 16 }]} onPress={() => { SoundManager.play('select'); removeTag(tag); }}><Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text><Text style={[styles.removeTagText, { color: colors.primary }]}>×</Text></TouchableOpacity>))}</View>)}
-      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 12, borderBottomWidth: 1, backgroundColor: 'transparent' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 0, paddingVertical: 12, borderBottomWidth: 1, backgroundColor: 'transparent', flexWrap: 'wrap', gap: 10 },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerButtons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  headerModeButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  headerModeButtonText: { fontSize: 14, fontWeight: 'bold' },
   closeButton: { paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 70 },
   closeButtonText: { fontSize: 14, fontWeight: 'bold' },
   section: { padding: 20, marginBottom: 25, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 },
@@ -429,9 +474,6 @@ const styles = StyleSheet.create({
   imageUploadBtn: { padding: 24, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   imageUploadText: { fontSize: 15, fontWeight: '600' },
   imagePreview: { position: 'relative', overflow: 'hidden', marginBottom: 12 },
-  matchModeContainer: { marginBottom: 12 },
-  matchModeLabel: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  matchModeHint: { fontSize: 12 },
   matchModeInfo: { padding: 10, borderWidth: 1, marginTop: 8 },
   matchModeInfoText: { fontSize: 12, lineHeight: 18 },
 });
