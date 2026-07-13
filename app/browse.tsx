@@ -45,8 +45,10 @@ export default function BrowseQuestionsScreen() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isCompactMode, setIsCompactMode] = useState(false);
 
+  // タブ管理用 state
+  const [activeTab, setActiveTab] = useState<'all' | 'folders'>('all');
+  
   // 問題集閲覧関連 state
-  const [showFoldersView, setShowFoldersView] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [folderQuestions, setFolderQuestions] = useState<Question[]>([]);
   const [isFolderBatchMode, setIsFolderBatchMode] = useState(false);
@@ -151,7 +153,6 @@ export default function BrowseQuestionsScreen() {
     await saveFolders(updatedFolders);
     setNewFolderName('');
     setShowFolderModal(false);
-    setShowFoldersView(true);
     Alert.alert('成功', '問題集を作成しました');
   };
 
@@ -349,15 +350,6 @@ export default function BrowseQuestionsScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-            onPress={() => {
-              setCurrentFolderId(null);
-              setShowFoldersView(true);
-            }}
-          >
-            <Text style={[styles.headerBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>📚 {t.folders}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
@@ -367,13 +359,77 @@ export default function BrowseQuestionsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+            onPress={() => { 
+              SoundManager.play('decide'); 
+              if (selectedFolder) {
+                // フォルダ詳細ビューからフォルダ一覧に戻る
+                setSelectedFolder(null);
+                setFolderQuestions([]);
+              } else {
+                // ホーム画面に戻る
+                navigate('/'); 
+              }
+            }}
           >
             <Text style={{ color: isCyberpunk ? '#000000' : '#ffffff', fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* セグメントタブ */}
+      <View style={[styles.segmentTabContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.segmentTab,
+            { 
+              borderColor: colors.border,
+              backgroundColor: activeTab === 'all' ? colors.primary : 'transparent'
+            }
+          ]}
+          onPress={() => {
+            SoundManager.play('decide');
+            setActiveTab('all');
+            setSelectedFolder(null);
+          }}
+        >
+          <Text style={[
+            styles.segmentTabText,
+            { 
+              color: activeTab === 'all' 
+                ? (isCyberpunk ? '#000000' : '#ffffff') 
+                : colors.text
+            }
+          ]}>
+            {locale === 'ja' ? 'すべての問題' : 'All Questions'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.segmentTab,
+            { 
+              borderColor: colors.border,
+              backgroundColor: activeTab === 'folders' ? colors.primary : 'transparent'
+            }
+          ]}
+          onPress={() => {
+            SoundManager.play('decide');
+            setActiveTab('folders');
+            setSelectedFolder(null);
+          }}
+        >
+          <Text style={[
+            styles.segmentTabText,
+            { 
+              color: activeTab === 'folders' 
+                ? (isCyberpunk ? '#000000' : '#ffffff') 
+                : colors.text
+            }
+          ]}>
+            📁 {locale === 'ja' ? '問題集' : 'Folders'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {isSelectionMode && selectedQuestionIds.length > 0 && (
@@ -397,102 +453,269 @@ export default function BrowseQuestionsScreen() {
         style={{ backgroundColor: colors.background }}
         contentContainerStyle={styles.mainScrollContent}
       >
-        {[...filteredQuestions].reverse().map((item) => (
-          <View
-            key={item.id}
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.primary },
-              isCompactMode && styles.cardCompact,
-            ]}
-          >
-            {isSelectionMode && (
-              <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
-                <Text style={[
-                  styles.checkboxText, 
-                  { 
-                    color: isCyberpunk ? '#ffffff' : '#000000',
-                    backgroundColor: isCyberpunk ? 'transparent' : colors.card,
-                    borderRadius: 4,
-                    paddingHorizontal: 4,
-                    paddingVertical: 2,
-                  }
-                ]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
-              </TouchableOpacity>
-            )}
-            <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
-              <TouchableOpacity
-                style={styles.cardHeaderLeft}
-                onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}
-                activeOpacity={isCompactMode ? 1 : 0.7}
+        {activeTab === 'all' ? (
+          <>
+            {[...filteredQuestions].reverse().map((item) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.primary },
+                  isCompactMode && styles.cardCompact,
+                ]}
               >
-                {!isCompactMode && (
-                  <>
-                    <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
-                    {item.isShared && <Text style={[{ fontSize: 10, color: colors.success, fontWeight: '700', marginLeft: 4 }]}>🔗</Text>}
-                  </>
+                {isSelectionMode && (
+                  <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
+                    <Text style={[
+                      styles.checkboxText, 
+                      { 
+                        color: isCyberpunk ? '#ffffff' : '#000000',
+                        backgroundColor: isCyberpunk ? 'transparent' : colors.card,
+                        borderRadius: 4,
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                      }
+                    ]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
+                  </TouchableOpacity>
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
-                  {isCompactMode && (
-                    <Text style={[styles.compactAnswerText, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>
-                      {getAnswerText(item)}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-              {!isCompactMode && (
-                <View style={styles.cardHeaderRight}>
-                  {item.image && (
-                    <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
-                      <img src={item.image} alt="" className="browse-thumbnail" />
+                <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
+                  <TouchableOpacity
+                    style={styles.cardHeaderLeft}
+                    onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}
+                    activeOpacity={isCompactMode ? 1 : 0.7}
+                  >
+                    {!isCompactMode && (
+                      <>
+                        <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
+                        {item.isShared && <Text style={[{ fontSize: 10, color: colors.success, fontWeight: '700', marginLeft: 4 }]}>🔗</Text>}
+                      </>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
+                      {isCompactMode && (
+                        <Text style={[styles.compactAnswerText, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>
+                          {getAnswerText(item)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                  {!isCompactMode && (
+                    <View style={styles.cardHeaderRight}>
+                      {item.image && (
+                        <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
+                          <img src={item.image} alt="" className="browse-thumbnail" />
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => requestDeleteQuestion(item.id)}
+                        style={styles.headerDeleteBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
+                        <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
-                  <TouchableOpacity
-                    onPress={() => requestDeleteQuestion(item.id)}
-                    style={styles.headerDeleteBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
-                    <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
-                  </TouchableOpacity>
                 </View>
-              )}
-            </View>
 
-            {!isCompactMode && expandedQuestionId === item.id && (
-              <View style={styles.expandedContent}>
-                {item.isShared && <Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>🔗 {locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text>}
-                <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
-                {item.tags && item.tags.length > 0 && (
-                  <View style={styles.tagRow}>
-                    {item.tags.map((tag, i) => (
-                      <View key={i} style={[styles.miniTag, { backgroundColor: colors.primary + '20' }]}>
-                        <Text style={[styles.miniTagText, { color: colors.primary }]}>{tag}</Text>
+                {!isCompactMode && expandedQuestionId === item.id && (
+                  <View style={styles.expandedContent}>
+                    {item.isShared && <Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>🔗 {locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text>}
+                    <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
+                    {item.tags && item.tags.length > 0 && (
+                      <View style={styles.tagRow}>
+                        {item.tags.map((tag, i) => (
+                          <View key={i} style={[styles.miniTag, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={[styles.miniTagText, { color: colors.primary }]}>{tag}</Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
-                  </View>
-                )}
-                <View style={styles.cardActions}>
-                  <TouchableOpacity onPress={() => startEditQuestion(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
-                    <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></TouchableOpacity>
-                </View>
-                {showAnswerId === item.id && (
-                  <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
-                    <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
-                    <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(item)}</Text>
+                    )}
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity onPress={() => startEditQuestion(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
+                        <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></TouchableOpacity>
+                    </View>
+                    {showAnswerId === item.id && (
+                      <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                        <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
+                        <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(item)}</Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
+            ))}
+            {questions.length === 0 && <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>}
+          </>
+        ) : (
+          <>
+            {selectedFolder ? (
+              /* フォルダ詳細ビュー */
+              <View style={styles.folderDetailView}>
+                <View style={styles.folderDetailHeader}>
+                  <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder.name}</Text>
+                  <Text style={[styles.folderDetailCount, { color: colors.textSecondary }]}>
+                    {folderQuestions.length}{locale === 'ja' ? '問' : ' questions'}
+                  </Text>
+                </View>
+                
+                <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 この問題集の問題</Text>
+                {folderQuestions.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
+                ) : (
+                  folderQuestions.map(question => (
+                    <View key={question.id} style={[styles.folderQuestionItem, { borderBottomColor: colors.border }]}>
+                      {isFolderBatchMode && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setSelectedFolderQuestionIds(prev =>
+                              prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]
+                            );
+                          }}
+                          style={styles.checkbox}
+                        >
+                          <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
+                            {selectedFolderQuestionIds.includes(question.id) ? '☑' : '☐'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      <View style={styles.folderQuestionContent}>
+                        <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
+                        <View style={styles.folderQuestionActions}>
+                          <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.primary }]} onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}>
+                            <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={async () => {
+                            if (!selectedFolder) return;
+                            const newQuestionIds = selectedFolder.questionIds.filter(id => id !== question.id);
+                            const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f);
+                            await saveFolders(updatedFolders);
+                            setSelectedFolder({ ...selectedFolder, questionIds: newQuestionIds });
+                            setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
+                          }}>
+                            <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
+                          </TouchableOpacity>
+                        </View>
+                        {showFolderAnswerId === question.id && (
+                          <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                            <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
+                            <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(question)}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  ))
+                )}
+                {isFolderBatchMode && selectedFolderQuestionIds.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.batchTagBar, { backgroundColor: colors.error }]}
+                    onPress={async () => {
+                      if (!selectedFolder) return;
+                      const newIds = selectedFolder.questionIds.filter(id => !selectedFolderQuestionIds.includes(id));
+                      const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newIds } : f);
+                      await saveFolders(updatedFolders);
+                      setSelectedFolder({ ...selectedFolder, questionIds: newIds });
+                      setFolderQuestions(prev => prev.filter(q => !selectedFolderQuestionIds.includes(q.id)));
+                      setSelectedFolderQuestionIds([]);
+                      setIsFolderBatchMode(false);
+                    }}
+                  >
+                    <Text style={[styles.batchTagBarText, { color: '#fff' }]}>
+                      🗑️ {locale === 'ja' ? `選択した${selectedFolderQuestionIds.length}問を除外` : `Remove ${selectedFolderQuestionIds.length} questions`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              /* フォルダ一覧ビュー（グリッド） */
+              <View style={styles.folderGridView}>
+                <View style={styles.folderGridHeader}>
+                  <Text style={[styles.folderGridTitle, { color: colors.text }]}>
+                    {locale === 'ja' ? '問題集一覧' : 'Folders'}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.createFolderBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setNewFolderName('');
+                      setShowFolderModal(true);
+                    }}
+                  >
+                    <Text style={[styles.createFolderBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                      ＋ {locale === 'ja' ? '作成' : 'Create'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {visibleFolders.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
+                ) : (
+                  <View style={styles.folderGrid}>
+                    {visibleFolders.map(folder => {
+                      const folderQuestionCount = folder.questionIds.length;
+                      const isSelected = selectedFolderIds.includes(folder.id);
+                      return (
+                        <TouchableOpacity
+                          key={folder.id}
+                          style={[
+                            styles.folderCard,
+                            { 
+                              backgroundColor: colors.card,
+                              borderColor: colors.border,
+                              shadowColor: colors.primary
+                            },
+                            isSelected && { backgroundColor: colors.error + '10' }
+                          ]}
+                          onPress={() => {
+                            if (!isFolderDeleteMode) {
+                              openFolderDetail(folder);
+                            } else {
+                              setSelectedFolderIds(prev => 
+                                prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]
+                              );
+                            }
+                          }}
+                        >
+                          {isFolderDeleteMode && (
+                            <View style={styles.folderCardCheckbox}>
+                              <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
+                                {isSelected ? '☑' : '☐'}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={styles.folderCardIcon}>📁</Text>
+                          <Text style={[styles.folderCardName, { color: colors.text }]} numberOfLines={2}>
+                            {folder.name}
+                          </Text>
+                          <View style={[styles.folderCountBadge, { backgroundColor: colors.primary }]}>
+                            <Text style={[styles.folderCountBadgeText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                              {folderQuestionCount}{locale === 'ja' ? '問' : ''}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+                
+                {isFolderDeleteMode && selectedFolderIds.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.deleteSelectedBtn, { backgroundColor: colors.error }]}
+                    onPress={() => setShowDeleteConfirmModal(true)}
+                  >
+                    <Text style={[styles.deleteSelectedBtnText, { color: '#ffffff' }]}>
+                      🗑️ {locale === 'ja' ? `${selectedFolderIds.length}個を削除` : `Delete ${selectedFolderIds.length}`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-          </View>
-        ))}
-        {questions.length === 0 && <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>}
+          </>
+        )}
       </ScrollView>
 
       {/* 編集モーダル */}
@@ -566,7 +789,7 @@ export default function BrowseQuestionsScreen() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>{t.folderCreate}</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={newFolderName} onChangeText={setNewFolderName} placeholder={t.folderName} placeholderTextColor={colors.textSecondary} maxLength={30} />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowFolderModal(false); setShowFoldersView(true); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowFolderModal(false); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={createFolder}><Text style={styles.modalSaveText}>{t.folderCreate}</Text></TouchableOpacity>
             </View>
           </View>
@@ -601,67 +824,6 @@ export default function BrowseQuestionsScreen() {
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => setShowBatchTagModal(false)}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={batchAddTags}><Text style={styles.modalSaveText}>{t.saveTags}</Text></TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 問題集一覧モーダル */}
-      <Modal visible={showFoldersView} transparent={false} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: colors.card }}>
-          <View style={{ flex: 1, padding: 20 }}>
-            <View style={styles.foldersModalHeader}>
-              <Text style={[styles.foldersModalTitle, { color: colors.text }]}>📚 {t.folders || (locale === 'ja' ? '問題集' : 'Folders')}</Text>
-              <View style={styles.foldersModalActions}>
-                <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: colors.primary }]} onPress={() => { setNewFolderName(''); setShowFoldersView(false); setShowFolderModal(true); }}><Text style={styles.folderHeaderActionBtnText}>＋ 作成</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: isFolderDeleteMode ? colors.error : colors.error + '20', borderWidth: 1, borderColor: colors.error }]} onPress={() => { setIsFolderDeleteMode(!isFolderDeleteMode); if (isFolderDeleteMode) setSelectedFolderIds([]); }}>
-                  <Text style={[styles.folderHeaderActionBtnText, { color: isFolderDeleteMode ? '#fff' : colors.error }]}>{isFolderDeleteMode ? `削除(${selectedFolderIds.length})` : '🗑️ 削除'}</Text>
-                </TouchableOpacity>
-                {isFolderDeleteMode && selectedFolderIds.length > 0 && (
-                  <TouchableOpacity style={[styles.folderHeaderActionBtn, { backgroundColor: colors.error }]} onPress={() => setShowDeleteConfirmModal(true)}><Text style={styles.folderHeaderActionBtnText}>実行</Text></TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => { setShowFoldersView(false); setSelectedFolder(null); setIsFolderDeleteMode(false); setSelectedFolderIds([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
-              </View>
-            </View>
-            {currentFolderId !== null && (
-              <TouchableOpacity style={[styles.parentNavBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={goToParentFolder}>
-                <Text style={[styles.parentNavText, { color: colors.primary }]}>⬅️ 上の階層へ戻る</Text>
-                <Text style={[styles.parentNavSubText, { color: colors.textSecondary }]}>{currentFolder?.name || 'ルート'}</Text>
-              </TouchableOpacity>
-            )}
-            <ScrollView>
-              {visibleFolders.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noFolders}</Text>
-              ) : (
-                visibleFolders.map(folder => {
-                  const folderQuestionCount = folder.questionIds.length;
-                  const isSelected = selectedFolderIds.includes(folder.id);
-                  return (
-                    <View
-                      key={folder.id}
-                      style={[
-                        styles.folderItem,
-                        { borderBottomColor: colors.border, borderColor: colors.border, backgroundColor: colors.card },
-                        isSelected && { backgroundColor: colors.error + '10' },
-                      ]}
-                    >
-                      {isFolderDeleteMode && (
-                        <TouchableOpacity onPress={() => { setSelectedFolderIds(prev => prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]); }} style={styles.checkbox}>
-                          <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{isSelected ? '☑' : '☐'}</Text>
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity style={styles.folderInfo} onPress={() => { if (!isFolderDeleteMode) openFolderDetail(folder); }}>
-                        <Text style={[styles.folderIcon, { color: colors.primary }]}>📁</Text>
-                        <View>
-                          <Text style={[styles.folderName, { color: colors.text }]}>{folder.name}</Text>
-                          <Text style={[styles.folderCount, { color: colors.textSecondary }]}>{folderQuestionCount}問</Text>
-                        </View>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.folderArrowBtn} onPress={() => openFolderDetail(folder)}><Text style={[styles.folderArrow, { color: colors.primary }]}>›</Text></TouchableOpacity>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -785,122 +947,6 @@ export default function BrowseQuestionsScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* 問題集の中身を表示するモーダル */}
-      <Modal visible={!!selectedFolder} transparent={false} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: colors.card }}>
-          <View style={styles.folderDetailBody}>
-            <View style={styles.folderDetailHeader}>
-              <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder?.name}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); setShowFolderAnswerId(null); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.openFolderBtn, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                if (!selectedFolder) return;
-                setSelectedFolder(null);
-                setFolderQuestions([]);
-                setShowFolderAnswerId(null);
-                setCurrentFolderId(selectedFolder.id);
-              }}
-            >
-              <Text style={[styles.openFolderBtnText, { color: onPrimary }]}>このフォルダを開く</Text>
-            </TouchableOpacity>
-            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 追加可能な問題</Text>
-            <ScrollView style={styles.addableQuestionsList} contentContainerStyle={styles.modalListContent}>
-              {questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>追加できる問題がありません</Text>
-              ) : (
-                questions.filter(q => !selectedFolder?.questionIds.includes(q.id)).map(question => (
-                  <TouchableOpacity key={question.id} style={[styles.folderAddableQuestionItem, { borderBottomColor: colors.border }]} onPress={async () => {
-                    if (!selectedFolder) return;
-                    const newQuestionIds = [...new Set([...selectedFolder.questionIds, question.id])];
-                    const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f);
-                    await saveFolders(updatedFolders);
-                    const updatedFolder = { ...selectedFolder, questionIds: newQuestionIds };
-                    setSelectedFolder(updatedFolder);
-                    setFolderQuestions(questions.filter(q => newQuestionIds.includes(q.id)));
-                  }}>
-                    <Text style={[styles.folderAddableQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
-                    <Text style={[styles.addButton, { color: colors.primary }]}>+ 追加</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-            <View style={styles.divider} />
-            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📖 この問題集の問題</Text>
-            <ScrollView style={styles.folderQuestionsList} contentContainerStyle={styles.modalListContent}>
-              {folderQuestions.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
-              ) : (
-                folderQuestions.map(question => (
-                  <View key={question.id} style={[styles.folderQuestionItem, { borderBottomColor: colors.border }]}>
-                    {isFolderBatchMode && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          setSelectedFolderQuestionIds(prev =>
-                            prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]
-                          );
-                        }}
-                        style={styles.checkbox}
-                      >
-                        <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
-                          {selectedFolderQuestionIds.includes(question.id) ? '☑' : '☐'}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    <View style={styles.folderQuestionContent}>
-                      <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
-                      <View style={styles.folderQuestionActions}>
-                        <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.primary }]} onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}>
-                          <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={async () => {
-                          if (!selectedFolder) return;
-                          const newQuestionIds = selectedFolder.questionIds.filter(id => id !== question.id);
-                          const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f);
-                          await saveFolders(updatedFolders);
-                          setSelectedFolder({ ...selectedFolder, questionIds: newQuestionIds });
-                          setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
-                        }}>
-                          <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
-                        </TouchableOpacity>
-                      </View>
-                      {showFolderAnswerId === question.id && (
-                        <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
-                          <Text style={[styles.answerLabel, { color: colors.success }]}>{t.answerDisplay}:</Text>
-                          <Text style={[styles.answerText, { color: colors.text }]}>{getAnswerText(question)}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-            {isFolderBatchMode && selectedFolderQuestionIds.length > 0 && (
-              <TouchableOpacity
-                style={[styles.batchTagBar, { backgroundColor: colors.error }]}
-                onPress={async () => {
-                  if (!selectedFolder) return;
-                  const newIds = selectedFolder.questionIds.filter(id => !selectedFolderQuestionIds.includes(id));
-                  const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newIds } : f);
-                  await saveFolders(updatedFolders);
-                  setSelectedFolder({ ...selectedFolder, questionIds: newIds });
-                  setFolderQuestions(prev => prev.filter(q => !selectedFolderQuestionIds.includes(q.id)));
-                  setSelectedFolderQuestionIds([]);
-                  setIsFolderBatchMode(false);
-                }}
-              >
-                <Text style={[styles.batchTagBarText, { color: '#fff' }]}>
-                  🗑️ {locale === 'ja' ? `選択した${selectedFolderQuestionIds.length}問を除外` : `Remove ${selectedFolderQuestionIds.length} questions`}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -920,6 +966,25 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, paddingRight: 8 },
   headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 },
+  segmentTabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  segmentTab: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentTabText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   mainScrollContent: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16 },
   title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
@@ -981,60 +1046,53 @@ const styles = StyleSheet.create({
   checkboxText: { fontSize: 20 },
   batchTagBar: { marginVertical: 12, padding: 14, borderRadius: 14, alignItems: 'center' },
   batchTagBarText: { color: '#000000', fontWeight: 'bold' },
-  foldersModalActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  folderArrowBtn: { paddingHorizontal: 16, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  foldersModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  foldersModalTitle: { fontSize: 20, fontWeight: 'bold' },
-  parentNavBtn: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 14, gap: 4 },
-  parentNavText: { fontSize: 14, fontWeight: 'bold' },
-  parentNavSubText: { fontSize: 12 },
-  closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
-  folderItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 14, borderBottomWidth: 1, borderWidth: 1, borderRadius: 16, marginBottom: 12 },
-  folderInfo: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-  folderIcon: { fontSize: 24 },
-  folderName: { fontSize: 16, fontWeight: '500' },
-  folderCount: { fontSize: 12, marginTop: 4 },
-  folderArrow: { fontSize: 28, fontWeight: 'bold' },
+  folderGridView: { flex: 1 },
+  folderGridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 16, marginBottom: 8 },
+  folderGridTitle: { fontSize: 18, fontWeight: 'bold' },
+  createFolderBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  createFolderBtnText: { fontSize: 14, fontWeight: 'bold' },
+  folderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 18 },
+  folderCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 8,
+    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  folderCardCheckbox: { position: 'absolute', top: 8, right: 8 },
+  folderCardIcon: { fontSize: 32, marginBottom: 4 },
+  folderCardName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
+  folderCountBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  folderCountBadgeText: { fontSize: 12, fontWeight: 'bold' },
+  deleteSelectedBtn: { margin: 18, padding: 14, borderRadius: 14, alignItems: 'center' },
+  deleteSelectedBtnText: { fontSize: 14, fontWeight: 'bold' },
+  addToFolderBar: { marginTop: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
+  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
+  folderDetailView: { flex: 1, paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
+  folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
+  folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
+  folderDetailCount: { fontSize: 14, fontWeight: '500' },
   folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 20, maxHeight: '80%' },
-  tagFilterList: { maxHeight: 400 },
-  tagFilterChip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8 },
-  tagFilterChipText: { fontSize: 15, fontWeight: '500' },
-  questionSelectItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1 },
-  questionSelectText: { fontSize: 15, flex: 1, lineHeight: 22 },
-  addButton: { fontSize: 14, fontWeight: 'bold', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, overflow: 'hidden' },
-  folderHeaderActionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  folderHeaderActionBtnText: { color: '#000000', fontSize: 12, fontWeight: 'bold' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16, paddingTop: 16 },
+  sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginTop: 6, marginBottom: 4, marginHorizontal: 4, letterSpacing: 0.2 },
+  folderQuestionItem: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },
+  folderQuestionContent: { gap: 12, paddingTop: 2 },
+  folderQuestionText: { fontSize: 15, lineHeight: 22 },
+  folderQuestionActions: { flexDirection: 'row', gap: 10, marginTop: 2, flexWrap: 'wrap' },
+  folderActionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
+  folderActionBtnText: { fontSize: 13, fontWeight: 'bold' },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
   countBadgeText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
-  filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
   cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },
   cardHeaderCompact: { paddingVertical: 8, paddingHorizontal: 10 },
   questionPreviewCompact: { fontSize: 11, lineHeight: 14 },
   compactAnswerText: { fontSize: 11, lineHeight: 14, fontStyle: 'italic' },
   compactToggleBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   compactToggleBtnText: { fontSize: 16, fontWeight: 'bold' },
-  topBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
-  topBackBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  folderDetailBody: { flex: 1, paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
-  folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
-  folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
-  openFolderBtn: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center' },
-  openFolderBtnText: { fontSize: 14, fontWeight: 'bold' },
-  sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginTop: 6, marginBottom: 4, marginHorizontal: 4, letterSpacing: 0.2 },
-  addableQuestionsList: { maxHeight: 200, marginHorizontal: 0, borderRadius: 16, overflow: 'hidden' },
-  folderQuestionsList: { maxHeight: 300, marginHorizontal: 0, borderRadius: 16, overflow: 'hidden' },
-  folderQuestionItem: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },
-  folderQuestionContent: { gap: 12, paddingTop: 2 },
-  folderQuestionText: { fontSize: 15, lineHeight: 22 },
-  folderQuestionActions: { flexDirection: 'row', gap: 10, marginTop: 2, flexWrap: 'wrap' },
-  folderAddableQuestionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, gap: 10 },
-  folderAddableQuestionText: { flex: 1, fontSize: 13, marginRight: 10, lineHeight: 20 },
-  folderActionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
-  folderActionBtnText: { fontSize: 13, fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 14 },
-  addToFolderBar: { marginTop: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
-  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
+  closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
   modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
 });
