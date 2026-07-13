@@ -369,7 +369,7 @@ export default function BrowseQuestionsScreen() {
             style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
-            <Text style={{ color: '#000000', fontWeight: '700', fontSize: 14 }}>
+            <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
@@ -976,7 +976,7 @@ const styles = StyleSheet.create({
   headerButtonsScroll: { marginBottom: 12 },
   headerButtons: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
   headerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1 },
-  headerBtnText: { fontSize: 12, fontWeight: 'bold', color: '#000000' },
+  headerBtnText: { fontSize: 12, fontWeight: 'bold', color: '#ffffff' },
   checkbox: { marginRight: 12, padding: 6 },
   checkboxText: { fontSize: 20 },
   batchTagBar: { marginVertical: 12, padding: 14, borderRadius: 14, alignItems: 'center' },
@@ -1006,7 +1006,7 @@ const styles = StyleSheet.create({
   folderHeaderActionBtnText: { color: '#000000', fontSize: 12, fontWeight: 'bold' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16, paddingTop: 16 },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
-  countBadgeText: { color: '#000000', fontWeight: 'bold', fontSize: 13 },
+  countBadgeText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
   filterActiveBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   filterActiveBadgeText: { fontSize: 12, fontWeight: 'bold' },
   cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },

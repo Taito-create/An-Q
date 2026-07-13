@@ -23,10 +23,19 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
       ? question.descriptiveAnswer
       : question.descriptiveAnswer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);
     
-    // すべてのキーワードがユーザー回答に含まれているかチェック
-    return correctAnswers.every(keyword => 
-      userAnswerLower.includes(keyword.trim().toLowerCase())
-    );
+    // ユーザー回答をスペース/カンマで分割
+    const userKeywords = userAnswerLower.split(/[,\s]+/).filter(kw => kw.length > 0);
+    
+    // キーワード数が一致するかチェック
+    if (userKeywords.length !== correctAnswers.length) {
+      return false;
+    }
+    
+    // 両方をソートして比較（順不同対応）
+    const sortedUser = userKeywords.sort();
+    const sortedCorrect = correctAnswers.map(kw => kw.trim().toLowerCase()).sort();
+    
+    return sortedUser.every((kw, i) => kw === sortedCorrect[i]);
   }
 
   // デフォルト（matchMode: 'any' または未指定）は完全一致または部分一致

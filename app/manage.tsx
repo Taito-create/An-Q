@@ -19,7 +19,7 @@ export default function ManageScreen() {
   const t = translations[locale];
   const navigate = useNavigate();
 
-  const [selectedTime, setSelectedTime] = useState('10');
+  const [selectedTime, setSelectedTime] = useState('5');
   const [customTimers, setCustomTimers] = useState<CustomTimer[]>([]);
   const [newTimerName, setNewTimerName] = useState('');
   const [newTimerMinutes, setNewTimerMinutes] = useState('');
@@ -46,9 +46,14 @@ export default function ManageScreen() {
       const timerSetting = await AsyncStorage.getItem('APP_TIMER_SETTING');
       if (timerSetting) {
         setSelectedTime(timerSetting);
+      } else {
+        // デフォルトは5分
+        setSelectedTime('5');
+        await AsyncStorage.setItem('APP_TIMER_SETTING', '5');
       }
     } catch (error) {
       console.error('Error loading timer setting:', error);
+      setSelectedTime('5');
     }
   };
 
