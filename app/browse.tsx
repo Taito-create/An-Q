@@ -382,13 +382,13 @@ export default function BrowseQuestionsScreen() {
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
             onPress={() => setShowBatchTagModal(true)}
           >
-            <Text style={styles.batchTagBarText}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
+            <Text style={[styles.batchTagBarText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
             onPress={batchDeleteQuestions}
           >
-            <Text style={[styles.batchTagBarText, { color: '#fff' }]}>🗑️ {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
+            <Text style={[styles.batchTagBarText, { color: '#ffffff' }]}>🗑️ {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -408,7 +408,16 @@ export default function BrowseQuestionsScreen() {
           >
             {isSelectionMode && (
               <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
-                <Text style={[styles.checkboxText, { color: '#ffffff' }]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
+                <Text style={[
+                  styles.checkboxText, 
+                  { 
+                    color: isCyberpunk ? '#ffffff' : '#000000',
+                    backgroundColor: isCyberpunk ? 'transparent' : colors.card,
+                    borderRadius: 4,
+                    paddingHorizontal: 4,
+                    paddingVertical: 2,
+                  }
+                ]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
               </TouchableOpacity>
             )}
             <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
@@ -423,27 +432,34 @@ export default function BrowseQuestionsScreen() {
                     {item.isShared && <Text style={[{ fontSize: 10, color: colors.success, fontWeight: '700', marginLeft: 4 }]}>🔗</Text>}
                   </>
                 )}
-                <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
+                  {isCompactMode && (
+                    <Text style={[styles.compactAnswerText, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>
+                      {getAnswerText(item)}
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
-              <View style={styles.cardHeaderRight}>
-                {item.image && (
-                  <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
-                    <img src={item.image} alt="" className="browse-thumbnail" />
-                  </View>
-                )}
-                <TouchableOpacity
-                  onPress={() => requestDeleteQuestion(item.id)}
-                  style={styles.headerDeleteBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
-                </TouchableOpacity>
-                {!isCompactMode && (
+              {!isCompactMode && (
+                <View style={styles.cardHeaderRight}>
+                  {item.image && (
+                    <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
+                      <img src={item.image} alt="" className="browse-thumbnail" />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => requestDeleteQuestion(item.id)}
+                    style={styles.headerDeleteBtn}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
                     <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              )}
             </View>
 
             {!isCompactMode && expandedQuestionId === item.id && (
@@ -996,6 +1012,7 @@ const styles = StyleSheet.create({
   cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },
   cardHeaderCompact: { paddingVertical: 8, paddingHorizontal: 10 },
   questionPreviewCompact: { fontSize: 11, lineHeight: 14 },
+  compactAnswerText: { fontSize: 11, lineHeight: 14, fontStyle: 'italic' },
   compactToggleBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   compactToggleBtnText: { fontSize: 16, fontWeight: 'bold' },
   topBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
