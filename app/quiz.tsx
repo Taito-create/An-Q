@@ -16,6 +16,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useQuestions } from './hooks/useQuestions';
 import { checkDescriptiveAnswer, getAnswerText } from './utils/answerUtils';
+import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
@@ -84,6 +85,7 @@ export default function QuizScreen() {
   const [mistakeCount, setMistakeCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
+  const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);  // 両解モード用
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isPaused, setIsPaused] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -91,6 +93,22 @@ export default function QuizScreen() {
   // 解説表示
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanationText, setExplanationText] = useState('');
+  
+  // 現在の問題を取得
+  const currentQuestion = shuffledQuestions[currentIndex];
+  
+  // 両解モードの問題かどうかを判定
+  const isAllMatchMode = currentQuestion?.matchMode === 'all' && currentQuestion.answerType === 'descriptive';
+  
+  // 正解キーワードのリストを取得
+  const correctKeywords = useMemo(() => {
+    if (!isAllMatchMode || !currentQuestion?.descriptiveAnswer) return [];
+    const answer = currentQuestion.descriptiveAnswer;
+    if (Array.isArray(answer)) {
+      return answer;
+    }
+    return answer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);
+  }, [isAllMatchMode, currentQuestion]);
 
   // Lottieアニメーション表示制御
   const [showSuccessLottie, setShowSuccessLottie] = useState(false);
@@ -384,12 +402,8 @@ export default function QuizScreen() {
     if (!isTimerActive || !quizStarted) return;
     if (timeLeft <= 0) {
       setIsTimerActive(false);
-      if (timeAttackMode) {
-        // タイムアタックモード: 時間切れ = 不正解として処理
-        handleAnswer('');
-      } else {
-        handleTimeUp();
-      }
+      // タイムアタックモードでも通常モードでも同じ処理
+      handleTimeUp();
       return;
     }
     const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
@@ -398,17 +412,26 @@ export default function QuizScreen() {
     };
   }, [isTimerActive, timeLeft, quizStarted, timeAttackMode]);
 
-  const handleTimeUp = () => {
+  const handleTimeUp = async () => {
     setIsTimerActive(false);
-    setShowReview(true);
-    Alert.alert(
-      '⏰ ' + t.timeUp, 
-      `${t.currentScore}: ${score} / ${shuffledQuestions.length}`,
-      [
-        { text: t.viewDetails, onPress: () => setShowReview(true) },
-        { text: t.home, onPress: () => navigate('/') },
-      ]
-    );
+    
+    // 未解答の問題を不正解として結果に追加
+    const unansweredResults: QuizResult[] = [];
+    for (let i = currentIndex; i < shuffledQuestions.length; i++) {
+      const q = shuffledQuestions[i];
+      unansweredResults.push({
+        questionId: q.id,
+        question: q.question,
+        yourAnswer: locale === 'ja' ? '時間切れ' : 'Time Up',
+        correctAnswer: getAnswerText(q),
+        isCorrect: false,
+        timeSpent: 0,
+      });
+    }
+    
+    // 既存の結果と未解答結果を結合して終了処理
+    const finalResults = [...results, ...unansweredResults];
+    await finishQuizWithResults(finalResults);
   };
 
   // ──────────────────────────────────────────────
@@ -537,7 +560,7 @@ export default function QuizScreen() {
         correct = checkDescriptiveAnswer(userAnswerStr, currentQuestion);
         actualCorrectAnswer = isReverseMode
           ? currentQuestion.question
-          : (currentQuestion.descriptiveAnswer || '');
+          : getAnswerText(currentQuestion);
         if (!correct) {
           setFeedbackMessage(actualCorrectAnswer);
           setShowFeedback(true);
@@ -591,6 +614,7 @@ export default function QuizScreen() {
     
     if (currentQuestion.answerType === 'descriptive') {
       setUserDescriptiveAnswer('');
+      setUserDescriptiveAnswers([]);
     }
     
     setIsCorrect(correct);
@@ -816,7 +840,6 @@ export default function QuizScreen() {
   const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);
   const timeSec = timeLeft % 60;
-  const currentQuestion = shuffledQuestions[currentIndex];
 
   // Play question sound when question changes
   useEffect(() => {
@@ -1521,22 +1544,72 @@ export default function QuizScreen() {
 
             {currentQuestion.answerType === 'descriptive' && (
               <View style={styles.descriptiveContainer}>
-                <TextInput
-                  style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
-                  value={userDescriptiveAnswer}
-                  onChangeText={setUserDescriptiveAnswer}
-                  placeholder="回答を入力"
-                  placeholderTextColor="#999"
-                  multiline
-                  editable={!answered && !isPaused}
-                />
-                <TouchableOpacity
-                  style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => handleAnswer(userDescriptiveAnswer)}
-                  disabled={answered || isPaused}
-                >
-                  <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
-                </TouchableOpacity>
+                {isAllMatchMode && correctKeywords.length > 0 ? (
+                  // 両解モード：複数の入力欄
+                  <View style={{ width: '100%', gap: 12 }}>
+                    <Text style={[{ fontSize: 14, color: colors.textSecondary, marginBottom: 8, fontWeight: '600' }]}>
+                      {locale === 'ja' ? '各キーワードを入力してください' : 'Enter each keyword'}
+                    </Text>
+                    {correctKeywords.map((keyword, index) => (
+                      <TextInput
+                        key={index}
+                        style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
+                        value={userDescriptiveAnswers[index] || ''}
+                        onChangeText={(text) => {
+                          const newAnswers = [...userDescriptiveAnswers];
+                          newAnswers[index] = text;
+                          setUserDescriptiveAnswers(newAnswers);
+                        }}
+                        placeholder={locale === 'ja' ? `キーワード ${index + 1}` : `Keyword ${index + 1}`}
+                        placeholderTextColor="#999"
+                        editable={!answered && !isPaused}
+                        onSubmitEditing={() => {
+                          // 最後の入力欄でEnterを押したら回答を送信
+                          if (index === correctKeywords.length - 1) {
+                            const fullAnswer = userDescriptiveAnswers.join(' ');
+                            handleAnswer(fullAnswer);
+                          }
+                        }}
+                        returnKeyType={index === correctKeywords.length - 1 ? 'go' : 'next'}
+                      />
+                    ))}
+                    <TouchableOpacity
+                      style={[styles.descriptiveBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
+                      onPress={() => {
+                        const fullAnswer = userDescriptiveAnswers.join(' ');
+                        handleAnswer(fullAnswer);
+                      }}
+                      disabled={answered || isPaused || userDescriptiveAnswers.length !== correctKeywords.length}
+                    >
+                      <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // 通常モード：単一の入力欄
+                  <View style={{ width: '100%' }}>
+                    <TextInput
+                      style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
+                      value={userDescriptiveAnswer}
+                      onChangeText={setUserDescriptiveAnswer}
+                      placeholder={locale === 'ja' ? '回答を入力' : 'Enter your answer'}
+                      placeholderTextColor="#999"
+                      multiline
+                      editable={!answered && !isPaused}
+                      onSubmitEditing={() => {
+                        // Enterキーで回答送信
+                        handleAnswer(userDescriptiveAnswer);
+                      }}
+                      returnKeyType="go"
+                    />
+                    <TouchableOpacity
+                      style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => handleAnswer(userDescriptiveAnswer)}
+                      disabled={answered || isPaused}
+                    >
+                      <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>

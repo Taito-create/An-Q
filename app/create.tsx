@@ -128,9 +128,13 @@ export default function CreateQuestionScreen() {
       // 複数の正解をスペース区切りの文字列として保存（両解モード対応）
       const answers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
       if (answers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
-      dataToSave.descriptiveAnswer = matchMode === 'all' 
-        ? answers.join(' ')  // 両解モード：スペース区切り
-        : answers[0];        // 通常モード：最初の1つのみ
+      
+      // 両解モードの場合は配列として保存、通常モードは単一文字列
+      if (matchMode === 'all') {
+        dataToSave.descriptiveAnswer = answers;  // 配列で保存
+      } else {
+        dataToSave.descriptiveAnswer = answers[0];  // 単一文字列
+      }
       dataToSave.matchMode = matchMode;  // 両解モードを保存
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;

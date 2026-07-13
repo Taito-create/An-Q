@@ -452,16 +452,19 @@ const HomeScreen = () => {
 
   const showTimerAlert = () => {
     SoundManager.play('decide');
+    const options = [
+      { text: locale === 'ja' ? 'なし（制限なし）' : 'No Limit', onPress: () => saveTimer(0) },
+      { text: '1min', onPress: () => saveTimer(1) },
+      { text: '3min', onPress: () => saveTimer(3) },
+      { text: '5min', onPress: () => saveTimer(5) },
+      { text: '10min', onPress: () => saveTimer(10) },
+      { text: t.cancel, style: 'cancel' as const }
+    ];
+    
     Alert.alert(
-      t.selectTimer,
-      '',
-      [
-        { text: '1min', onPress: () => saveTimer(1) },
-        { text: '3min', onPress: () => saveTimer(3) },
-        { text: '5min', onPress: () => saveTimer(5) },
-        { text: '10min', onPress: () => saveTimer(10) },
-        { text: t.cancel, style: 'cancel' }
-      ]
+      locale === 'ja' ? '⏱ タイマー設定' : '⏱ Timer Settings',
+      locale === 'ja' ? 'クイズの制限時間を選択してください' : 'Select quiz time limit',
+      options
     );
   };
 
@@ -506,18 +509,27 @@ const HomeScreen = () => {
 
   const primaryTextColor = isCyberpunk ? '#1A1A1A' : onPrimary;
 
-  const renderStatsCard = () => (
-    <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
+  const renderStatsCard = () => {
+    const timerDisplay = displayTimer || `${timerMinutes}${t.minutes}`;
+    const isNoLimit = displayTimer === (locale === 'ja' ? 'なし' : 'No limit') || timerMinutes === 0;
+    
+    return (
+      <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
+        </View>
+        <View style={[styles.statItem, { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 20 }]}>
+          <Text style={[styles.statNumber, { color: isNoLimit ? colors.success : colors.primary, fontSize: fs(24) }]}>
+            {isNoLimit ? '∞' : timerDisplay}
+          </Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>
+            {isNoLimit ? (locale === 'ja' ? '制限なし' : 'No Limit') : t.timer}
+          </Text>
+        </View>
       </View>
-      <View style={styles.statItem}>
-        <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{displayTimer || `${timerMinutes}${t.minutes}`}</Text>
-        <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.timer}</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderTodayQuestion = () => {
     if (!todayQuestion) return null;

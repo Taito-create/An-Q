@@ -175,6 +175,61 @@ export default function BrowseQuestionsScreen() {
     );
   };
 
+  const batchDeleteQuestions = async () => {
+    if (selectedQuestionIds.length === 0) {
+      Alert.alert('エラー', locale === 'ja' ? '削除する問題を選択してください' : 'Please select questions to delete');
+      return;
+    }
+
+    const confirmMessage = locale === 'ja'
+      ? `選択した${selectedQuestionIds.length}問の問題を削除しますか？\nこの操作は取り消せません。`
+      : `Are you sure you want to delete ${selectedQuestionIds.length} selected questions?\nThis action cannot be undone.`;
+
+    Alert.alert(
+      locale === 'ja' ? '一括削除の確認' : 'Confirm Batch Delete',
+      confirmMessage,
+      [
+        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+        {
+          text: locale === 'ja' ? '削除する' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 選択した問題を削除
+              let updatedQuestions = questions;
+              for (const id of selectedQuestionIds) {
+                updatedQuestions = await deleteQuestion(id);
+              }
+
+              // フォルダからも削除
+              const updatedFolders = folders.map(folder => ({
+                ...folder,
+                questionIds: folder.questionIds.filter(qid => !selectedQuestionIds.includes(qid))
+              }));
+              await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updatedFolders));
+              setFolders(updatedFolders);
+
+              // 選択状態をクリア
+              setSelectedQuestionIds([]);
+              setIsSelectionMode(false);
+
+              SoundManager.play('complete');
+              Alert.alert(
+                locale === 'ja' ? '削除完了' : 'Deleted',
+                locale === 'ja'
+                  ? `${selectedQuestionIds.length}問の問題を削除しました`
+                  : `Deleted ${selectedQuestionIds.length} questions`
+              );
+            } catch (e) {
+              console.error('一括削除エラー:', e);
+              Alert.alert('エラー', locale === 'ja' ? '削除に失敗しました' : 'Failed to delete questions');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const requestDeleteQuestion = (id: number) => {
     setDeleteTargetId(id);
     setShowQuestionDeleteModal(true);
@@ -322,9 +377,20 @@ export default function BrowseQuestionsScreen() {
       </View>
 
       {isSelectionMode && selectedQuestionIds.length > 0 && (
-        <TouchableOpacity style={[styles.batchTagBar, { backgroundColor: colors.primary }]} onPress={() => setShowBatchTagModal(true)}>
-          <Text style={styles.batchTagBarText}>📋 {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12, paddingHorizontal: 4 }}>
+          <TouchableOpacity 
+            style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
+            onPress={() => setShowBatchTagModal(true)}
+          >
+            <Text style={styles.batchTagBarText}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
+            onPress={batchDeleteQuestions}
+          >
+            <Text style={[styles.batchTagBarText, { color: '#fff' }]}>🗑️ {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <ScrollView

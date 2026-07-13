@@ -15,20 +15,26 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
   }
 
   const userAnswerLower = userAnswer.trim().toLowerCase();
-  const correctAnswerLower = question.descriptiveAnswer.trim().toLowerCase();
 
   // matchModeが'all'の場合はすべてのキーワードが含まれているかチェック
   if (question.matchMode === 'all') {
-    // 正解をスペースまたはカンマで区切ってキーワードリストに分解
-    const keywords = correctAnswerLower
-      .split(/[,\s]+/)
-      .filter(kw => kw.length > 0);
+    // 正解が配列の場合（新形式）
+    const correctAnswers = Array.isArray(question.descriptiveAnswer)
+      ? question.descriptiveAnswer
+      : question.descriptiveAnswer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);
     
     // すべてのキーワードがユーザー回答に含まれているかチェック
-    return keywords.every(keyword => userAnswerLower.includes(keyword));
+    return correctAnswers.every(keyword => 
+      userAnswerLower.includes(keyword.trim().toLowerCase())
+    );
   }
 
   // デフォルト（matchMode: 'any' または未指定）は完全一致または部分一致
+  const correctAnswerStr = typeof question.descriptiveAnswer === 'string'
+    ? question.descriptiveAnswer
+    : (question.descriptiveAnswer as string[])[0] || '';
+  const correctAnswerLower = correctAnswerStr.trim().toLowerCase();
+  
   return userAnswerLower === correctAnswerLower || userAnswerLower.includes(correctAnswerLower);
 };
 
@@ -46,6 +52,10 @@ export const getAnswerText = (question: Question): string => {
       const correctOption = question.multipleChoice?.options[correctIdx] || '';
       return `${correctIdx + 1}. ${correctOption}`;
     case 'descriptive':
+      // 配列の場合はスペース区切りで表示
+      if (Array.isArray(question.descriptiveAnswer)) {
+        return question.descriptiveAnswer.join(' ');
+      }
       return question.descriptiveAnswer || '';
     default:
       return '';
