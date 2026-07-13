@@ -334,7 +334,7 @@ export default function BrowseQuestionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
-        <Text style={[styles.headerTitle, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.headerTitle, { color: isCyberpunk ? '#ffffff' : colors.text }]}>
           {t.manageQuestions}
         </Text>
         <View style={styles.headerActions}>
@@ -558,10 +558,59 @@ export default function BrowseQuestionsScreen() {
               /* フォルダ詳細ビュー */
               <View style={styles.folderDetailView}>
                 <View style={styles.folderDetailHeader}>
-                  <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder.name}</Text>
-                  <Text style={[styles.folderDetailCount, { color: colors.textSecondary }]}>
-                    {folderQuestions.length}{locale === 'ja' ? '問' : ' questions'}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder.name}</Text>
+                    <Text style={[styles.folderDetailCount, { color: colors.textSecondary }]}>
+                      {folderQuestions.length}{locale === 'ja' ? '問' : ' questions'}
+                    </Text>
+                  </View>
+                  <View style={styles.folderDetailHeaderActions}>
+                    <TouchableOpacity
+                      style={[styles.addQuestionsBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        setSelectedFolderForAdd(selectedFolder);
+                        setShowAddToFolderModal(true);
+                      }}
+                    >
+                      <Text style={[styles.addQuestionsBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                        ＋ {locale === 'ja' ? '問題を追加' : 'Add Questions'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
+                      onPress={() => {
+                        Alert.alert(
+                          locale === 'ja' ? '確認' : 'Confirm',
+                          locale === 'ja' 
+                            ? `「${selectedFolder.name}」を削除しますか？\nこの操作は取り消せません。` 
+                            : `Delete "${selectedFolder.name}"?\nThis action cannot be undone.`,
+                          [
+                            { text: t.cancel, style: 'cancel' },
+                            {
+                              text: locale === 'ja' ? '削除' : 'Delete',
+                              style: 'destructive',
+                              onPress: async () => {
+                                const updatedFolders = folders.filter(f => f.id !== selectedFolder.id);
+                                await saveFolders(updatedFolders);
+                                setSelectedFolder(null);
+                                setFolderQuestions([]);
+                                SoundManager.play('complete');
+                                Alert.alert(
+                                  locale === 'ja' ? '削除完了' : 'Deleted',
+                                  locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
+                                );
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <Text style={styles.deleteFolderBtnText}>🗑️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
+                      <Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 
                 <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 この問題集の問題</Text>
@@ -1077,6 +1126,11 @@ const styles = StyleSheet.create({
   folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
   folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
   folderDetailCount: { fontSize: 14, fontWeight: '500' },
+  folderDetailHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addQuestionsBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, alignItems: 'center' },
+  addQuestionsBtnText: { fontSize: 13, fontWeight: 'bold' },
+  deleteFolderBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  deleteFolderBtnText: { fontSize: 18 },
   folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 20, maxHeight: '80%' },
   sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginTop: 6, marginBottom: 4, marginHorizontal: 4, letterSpacing: 0.2 },
   folderQuestionItem: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },

@@ -779,6 +779,19 @@ const HomeScreen = () => {
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
+                  window.location.reload();
+                  setShowMenu(false);
+                }}
+              >
+                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                  {locale === 'ja' ? '🔄 更新' : '🔄 Reload'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  SoundManager.play('decide');
                   navigate('/settings');
                   setShowMenu(false);
                 }}
