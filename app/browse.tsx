@@ -343,41 +343,34 @@ export default function BrowseQuestionsScreen() {
       return;
     }
     
-    Alert.alert(
-      locale === 'ja' ? '確認' : 'Confirm',
-      locale === 'ja' 
-        ? `「${selectedFolder.name}」を削除しますか？\nこの操作は取り消せません。` 
-        : `Delete "${selectedFolder.name}"?\nThis action cannot be undone.`,
-      [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: locale === 'ja' ? '削除' : 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('deleteFolder 呼び出し:', selectedFolder.id);
-              await deleteFolder(selectedFolder.id);
-              console.log('deleteFolder 成功');
-              
-              console.log('フォルダ詳細ビューをクリア');
-              setSelectedFolder(null);
-              setFolderQuestions([]);
-              
-              console.log('完了音を再生');
-              SoundManager.play('complete');
-              
-              Alert.alert(
-                locale === 'ja' ? '削除完了' : 'Deleted',
-                locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
-              );
-            } catch (error) {
-              console.error('deleteFolder エラー:', error);
-              Alert.alert('エラー', '削除に失敗しました');
-            }
-          }
-        }
-      ]
-    );
+    const confirmMessage = locale === 'ja' 
+      ? `「${selectedFolder.name}」を削除しますか？\nこの操作は取り消せません。` 
+      : `Delete "${selectedFolder.name}"?\nThis action cannot be undone.`;
+    
+    const proceed = window.confirm(confirmMessage);
+    
+    if (proceed) {
+      console.log('削除を確定しました:', selectedFolder.id);
+      try {
+        console.log('deleteFolder 呼び出し:', selectedFolder.id);
+        const updatedFolders = await deleteFolder(selectedFolder.id);
+        console.log('deleteFolder 成功');
+        
+        console.log('フォルダ詳細ビューをクリア');
+        setSelectedFolder(null);
+        setFolderQuestions([]);
+        
+        console.log('完了音を再生');
+        SoundManager.play('complete');
+        
+        window.alert(locale === 'ja' ? '削除完了：問題集を削除しました' : 'Deleted: Folder deleted');
+      } catch (error) {
+        console.error('deleteFolder エラー:', error);
+        window.alert('エラー：削除に失敗しました');
+      }
+    } else {
+      console.log('削除をキャンセルしました');
+    }
   };
 
   const handleAddQuestionsToFolder = async () => {
@@ -418,10 +411,10 @@ export default function BrowseQuestionsScreen() {
       console.log('完了音を再生');
       SoundManager.play('complete');
       
-      Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
+      window.alert(`${selectedQuestionIdsForAdd.length}問を追加しました`);
     } catch (error) {
       console.error('addQuestionsToFolder エラー:', error);
-      Alert.alert('エラー', '追加に失敗しました');
+      window.alert('エラー：追加に失敗しました');
     }
   };
 
