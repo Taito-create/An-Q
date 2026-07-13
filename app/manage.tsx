@@ -19,7 +19,7 @@ export default function ManageScreen() {
   const t = translations[locale];
   const navigate = useNavigate();
 
-  const [selectedTime, setSelectedTime] = useState('5');
+  const [selectedTime, setSelectedTime] = useState('0');
   const [customTimers, setCustomTimers] = useState<CustomTimer[]>([]);
   const [newTimerName, setNewTimerName] = useState('');
   const [newTimerMinutes, setNewTimerMinutes] = useState('');
@@ -47,13 +47,12 @@ export default function ManageScreen() {
       if (timerSetting) {
         setSelectedTime(timerSetting);
       } else {
-        // デフォルトは5分
-        setSelectedTime('5');
-        await AsyncStorage.setItem('APP_TIMER_SETTING', '5');
+        // デフォルトは無制限（0）
+        setSelectedTime('0');
       }
     } catch (error) {
       console.error('Error loading timer setting:', error);
-      setSelectedTime('5');
+      setSelectedTime('0');
     }
   };
 
@@ -75,7 +74,7 @@ export default function ManageScreen() {
     await AsyncStorage.removeItem('APP_TIMER_SETTING');
     await AsyncStorage.removeItem('active_timer_minutes');
     await AsyncStorage.removeItem('active_timer_label');
-    setSelectedTime('');
+    setSelectedTime('0');  // 無制限に設定
     SoundManager.play('complete');
   };
 

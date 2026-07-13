@@ -333,12 +333,12 @@ export default function BrowseQuestionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
+        <Text style={[styles.headerTitle, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
           {t.manageQuestions}
         </Text>
         <View style={styles.headerActions}>
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-            <Text style={styles.countBadgeText}>{filteredQuestions.length}</Text>
+            <Text style={[styles.countBadgeText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>{filteredQuestions.length}</Text>
           </View>
           <TouchableOpacity
             style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
@@ -355,13 +355,13 @@ export default function BrowseQuestionsScreen() {
               setShowFoldersView(true);
             }}
           >
-            <Text style={[styles.headerBtnText, { color: '#000000' }]}>📚 {t.folders}</Text>
+            <Text style={[styles.headerBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>📚 {t.folders}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
-            <Text style={[styles.headerBtnText, { color: isSelectionMode ? '#fff' : colors.primary }]}>
+            <Text style={[styles.headerBtnText, { color: isSelectionMode ? (isCyberpunk ? '#000000' : '#ffffff') : colors.primary }]}>
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
             </Text>
           </TouchableOpacity>
