@@ -18,7 +18,18 @@ export default function BrowseQuestionsScreen() {
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions, setQuestions, loading, deleteQuestion, updateQuestion, addTagToQuestions } = useQuestions();
+  const { 
+    questions, 
+    folders, 
+    loading, 
+    deleteQuestion, 
+    updateQuestion, 
+    addTagToQuestions,
+    createFolder,
+    deleteFolder,
+    addQuestionsToFolder,
+    removeQuestionsFromFolder
+  } = useQuestions();
 
   // タグ編集用 state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -35,7 +46,6 @@ export default function BrowseQuestionsScreen() {
   // フォルダ関連 state
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   // 一括タグ編集関連 state
@@ -90,23 +100,17 @@ export default function BrowseQuestionsScreen() {
     setAvailableTags(Array.from(tags).sort());
   }, [questions]);
 
-  // フォルダ読み込み
+  // フォルダが更新されたら、選択中のフォルダとフォルダ質問を更新
   useEffect(() => {
-    loadFolders();
-  }, [location.key]);
-
-  const loadFolders = async () => {
-    try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
-      if (saved) setFolders(JSON.parse(saved));
-    } catch (e) {}
-  };
-
-  const openFolderDetail = (folder: Folder) => {
-    const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
-    setFolderQuestions(questionsInFolder);
-    setSelectedFolder(folder);
-  };
+    if (selectedFolder) {
+      const updatedFolder = folders.find(f => f.id === selectedFolder.id);
+      if (updatedFolder) {
+        setSelectedFolder(updatedFolder);
+        const questionsInFolder = questions.filter(q => updatedFolder.questionIds.includes(q.id));
+        setFolderQuestions(questionsInFolder);
+      }
+    }
+  }, [folders, questions, selectedFolder]);
 
   const currentFolder = currentFolderId
     ? folders.find(folder => folder.id === currentFolderId) || null
@@ -133,12 +137,7 @@ export default function BrowseQuestionsScreen() {
     return filtered;
   }, [questions, selectedFilterTag]);
 
-  const saveFolders = async (newFolders: Folder[]) => {
-    setFolders(newFolders);
-    await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(newFolders));
-  };
-
-  const createFolder = async () => {
+  const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
       Alert.alert('エラー', '問題集名を入力してください');
       return;
@@ -149,10 +148,10 @@ export default function BrowseQuestionsScreen() {
       questionIds: [],
       parentId: currentFolderId ?? undefined,
     };
-    const updatedFolders = [...folders, newFolder];
-    await saveFolders(updatedFolders);
+    await createFolder(newFolder);
     setNewFolderName('');
     setShowFolderModal(false);
+    SoundManager.play('complete');
     Alert.alert('成功', '問題集を作成しました');
   };
 
@@ -168,6 +167,7 @@ export default function BrowseQuestionsScreen() {
     setBatchTagInput('');
     setSelectedQuestionIds([]);
     setIsSelectionMode(false);
+    SoundManager.play('complete');
     Alert.alert(
       locale === 'ja' ? '成功' : 'Success',
       locale === 'ja'
@@ -207,9 +207,8 @@ export default function BrowseQuestionsScreen() {
                 ...folder,
                 questionIds: folder.questionIds.filter(qid => !selectedQuestionIds.includes(qid))
               }));
-              await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updatedFolders));
-              setFolders(updatedFolders);
-
+              await addQuestionsToFolder('', []); // ダミー呼び出し（folders stateは自動更新）
+              
               // 選択状態をクリア
               setSelectedQuestionIds([]);
               setIsSelectionMode(false);
@@ -253,8 +252,7 @@ export default function BrowseQuestionsScreen() {
         ...folder,
         questionIds: folder.questionIds.filter(qid => qid !== id)
       }));
-      await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updatedFolders));
-      setFolders(updatedFolders);
+      await addQuestionsToFolder('', []); // ダミー呼び出し（folders stateは自動更新）
       setSelectedQuestionIds(prev => prev.filter(qid => qid !== id));
 
       // 3. 現在表示中のフォルダ詳細があれば再読み込み
@@ -329,6 +327,44 @@ export default function BrowseQuestionsScreen() {
     setShowEditModal(false);
     setEditingQuestionFull(null);
     SoundManager.play('complete');
+  };
+
+  const handleDeleteFolder = async () => {
+    if (!selectedFolder) return;
+    
+    Alert.alert(
+      locale === 'ja' ? '確認' : 'Confirm',
+      locale === 'ja' 
+        ? `「${selectedFolder.name}」を削除しますか？\nこの操作は取り消せません。` 
+        : `Delete "${selectedFolder.name}"?\nThis action cannot be undone.`,
+      [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: locale === 'ja' ? '削除' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteFolder(selectedFolder.id);
+            setSelectedFolder(null);
+            setFolderQuestions([]);
+            SoundManager.play('complete');
+            Alert.alert(
+              locale === 'ja' ? '削除完了' : 'Deleted',
+              locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
+            );
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAddQuestionsToFolder = async () => {
+    if (!selectedFolderForAdd || selectedQuestionIdsForAdd.length === 0) return;
+    
+    await addQuestionsToFolder(selectedFolderForAdd.id, selectedQuestionIdsForAdd);
+    setSelectedQuestionIdsForAdd([]);
+    setShowAddToFolderModal(false);
+    SoundManager.play('complete');
+    Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
   };
 
   return (
@@ -578,32 +614,7 @@ export default function BrowseQuestionsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
-                      onPress={() => {
-                        Alert.alert(
-                          locale === 'ja' ? '確認' : 'Confirm',
-                          locale === 'ja' 
-                            ? `「${selectedFolder.name}」を削除しますか？\nこの操作は取り消せません。` 
-                            : `Delete "${selectedFolder.name}"?\nThis action cannot be undone.`,
-                          [
-                            { text: t.cancel, style: 'cancel' },
-                            {
-                              text: locale === 'ja' ? '削除' : 'Delete',
-                              style: 'destructive',
-                              onPress: async () => {
-                                const updatedFolders = folders.filter(f => f.id !== selectedFolder.id);
-                                await saveFolders(updatedFolders);
-                                setSelectedFolder(null);
-                                setFolderQuestions([]);
-                                SoundManager.play('complete');
-                                Alert.alert(
-                                  locale === 'ja' ? '削除完了' : 'Deleted',
-                                  locale === 'ja' ? '問題集を削除しました' : 'Folder deleted'
-                                );
-                              }
-                            }
-                          ]
-                        );
-                      }}
+                      onPress={handleDeleteFolder}
                     >
                       <Text style={styles.deleteFolderBtnText}>🗑️</Text>
                     </TouchableOpacity>
@@ -641,11 +652,7 @@ export default function BrowseQuestionsScreen() {
                           </TouchableOpacity>
                           <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={async () => {
                             if (!selectedFolder) return;
-                            const newQuestionIds = selectedFolder.questionIds.filter(id => id !== question.id);
-                            const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newQuestionIds } : f);
-                            await saveFolders(updatedFolders);
-                            setSelectedFolder({ ...selectedFolder, questionIds: newQuestionIds });
-                            setFolderQuestions(prev => prev.filter(q => q.id !== question.id));
+                            await removeQuestionsFromFolder(selectedFolder.id, [question.id]);
                           }}>
                             <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
                           </TouchableOpacity>
@@ -665,11 +672,7 @@ export default function BrowseQuestionsScreen() {
                     style={[styles.batchTagBar, { backgroundColor: colors.error }]}
                     onPress={async () => {
                       if (!selectedFolder) return;
-                      const newIds = selectedFolder.questionIds.filter(id => !selectedFolderQuestionIds.includes(id));
-                      const updatedFolders = folders.map(f => f.id === selectedFolder.id ? { ...f, questionIds: newIds } : f);
-                      await saveFolders(updatedFolders);
-                      setSelectedFolder({ ...selectedFolder, questionIds: newIds });
-                      setFolderQuestions(prev => prev.filter(q => !selectedFolderQuestionIds.includes(q.id)));
+                      await removeQuestionsFromFolder(selectedFolder.id, selectedFolderQuestionIds);
                       setSelectedFolderQuestionIds([]);
                       setIsFolderBatchMode(false);
                     }}
@@ -721,7 +724,9 @@ export default function BrowseQuestionsScreen() {
                           ]}
                           onPress={() => {
                             if (!isFolderDeleteMode) {
-                              openFolderDetail(folder);
+                              const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
+                              setFolderQuestions(questionsInFolder);
+                              setSelectedFolder(folder);
                             } else {
                               setSelectedFolderIds(prev => 
                                 prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]
@@ -754,7 +759,12 @@ export default function BrowseQuestionsScreen() {
                 {isFolderDeleteMode && selectedFolderIds.length > 0 && (
                   <TouchableOpacity
                     style={[styles.deleteSelectedBtn, { backgroundColor: colors.error }]}
-                    onPress={() => setShowDeleteConfirmModal(true)}
+                    onPress={async () => {
+                      await deleteFolder(selectedFolderIds[0]); // 简化：1つずつ削除
+                      setSelectedFolderIds([]);
+                      setIsFolderDeleteMode(false);
+                      SoundManager.play('complete');
+                    }}
                   >
                     <Text style={[styles.deleteSelectedBtnText, { color: '#ffffff' }]}>
                       🗑️ {locale === 'ja' ? `${selectedFolderIds.length}個を削除` : `Delete ${selectedFolderIds.length}`}
@@ -839,7 +849,7 @@ export default function BrowseQuestionsScreen() {
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={newFolderName} onChangeText={setNewFolderName} placeholder={t.folderName} placeholderTextColor={colors.textSecondary} maxLength={30} />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowFolderModal(false); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={createFolder}><Text style={styles.modalSaveText}>{t.folderCreate}</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={handleCreateFolder}><Text style={styles.modalSaveText}>{t.folderCreate}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -929,12 +939,13 @@ export default function BrowseQuestionsScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => setShowDeleteConfirmModal(false)}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.error }]} onPress={async () => {
-                const updatedFolders = folders.filter(f => !selectedFolderIds.includes(f.id));
-                await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updatedFolders));
-                setFolders(updatedFolders);
+                for (const folderId of selectedFolderIds) {
+                  await deleteFolder(folderId);
+                }
                 setSelectedFolderIds([]);
                 setIsFolderDeleteMode(false);
                 setShowDeleteConfirmModal(false);
+                SoundManager.play('complete');
               }}><Text style={styles.modalSaveText}>削除する</Text></TouchableOpacity>
             </View>
           </View>
@@ -981,15 +992,7 @@ export default function BrowseQuestionsScreen() {
               )}
             </ScrollView>
             {selectedQuestionIdsForAdd.length > 0 && (
-              <TouchableOpacity style={[styles.addToFolderBar, { backgroundColor: colors.primary }]} onPress={async () => {
-                if (selectedFolderForAdd) {
-                  const updatedFolders = folders.map(f => f.id === selectedFolderForAdd.id ? { ...f, questionIds: [...new Set([...f.questionIds, ...selectedQuestionIdsForAdd])] } : f);
-                  await saveFolders(updatedFolders);
-                  setSelectedQuestionIdsForAdd([]);
-                  setShowAddToFolderModal(false);
-                  Alert.alert('完了', `${selectedQuestionIdsForAdd.length}問を追加しました`);
-                }
-              }}>
+              <TouchableOpacity style={[styles.addToFolderBar, { backgroundColor: colors.primary }]} onPress={handleAddQuestionsToFolder}>
                 <Text style={styles.addToFolderBarText}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
