@@ -60,10 +60,10 @@ export default function ManageScreen() {
     try {
       await AsyncStorage.setItem('APP_TIMER_SETTING', minutes);
       await AsyncStorage.setItem('active_timer_minutes', minutes);
-      const timerLabel = customTimers.find(t => t.minutes === parseInt(minutes))?.name || `${minutes}${locale === 'ja' ? '分' : 'min'}`;
+      const timerLabel = customTimers.find(t => t.minutes === parseInt(minutes))?.name || `${minutes}${locale === 'ja' ? '分' : ' min'}`;
       await AsyncStorage.setItem('active_timer_label', timerLabel);
       setSelectedTime(minutes);
-      SoundManager.play('complete');
+      SoundManager.play('decide');
       // 保存後にホーム画面に戻る
       setTimeout(() => {
         navigate('/');
@@ -83,7 +83,7 @@ export default function ManageScreen() {
         locale === 'ja' ? 'なし' : 'No limit'
       );
       setSelectedTime('0');
-      SoundManager.play('complete');
+      SoundManager.play('decide');
       // 保存後にホーム画面に戻る
       setTimeout(() => {
         navigate('/');
@@ -165,10 +165,44 @@ export default function ManageScreen() {
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
           onPress={() => { SoundManager.play('decide'); navigate('/'); }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+          <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      {/* プリセットタイマー */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          {locale === 'ja' ? 'タイマーを選択' : 'Select Timer'}
+        </Text>
+        <View style={styles.presetTimerGrid}>
+          <TouchableOpacity
+            style={[styles.presetTimerButton, { backgroundColor: selectedTime === '0' ? colors.primary : colors.background, borderColor: colors.border }]}
+            onPress={() => {
+              SoundManager.play('decide');
+              clearTimerSetting();
+            }}
+          >
+            <Text style={[styles.presetTimerText, { color: selectedTime === '0' ? (isCyberpunk ? '#000000' : '#ffffff') : colors.text }]}>
+              {locale === 'ja' ? 'なし' : 'None'}
+            </Text>
+          </TouchableOpacity>
+          {[5, 10, 30].map((minutes) => (
+            <TouchableOpacity
+              key={minutes}
+              style={[styles.presetTimerButton, { backgroundColor: selectedTime === minutes.toString() ? colors.primary : colors.background, borderColor: colors.border }]}
+              onPress={() => {
+                SoundManager.play('decide');
+                saveTimerSetting(minutes.toString());
+              }}
+            >
+              <Text style={[styles.presetTimerText, { color: selectedTime === minutes.toString() ? (isCyberpunk ? '#000000' : '#ffffff') : colors.text }]}>
+                {minutes}{locale === 'ja' ? '分' : ' min'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* カスタムタイマー追加 */}
@@ -195,7 +229,7 @@ export default function ManageScreen() {
         />
         
         <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={addCustomTimer}>
-          <Text style={styles.addButtonText}>
+          <Text style={[styles.addButtonText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
             ＋ {locale === 'ja' ? 'タイマーを追加' : 'Add Timer'}
           </Text>
         </TouchableOpacity>
@@ -279,7 +313,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   customInput: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10, fontSize: 16 },
   addButton: { padding: 12, borderRadius: 8, alignItems: 'center' },
-  addButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  addButtonText: { fontSize: 16, fontWeight: 'bold' },
+  presetTimerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
+  presetTimerButton: { flex: 1, minWidth: 80, paddingVertical: 14, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  presetTimerText: { fontSize: 15, fontWeight: 'bold' },
   customTimerItem: { padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   customTimerInfo: { flex: 1 },
   customTimerName: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
