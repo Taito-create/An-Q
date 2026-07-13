@@ -63,7 +63,11 @@ export default function ManageScreen() {
       const timerLabel = customTimers.find(t => t.minutes === parseInt(minutes))?.name || `${minutes}${locale === 'ja' ? '分' : 'min'}`;
       await AsyncStorage.setItem('active_timer_label', timerLabel);
       setSelectedTime(minutes);
-      Alert.alert(t.success, locale === 'ja' ? 'タイマー設定を保存しました！' : 'Timer settings saved!');
+      SoundManager.play('complete');
+      // 保存後にホーム画面に戻る
+      setTimeout(() => {
+        navigate('/');
+      }, 300);
     } catch (error) {
       console.error('Error saving timer setting:', error);
       Alert.alert(t.error, t.failedToSave);
@@ -71,11 +75,23 @@ export default function ManageScreen() {
   };
 
   const clearTimerSetting = async () => {
-    await AsyncStorage.removeItem('APP_TIMER_SETTING');
-    await AsyncStorage.removeItem('active_timer_minutes');
-    await AsyncStorage.removeItem('active_timer_label');
-    setSelectedTime('0');  // 無制限に設定
-    SoundManager.play('complete');
+    try {
+      // キーを削除せずに'0'を保存
+      await AsyncStorage.setItem('APP_TIMER_SETTING', '0');
+      await AsyncStorage.setItem('active_timer_minutes', '0');
+      await AsyncStorage.setItem('active_timer_label', 
+        locale === 'ja' ? 'なし' : 'No limit'
+      );
+      setSelectedTime('0');
+      SoundManager.play('complete');
+      // 保存後にホーム画面に戻る
+      setTimeout(() => {
+        navigate('/');
+      }, 300);
+    } catch (error) {
+      console.error('Error clearing timer setting:', error);
+      Alert.alert(t.error, t.failedToSave);
+    }
   };
 
   const addCustomTimer = async () => {
@@ -196,7 +212,10 @@ export default function ManageScreen() {
             <View key={timer.id} style={[styles.customTimerItem, { borderColor: colors.border }, selectedTime === timer.minutes.toString() && { backgroundColor: colors.primary + '20' }]}>
               <TouchableOpacity 
                 style={styles.customTimerInfo} 
-                onPress={() => saveTimerSetting(timer.minutes.toString())}
+                onPress={() => {
+                  SoundManager.play('decide');
+                  saveTimerSetting(timer.minutes.toString());
+                }}
               >
                 <Text style={[styles.customTimerName, { color: colors.text }]}>
                   {timer.name}
@@ -219,10 +238,13 @@ export default function ManageScreen() {
       )}
 
       {/* なし（タイマー解除） */}
-      <TouchableOpacity
-        style={[styles.clearButton, { borderColor: colors.error }]}
-        onPress={clearTimerSetting}
-      >
+          <TouchableOpacity
+            style={[styles.clearButton, { borderColor: colors.error }]}
+            onPress={() => {
+              SoundManager.play('decide');
+              clearTimerSetting();
+            }}
+          >
         <Text style={[{ color: colors.error, fontWeight: '700', textAlign: 'center' }]}>
           {locale === 'ja' ? '🔄 タイマーを解除（なし）' : '🔄 Clear Timer (No Limit)'}
         </Text>
