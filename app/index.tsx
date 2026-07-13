@@ -18,6 +18,7 @@ import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucid
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
+import { useQuestions } from './hooks/useQuestions';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -46,6 +47,7 @@ const HomeScreen = () => {
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
   const { user } = useAuth();
+  const { questions: questionsFromHook, loading: questionsLoading } = useQuestions();
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
@@ -163,6 +165,23 @@ const HomeScreen = () => {
   const [examDates, setExamDates] = useState<any[]>([]);
   const [examCountdown, setExamCountdown] = useState<{daysLeft: number, examName: string} | null>(null);
   const [quickReviewQuestions, setQuickReviewQuestions] = useState<any[]>([]);
+
+  // questionsFromHookが更新されたら問題数を反映
+  useEffect(() => {
+    if (questionsFromHook.length > 0 || !questionsLoading) {
+      setTotalQuestions(questionsFromHook.length);
+      // 今日の問題も更新
+      if (questionsFromHook.length > 0) {
+        const today = new Date();
+        const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+        const idx = seed % questionsFromHook.length;
+        setTodayQuestion(questionsFromHook[idx]);
+      }
+      // 苦手問題も更新
+      const weak = questionsFromHook.filter((q: any) => (q.mistakeCount ?? 0) > 0);
+      setWeakQuestionCount(weak.length);
+    }
+  }, [questionsFromHook, questionsLoading]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -383,18 +402,21 @@ const HomeScreen = () => {
 
   const loadSettings = async () => {
     try {
-      const savedQuestions = await AsyncStorage.getItem('quiz_questions');
-      if (savedQuestions) {
-        const questions = JSON.parse(savedQuestions);
-        setTotalQuestions(questions.length);
-        if (questions.length > 0) {
-          const today = new Date();
-          const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-          const idx = seed % questions.length;
-          setTodayQuestion(questions[idx]);
+      // 未ログイン時のみローカルストレージから読み込み
+      if (!user) {
+        const savedQuestions = await AsyncStorage.getItem('quiz_questions');
+        if (savedQuestions) {
+          const questions = JSON.parse(savedQuestions);
+          setTotalQuestions(questions.length);
+          if (questions.length > 0) {
+            const today = new Date();
+            const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+            const idx = seed % questions.length;
+            setTodayQuestion(questions[idx]);
+          }
+          const weak = questions.filter((q: any) => (q.mistakeCount ?? 0) > 0);
+          setWeakQuestionCount(weak.length);
         }
-        const weak = questions.filter((q: any) => (q.mistakeCount ?? 0) > 0);
-        setWeakQuestionCount(weak.length);
       }
 
       await loadTimerSetting();

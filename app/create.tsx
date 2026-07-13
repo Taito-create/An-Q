@@ -125,8 +125,12 @@ export default function CreateQuestionScreen() {
     }
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
-      if (!descriptiveAnswers[0]?.trim()) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
-      dataToSave.descriptiveAnswers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
+      // 複数の正解をスペース区切りの文字列として保存（両解モード対応）
+      const answers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
+      if (answers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
+      dataToSave.descriptiveAnswer = matchMode === 'all' 
+        ? answers.join(' ')  // 両解モード：スペース区切り
+        : answers[0];        // 通常モード：最初の1つのみ
       dataToSave.matchMode = matchMode;  // 両解モードを保存
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
