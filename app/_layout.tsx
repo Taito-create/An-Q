@@ -3,6 +3,7 @@ import { ThemeProvider, useTheme } from './theme';
 import { SoundManager } from './sound';
 import { BGMProvider } from './bgmContext';
 import { CustomBGMProvider } from './customBGMContext';
+import { QuestionsProvider } from './context/QuestionsContext';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -79,7 +80,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <BGMProvider>
         <CustomBGMProvider>
-          <RootLayoutInner />
+          <QuestionsProvider>
+            <RootLayoutInner />
+          </QuestionsProvider>
         </CustomBGMProvider>
       </BGMProvider>
     </ThemeProvider>

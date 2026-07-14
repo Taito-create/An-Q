@@ -9,7 +9,7 @@ import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert } from './utils/answerUtils';
-import { useQuestions } from './hooks/useQuestions';
+import { useQuestionsContext } from './context/QuestionsContext';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -29,7 +29,7 @@ export default function BrowseQuestionsScreen() {
     deleteFolder,
     addQuestionsToFolder,
     removeQuestionsFromFolder
-  } = useQuestions();
+  } = useQuestionsContext();
 
   // タグ編集用 state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -648,7 +648,7 @@ export default function BrowseQuestionsScreen() {
                         setShowAddToFolderModal(true);
                       }}
                     >
-                      <Text style={[styles.addQuestionsBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                      <Text style={[styles.addQuestionsBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
                         ＋ {locale === 'ja' ? '問題を追加' : 'Add Questions'}
                       </Text>
                     </TouchableOpacity>
@@ -740,7 +740,7 @@ export default function BrowseQuestionsScreen() {
                       setShowFolderModal(true);
                     }}
                   >
-                    <Text style={[styles.createFolderBtnText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                    <Text style={[styles.createFolderBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
                       ＋ {locale === 'ja' ? '作成' : 'Create'}
                     </Text>
                   </TouchableOpacity>
@@ -977,19 +977,40 @@ export default function BrowseQuestionsScreen() {
       <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>🗑️ {selectedFolderIds.length}個の問題集を削除しますか？</Text>
-            <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 13 }]}>この操作は取り消せません</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? '問題集の削除' : 'Delete Folder'}
+            </Text>
+            <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 13 }]}>
+              {locale === 'ja' 
+                ? `『{selectedFolder?.name}』を削除しますか？\nこの操作は取り消せません。`
+                : `Delete '{selectedFolder?.name}'?\nThis action cannot be undone.`}
+            </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => setShowDeleteConfirmModal(false)}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.error }]} onPress={async () => {
-                for (const folderId of selectedFolderIds) {
-                  await deleteFolder(folderId);
-                }
-                setSelectedFolderIds([]);
-                setIsFolderDeleteMode(false);
-                setShowDeleteConfirmModal(false);
-                SoundManager.play('complete');
-              }}><Text style={styles.modalSaveText}>削除する</Text></TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]} 
+                onPress={() => setShowDeleteConfirmModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalSaveBtn, { backgroundColor: colors.error }]} 
+                onPress={async () => {
+                  if (selectedFolder) {
+                    await deleteFolder(selectedFolder.id);
+                    setSelectedFolder(null);
+                    setFolderQuestions([]);
+                    setShowDeleteConfirmModal(false);
+                    SoundManager.play('complete');
+                    window.alert(locale === 'ja' ? '削除完了：問題集を削除しました' : 'Deleted: Folder deleted');
+                  }
+                }}
+              >
+                <Text style={styles.modalSaveText}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

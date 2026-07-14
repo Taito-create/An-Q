@@ -14,7 +14,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useTheme } from './theme';
 import { loadStats, incrementStat } from './missions';
-import { useQuestions } from './hooks/useQuestions';
+import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
@@ -25,7 +25,7 @@ export default function CreateQuestionScreen() {
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions, saveQuestions } = useQuestions();
+  const { questions, saveQuestions } = useQuestionsContext();
   const { user } = useAuth();
   const cpR: number | undefined = isCyberpunk ? 0 : undefined;
   const cpB: number | undefined = isCyberpunk ? 2 : undefined;
@@ -242,7 +242,7 @@ export default function CreateQuestionScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.tags}</Text>
           <View style={styles.tagInputContainer}>
             <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={t.enterTag} placeholderTextColor={colors.textSecondary} onSubmitEditing={() => { SoundManager.play('decide'); addTag(); }} />
-            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={() => { SoundManager.play('decide'); addTag(); }}><Text style={styles.addTagText}>+</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={() => { SoundManager.play('decide'); addTag(); }}><Text style={[styles.addTagText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>+</Text></TouchableOpacity>
           </View>
           {tags.length > 0 && (<View style={styles.tagContainer}>{tags.map((tag, index) => (<TouchableOpacity key={index} style={[styles.tag, { backgroundColor: colors.primary + '20', borderRadius: cpR ?? 16 }]} onPress={() => { SoundManager.play('select'); removeTag(tag); }}><Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text><Text style={[styles.removeTagText, { color: colors.primary }]}>×</Text></TouchableOpacity>))}</View>)}
         </View>
@@ -386,7 +386,7 @@ export default function CreateQuestionScreen() {
             />
           </View>
         )}
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: onPrimary }]}>{t.createQuestion}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>{t.createQuestion}</Text></TouchableOpacity>
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>

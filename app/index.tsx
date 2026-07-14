@@ -18,7 +18,7 @@ import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucid
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
-import { useQuestions } from './hooks/useQuestions';
+import { useQuestionsContext } from './context/QuestionsContext';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -47,7 +47,7 @@ const HomeScreen = () => {
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
   const { user } = useAuth();
-  const { questions: questionsFromHook, loading: questionsLoading } = useQuestions();
+  const { questions: questionsFromHook, loading: questionsLoading } = useQuestionsContext();
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
