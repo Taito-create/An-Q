@@ -395,11 +395,8 @@ export default function BrowseQuestionsScreen() {
       
       console.log('完了音を再生');
       SoundManager.play('complete');
-      
-      window.alert(`${selectedQuestionIdsForAdd.length}問を追加しました`);
     } catch (error) {
       console.error('addQuestionsToFolder エラー:', error);
-      window.alert('エラー：追加に失敗しました');
     }
   };
 
@@ -411,7 +408,7 @@ export default function BrowseQuestionsScreen() {
         </Text>
         <View style={styles.headerActions}>
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.countBadgeText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>{filteredQuestions.length}</Text>
+            <Text style={[styles.countBadgeText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{filteredQuestions.length}</Text>
           </View>
           <TouchableOpacity
             style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
@@ -425,7 +422,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
-            <Text style={[styles.headerBtnText, { color: isSelectionMode ? (isCyberpunk ? '#000000' : '#ffffff') : colors.primary }]}>
+            <Text style={[styles.headerBtnText, { color: isSelectionMode ? (isCyberpunk ? '#ffffff' : '#000000') : colors.primary }]}>
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
             </Text>
           </TouchableOpacity>
@@ -443,7 +440,7 @@ export default function BrowseQuestionsScreen() {
               }
             }}
           >
-            <Text style={{ color: isCyberpunk ? '#000000' : '#ffffff', fontWeight: '700', fontSize: 14 }}>
+            <Text style={{ color: isCyberpunk ? '#ffffff' : '#000000', fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
@@ -470,7 +467,7 @@ export default function BrowseQuestionsScreen() {
             styles.segmentTabText,
             { 
               color: activeTab === 'all' 
-                ? (isCyberpunk ? '#000000' : '#ffffff') 
+                ? (isCyberpunk ? '#ffffff' : '#000000')
                 : colors.text
             }
           ]}>
@@ -495,7 +492,7 @@ export default function BrowseQuestionsScreen() {
             styles.segmentTabText,
             { 
               color: activeTab === 'folders' 
-                ? (isCyberpunk ? '#000000' : '#ffffff') 
+                ? (isCyberpunk ? '#ffffff' : '#000000')
                 : colors.text
             }
           ]}>
@@ -510,7 +507,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
             onPress={() => setShowBatchTagModal(true)}
           >
-            <Text style={[styles.batchTagBarText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
+            <Text style={[styles.batchTagBarText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
@@ -659,7 +656,7 @@ export default function BrowseQuestionsScreen() {
                         handleDeleteFolder();
                       }}
                     >
-                      <Text style={styles.deleteFolderBtnText}>🗑️</Text>
+                      <Text style={[styles.deleteFolderBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>🗑️</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
                       <Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text>
@@ -691,13 +688,13 @@ export default function BrowseQuestionsScreen() {
                         <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
                         <View style={styles.folderQuestionActions}>
                           <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.primary }]} onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}>
-                            <Text style={[styles.folderActionBtnText, { color: colors.primary }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
+                            <Text style={[styles.folderActionBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={async () => {
                             if (!selectedFolder) return;
                             await removeQuestionsFromFolder(selectedFolder.id, [question.id]);
                           }}>
-                            <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
+                            <Text style={[styles.folderActionBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>− 除外</Text>
                           </TouchableOpacity>
                         </View>
                         {showFolderAnswerId === question.id && (
@@ -789,7 +786,7 @@ export default function BrowseQuestionsScreen() {
                             {folder.name}
                           </Text>
                           <View style={[styles.folderCountBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={[styles.folderCountBadgeText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                            <Text style={[styles.folderCountBadgeText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
                               {folderQuestionCount}{locale === 'ja' ? '問' : ''}
                             </Text>
                           </View>
@@ -978,12 +975,12 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? '問題集の削除' : 'Delete Folder'}
+              {`『${selectedFolder?.name}』を削除しますか？`}
             </Text>
             <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 13 }]}>
               {locale === 'ja' 
-                ? `『{selectedFolder?.name}』を削除しますか？\nこの操作は取り消せません。`
-                : `Delete '{selectedFolder?.name}'?\nThis action cannot be undone.`}
+                ? 'この操作は取り消せません。'
+                : 'This action cannot be undone.'}
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity 
@@ -1065,7 +1062,7 @@ export default function BrowseQuestionsScreen() {
                   handleAddQuestionsToFolder();
                 }}
               >
-                <Text style={styles.addToFolderBarText}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
+                <Text style={[styles.addToFolderBarText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1196,7 +1193,7 @@ const styles = StyleSheet.create({
   deleteSelectedBtn: { margin: 18, padding: 14, borderRadius: 14, alignItems: 'center' },
   deleteSelectedBtnText: { fontSize: 14, fontWeight: 'bold' },
   addToFolderBar: { marginTop: 16, padding: 16, borderRadius: 14, alignItems: 'center' },
-  addToFolderBarText: { color: '#000000', fontWeight: 'bold', fontSize: 14 },
+  addToFolderBarText: { fontWeight: 'bold', fontSize: 14 },
   folderDetailView: { flex: 1, paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
   folderDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 12 },
   folderDetailTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, lineHeight: 26 },
@@ -1205,7 +1202,9 @@ const styles = StyleSheet.create({
   addQuestionsBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, alignItems: 'center' },
   addQuestionsBtnText: { fontSize: 13, fontWeight: 'bold' },
   deleteFolderBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  deleteFolderBtnText: { fontSize: 18 },
+  deleteFolderBtnText: { 
+    fontSize: 18
+  },
   folderDetailContainer: { width: '90%', maxWidth: 500, padding: 24, borderRadius: 20, maxHeight: '80%' },
   sectionSubtitle: { fontSize: 13, fontWeight: 'bold', marginTop: 6, marginBottom: 4, marginHorizontal: 4, letterSpacing: 0.2 },
   folderQuestionItem: { paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1 },
@@ -1213,7 +1212,10 @@ const styles = StyleSheet.create({
   folderQuestionText: { fontSize: 15, lineHeight: 22 },
   folderQuestionActions: { flexDirection: 'row', gap: 10, marginTop: 2, flexWrap: 'wrap' },
   folderActionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
-  folderActionBtnText: { fontSize: 13, fontWeight: 'bold' },
+  folderActionBtnText: { 
+    fontSize: 13, 
+    fontWeight: 'bold'
+  },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
   countBadgeText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
   cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },
