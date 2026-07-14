@@ -6,6 +6,7 @@ import { BGMProvider } from '../app/bgmContext';
 import { SEProvider } from '../app/seContext';
 import { CustomBGMProvider } from '../app/customBGMContext';
 import { AuthProvider } from '../app/auth/AuthContext';
+import { QuestionsProvider } from '../app/context/QuestionsContext';
 import MiniPlayer from '../app/miniPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from '../app/missions';
@@ -131,10 +132,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <SEProvider>
           <CustomBGMProvider>
             <AuthProvider>
-              <ThemedRoot>
-                <MiniPlayer />
-                {children}
-              </ThemedRoot>
+              <QuestionsProvider>
+                <ThemedRoot>
+                  <MiniPlayer />
+                  {children}
+                </ThemedRoot>
+              </QuestionsProvider>
             </AuthProvider>
           </CustomBGMProvider>
         </SEProvider>
