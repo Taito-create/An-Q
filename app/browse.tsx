@@ -368,31 +368,23 @@ export default function BrowseQuestionsScreen() {
   const handleRemoveQuestionFromFolder = async (questionId: number) => {
     if (!selectedFolder) return;
 
-    Alert.alert(
-      t.removeQuestion || '問題を除外',
-      locale === 'ja'
-        ? 'この問題をフォルダから除外しますか？'
-        : 'Remove this question from the folder?',
-      [
-        { text: t.cancel || 'キャンセル', style: 'cancel' },
-        {
-          text: t.remove || '除外',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const updatedFolders = await removeQuestionsFromFolder(selectedFolder.id, [questionId]);
-              SoundManager.play('delete');
-              const updatedFolder = updatedFolders.find(f => f.id === selectedFolder.id);
-              if (updatedFolder) {
-                setSelectedFolder(updatedFolder);
-              }
-            } catch (error) {
-              console.error('Failed to remove question from folder:', error);
-            }
-          }
+    const message = locale === 'ja'
+      ? 'この問題をフォルダから除外しますか？'
+      : 'Remove this question from the folder?';
+
+    // Web環境でも確実に動作する window.confirm を使用
+    if (window.confirm(message)) {
+      try {
+        const updatedFolders = await removeQuestionsFromFolder(selectedFolder.id, [questionId]);
+        SoundManager.play('delete');
+        const updatedFolder = updatedFolders.find(f => f.id === selectedFolder.id);
+        if (updatedFolder) {
+          setSelectedFolder(updatedFolder);
         }
-      ]
-    );
+      } catch (error) {
+        console.error('Failed to remove question from folder:', error);
+      }
+    }
   };
 
   const handleAddQuestionsToFolder = async () => {
