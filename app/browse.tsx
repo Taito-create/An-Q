@@ -365,6 +365,36 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
+  const handleRemoveQuestionFromFolder = async (questionId: number) => {
+    if (!selectedFolder) return;
+
+    Alert.alert(
+      t.removeQuestion || '問題を除外',
+      locale === 'ja'
+        ? 'この問題をフォルダから除外しますか？'
+        : 'Remove this question from the folder?',
+      [
+        { text: t.cancel || 'キャンセル', style: 'cancel' },
+        {
+          text: t.remove || '除外',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedFolders = await removeQuestionsFromFolder(selectedFolder.id, [questionId]);
+              SoundManager.play('delete');
+              const updatedFolder = updatedFolders.find(f => f.id === selectedFolder.id);
+              if (updatedFolder) {
+                setSelectedFolder(updatedFolder);
+              }
+            } catch (error) {
+              console.error('Failed to remove question from folder:', error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleAddQuestionsToFolder = async () => {
     console.log('=== handleAddQuestionsToFolder 開始 ===');
     console.log('selectedFolderForAdd:', selectedFolderForAdd);
@@ -656,7 +686,7 @@ export default function BrowseQuestionsScreen() {
                         handleDeleteFolder();
                       }}
                     >
-                      <Text style={[styles.deleteFolderBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>🗑️</Text>
+                      <Text style={[styles.deleteFolderBtnText, { color: colors.text }]}>🗑️</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
                       <Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text>
@@ -687,15 +717,12 @@ export default function BrowseQuestionsScreen() {
                       <View style={styles.folderQuestionContent}>
                         <Text style={[styles.folderQuestionText, { color: colors.text }]} numberOfLines={2}>{question.question}</Text>
                         <View style={styles.folderQuestionActions}>
-                          <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.primary }]} onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}>
-                            <Text style={[styles.folderActionBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={async () => {
-                            if (!selectedFolder) return;
-                            await removeQuestionsFromFolder(selectedFolder.id, [question.id]);
-                          }}>
-                            <Text style={[styles.folderActionBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>− 除外</Text>
-                          </TouchableOpacity>
+                           <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.primary }]} onPress={() => setShowFolderAnswerId(showFolderAnswerId === question.id ? null : question.id)}>
+                             <Text style={[styles.folderActionBtnText, { color: colors.text }]}>{showFolderAnswerId === question.id ? '隠す' : t.showAnswer}</Text>
+                           </TouchableOpacity>
+                            <TouchableOpacity style={[styles.folderActionBtn, { borderColor: colors.error }]} onPress={() => handleRemoveQuestionFromFolder(question.id)}>
+                             <Text style={[styles.folderActionBtnText, { color: colors.error }]}>− 除外</Text>
+                           </TouchableOpacity>
                         </View>
                         {showFolderAnswerId === question.id && (
                           <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
