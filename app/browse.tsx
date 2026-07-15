@@ -15,7 +15,7 @@ import './browse.css';
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors, onPrimary } = useTheme();
+  const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { 
@@ -433,7 +433,7 @@ export default function BrowseQuestionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
-        <Text style={[styles.headerTitle, { color: isCyberpunk ? '#ffffff' : colors.text }]}>
+        <Text style={[styles.headerTitle, { color: onPrimary }]}>
           {t.manageQuestions}
         </Text>
         <View style={styles.headerActions}>
