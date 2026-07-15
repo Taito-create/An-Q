@@ -15,7 +15,7 @@ import './browse.css';
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors, onPrimary, isCyberpunk } = useTheme();
+  const { colors, onPrimary } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { 
@@ -438,7 +438,7 @@ export default function BrowseQuestionsScreen() {
         </Text>
         <View style={styles.headerActions}>
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.countBadgeText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{filteredQuestions.length}</Text>
+            <Text style={[styles.countBadgeText, { color: onPrimary }]}>{filteredQuestions.length}</Text>
           </View>
           <TouchableOpacity
             style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
@@ -452,7 +452,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
-            <Text style={[styles.headerBtnText, { color: isSelectionMode ? (isCyberpunk ? '#ffffff' : '#000000') : colors.primary }]}>
+            <Text style={[styles.headerBtnText, { color: isSelectionMode ? onPrimary : colors.primary }]}>
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
             </Text>
           </TouchableOpacity>
@@ -470,7 +470,7 @@ export default function BrowseQuestionsScreen() {
               }
             }}
           >
-            <Text style={{ color: isCyberpunk ? '#ffffff' : '#000000', fontWeight: '700', fontSize: 14 }}>
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
               {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
@@ -497,11 +497,11 @@ export default function BrowseQuestionsScreen() {
             styles.segmentTabText,
             { 
               color: activeTab === 'all' 
-                ? (isCyberpunk ? '#ffffff' : '#000000')
+                ? onPrimary
                 : colors.text
-            }
-          ]}>
-            {locale === 'ja' ? 'すべての問題' : 'All Questions'}
+              }
+            ]}>
+              {locale === 'ja' ? 'すべての問題' : 'All Questions'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -522,11 +522,11 @@ export default function BrowseQuestionsScreen() {
             styles.segmentTabText,
             { 
               color: activeTab === 'folders' 
-                ? (isCyberpunk ? '#ffffff' : '#000000')
+                ? onPrimary
                 : colors.text
-            }
-          ]}>
-            📁 {locale === 'ja' ? '問題集' : 'Folders'}
+              }
+            ]}>
+              📁 {locale === 'ja' ? '問題集' : 'Folders'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -537,7 +537,7 @@ export default function BrowseQuestionsScreen() {
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
             onPress={() => setShowBatchTagModal(true)}
           >
-            <Text style={[styles.batchTagBarText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
+            <Text style={[styles.batchTagBarText, { color: onPrimary }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
@@ -568,7 +568,7 @@ export default function BrowseQuestionsScreen() {
                     <Text style={[
                       styles.checkboxText, 
                       { 
-                        color: isCyberpunk ? '#ffffff' : '#000000',
+                        color: onPrimary,
                         backgroundColor: isCyberpunk ? 'transparent' : colors.card,
                         borderRadius: 4,
                         paddingHorizontal: 4,
@@ -675,7 +675,7 @@ export default function BrowseQuestionsScreen() {
                         setShowAddToFolderModal(true);
                       }}
                     >
-                      <Text style={[styles.addQuestionsBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
+                      <Text style={[styles.addQuestionsBtnText, { color: onPrimary }]}>
                         ＋ {locale === 'ja' ? '問題を追加' : 'Add Questions'}
                       </Text>
                     </TouchableOpacity>
@@ -764,7 +764,7 @@ export default function BrowseQuestionsScreen() {
                       setShowFolderModal(true);
                     }}
                   >
-                    <Text style={[styles.createFolderBtnText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
+                    <Text style={[styles.createFolderBtnText, { color: onPrimary }]}>
                       ＋ {locale === 'ja' ? '作成' : 'Create'}
                     </Text>
                   </TouchableOpacity>
@@ -813,7 +813,7 @@ export default function BrowseQuestionsScreen() {
                             {folder.name}
                           </Text>
                           <View style={[styles.folderCountBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={[styles.folderCountBadgeText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>
+                            <Text style={[styles.folderCountBadgeText, { color: onPrimary }]}>
                               {folderQuestionCount}{locale === 'ja' ? '問' : ''}
                             </Text>
                           </View>
@@ -1080,7 +1080,7 @@ export default function BrowseQuestionsScreen() {
                   handleAddQuestionsToFolder();
                 }}
               >
-                <Text style={[styles.addToFolderBarText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
+                <Text style={[styles.addToFolderBarText, { color: onPrimary }]}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
           </View>

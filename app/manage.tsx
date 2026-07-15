@@ -229,7 +229,7 @@ export default function ManageScreen() {
         />
         
         <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={addCustomTimer}>
-          <Text style={[styles.addButtonText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+          <Text style={[styles.addButtonText, { color: onPrimary }]}>
             ＋ {locale === 'ja' ? 'タイマーを追加' : 'Add Timer'}
           </Text>
         </TouchableOpacity>
