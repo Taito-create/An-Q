@@ -64,6 +64,10 @@ export default function BrowseQuestionsScreen() {
   const [isFolderBatchMode, setIsFolderBatchMode] = useState(false);
   const [selectedFolderQuestionIds, setSelectedFolderQuestionIds] = useState<number[]>([]);
 
+  // 除外確認モーダル用 state
+  const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
+  const [targetQuestionIdToRemove, setTargetQuestionIdToRemove] = useState<number | null>(null);
+
   // タグ絞り込み用 state
   const [selectedFilterTag, setSelectedFilterTag] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -365,25 +369,26 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
-  const handleRemoveQuestionFromFolder = async (questionId: number) => {
-    if (!selectedFolder) return;
+  const handleRemoveQuestionFromFolder = (questionId: number) => {
+    // Stateを更新して自前モーダルを開く
+    setTargetQuestionIdToRemove(questionId);
+    setShowRemoveConfirmModal(true);
+  };
 
-    const message = locale === 'ja'
-      ? 'この問題をフォルダから除外しますか？'
-      : 'Remove this question from the folder?';
-
-    // Web環境でも確実に動作する window.confirm を使用
-    if (window.confirm(message)) {
-      try {
-        const updatedFolders = await removeQuestionsFromFolder(selectedFolder.id, [questionId]);
-        SoundManager.play('delete');
-        const updatedFolder = updatedFolders.find(f => f.id === selectedFolder.id);
-        if (updatedFolder) {
-          setSelectedFolder(updatedFolder);
-        }
-      } catch (error) {
-        console.error('Failed to remove question from folder:', error);
+  const confirmRemoveQuestion = async () => {
+    if (!selectedFolder || targetQuestionIdToRemove === null) return;
+    try {
+      const updatedFolders = await removeQuestionsFromFolder(selectedFolder.id, [targetQuestionIdToRemove]);
+      SoundManager.play('delete');
+      const updatedFolder = updatedFolders.find(f => f.id === selectedFolder.id);
+      if (updatedFolder) {
+        setSelectedFolder(updatedFolder);
       }
+    } catch (error) {
+      console.error('Failed to remove question from folder:', error);
+    } finally {
+      setShowRemoveConfirmModal(false);
+      setTargetQuestionIdToRemove(null);
     }
   };
 
@@ -1084,6 +1089,43 @@ export default function BrowseQuestionsScreen() {
                 <Text style={[styles.addToFolderBarText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 除外確認モーダル */}
+      <Modal visible={showRemoveConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? '問題を除外' : 'Remove Question'}
+            </Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              {locale === 'ja'
+                ? 'この問題をフォルダから除外しますか？'
+                : 'Remove this question from the folder?'}
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowRemoveConfirmModal(false);
+                  setTargetQuestionIdToRemove(null);
+                }}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={confirmRemoveQuestion}
+              >
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '除外する' : 'Remove'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
