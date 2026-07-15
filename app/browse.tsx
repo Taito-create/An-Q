@@ -353,18 +353,15 @@ export default function BrowseQuestionsScreen() {
       const updatedFolders = await deleteFolder(selectedFolder.id);
       console.log('deleteFolder 成功');
       
-      console.log('フォルダ詳細ビューをクリア');
+      // 先にモーダルを閉じて状態をリセット（window.alert は使わない）
+      setShowDeleteConfirmModal(false);
       setSelectedFolder(null);
       setFolderQuestions([]);
-      setShowDeleteConfirmModal(false);
       
       console.log('完了音を再生');
       SoundManager.play('complete');
-      
-      window.alert(locale === 'ja' ? '削除完了：問題集を削除しました' : 'Deleted: Folder deleted');
     } catch (error) {
       console.error('deleteFolder エラー:', error);
-      window.alert('エラー：削除に失敗しました');
       setShowDeleteConfirmModal(false);
     }
   };
@@ -1017,16 +1014,7 @@ export default function BrowseQuestionsScreen() {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalSaveBtn, { backgroundColor: colors.error }]} 
-                onPress={async () => {
-                  if (selectedFolder) {
-                    await deleteFolder(selectedFolder.id);
-                    setSelectedFolder(null);
-                    setFolderQuestions([]);
-                    setShowDeleteConfirmModal(false);
-                    SoundManager.play('complete');
-                    window.alert(locale === 'ja' ? '削除完了：問題集を削除しました' : 'Deleted: Folder deleted');
-                  }
-                }}
+                onPress={confirmDeleteFolder}
               >
                 <Text style={styles.modalSaveText}>
                   {locale === 'ja' ? '削除する' : 'Delete'}
