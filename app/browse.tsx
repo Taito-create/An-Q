@@ -77,6 +77,7 @@ export default function BrowseQuestionsScreen() {
   const [isFolderDeleteMode, setIsFolderDeleteMode] = useState(false);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [folderNameToDelete, setFolderNameToDelete] = useState<string>('');
 
   // 問題削除確認モーダル用 state（Web では Alert が動作しないため独自モーダルを使用）
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
@@ -342,6 +343,8 @@ export default function BrowseQuestionsScreen() {
       return;
     }
     
+    // モーダルを開く前にフォルダ名を退避（モーダル表示中のチラつき防止）
+    setFolderNameToDelete(selectedFolder.name);
     setShowDeleteConfirmModal(true);
   };
 
@@ -363,6 +366,9 @@ export default function BrowseQuestionsScreen() {
     } catch (error) {
       console.error('deleteFolder エラー:', error);
       setShowDeleteConfirmModal(false);
+    } finally {
+      // 退避したフォルダ名をクリア（モーダルが閉じきった後にリセット）
+      setFolderNameToDelete('');
     }
   };
 
@@ -996,7 +1002,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {`『${selectedFolder?.name}』を削除しますか？`}
+              {`『${folderNameToDelete}』を削除しますか？`}
             </Text>
             <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 13 }]}>
               {locale === 'ja' 
