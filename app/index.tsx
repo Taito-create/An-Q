@@ -220,21 +220,31 @@ const HomeScreen = () => {
 
   const loadUserProgress = async () => {
     try {
+      // 1. まずローカルのキャッシュ（AsyncStorage）から最速で読み込んで、画面に即表示！
+      const cachedLevel = await AsyncStorage.getItem(STORAGE_KEYS.USER_LEVEL);
+      const cachedCoins = await AsyncStorage.getItem(STORAGE_KEYS.USER_COINS);
+      const cachedProfile = await AsyncStorage.getItem('user_profile_cache');
+      
+      if (cachedLevel) setUserLevel(parseInt(cachedLevel, 10));
+      if (cachedCoins) setUserCoins(parseInt(cachedCoins, 10));
+      if (cachedProfile) setProfile(JSON.parse(cachedProfile));
+
+      // 2. その後、裏で Firestore から最新データを取得し、差分があればアップデート！
       if (user?.uid) {
         const userProfile = await readUserProfileDocument(user.uid);
         if (userProfile) {
           setUserLevel(userProfile.level);
           setUserCoins(userProfile.totalCoins);
           setProfile(userProfile);
+          
+          // 最新データを次回遷移時のために最速でキャッシュに保存しておく
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_LEVEL, userProfile.level.toString());
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_COINS, userProfile.totalCoins.toString());
+          await AsyncStorage.setItem('user_profile_cache', JSON.stringify(userProfile));
+          
           const progress = Math.min((userProfile.currentXP / userProfile.nextLevelXP) * 100, 100);
           setXpProgress(progress);
         }
-      } else {
-        // Fallback to local storage
-        const level = await AsyncStorage.getItem('user_level');
-        const coins = await AsyncStorage.getItem('user_coins');
-        if (level) setUserLevel(parseInt(level, 10));
-        if (coins) setUserCoins(parseInt(coins, 10));
       }
     } catch (error) {
       console.error('Failed to load user progress:', error);
@@ -376,8 +386,8 @@ const HomeScreen = () => {
         let bonus = 5 + Math.floor((streak - 1) * 0.5);
         if (bonus > 20) bonus = 20;
         
-        const currentCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
-        await AsyncStorage.setItem('user_coins', (currentCoins + bonus).toString());
+        const currentCoins = parseInt(await AsyncStorage.getItem(STORAGE_KEYS.USER_COINS) || '0', 10);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_COINS, (currentCoins + bonus).toString());
         await AsyncStorage.setItem('daily_login_bonus_date', today);
         await AsyncStorage.setItem('login_streak', streak.toString());
         
