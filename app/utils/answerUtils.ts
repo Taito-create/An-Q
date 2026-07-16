@@ -61,9 +61,13 @@ export const getAnswerText = (question: Question): string => {
       const correctOption = question.multipleChoice?.options[correctIdx] || '';
       return `${correctIdx + 1}. ${correctOption}`;
     case 'descriptive':
-      // 配列の場合はスペース区切りで表示
+      // 配列の場合はカンマ区切りで表示（両解モードの場合は「両方正解」と明示）
       if (Array.isArray(question.descriptiveAnswer)) {
-        return question.descriptiveAnswer.join(' ');
+        const answers = question.descriptiveAnswer;
+        if (question.matchMode === 'all' && answers.length > 1) {
+          return `${answers.join('、')}（両方正解）`;
+        }
+        return answers.join('、');
       }
       return question.descriptiveAnswer || '';
     default:

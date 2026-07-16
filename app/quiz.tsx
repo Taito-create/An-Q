@@ -323,6 +323,7 @@ export default function QuizScreen() {
     setAllTags(sortedTags);
     setSelectedTags(sortedTags);
     setPreQuestionCount(Math.min(enabled.length, 50));
+    setIsLoading(false);
   }, [allQuestionsFromHook]);
 
   const loadTimerPresets = async () => {
@@ -847,6 +848,15 @@ export default function QuizScreen() {
       SoundManager.play('question');
     }
   }, [currentIndex]);
+
+  // ローディング中
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={[{ fontSize: 16, color: colors.text }]}>読み込み中...</Text>
+      </View>
+    );
+  }
 
   // プレ設定画面
   if (showPreSettings) {

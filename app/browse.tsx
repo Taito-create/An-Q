@@ -433,7 +433,7 @@ export default function BrowseQuestionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
-        <Text style={[styles.headerTitle, { color: onPrimary }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
           {t.manageQuestions}
         </Text>
         <View style={styles.headerActions}>
@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
   confirmModalConfirmText: { color: '#fff', fontWeight: 'bold' },
   modalContainer: { width: '85%', maxWidth: 400, padding: 24, borderRadius: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 20, backgroundColor: '#fff' },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 20 },
   modalButtons: { flexDirection: 'row', gap: 12 },
   modalCancelBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   modalCancelText: { fontWeight: 'bold' },

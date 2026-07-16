@@ -181,59 +181,9 @@ export default function CreateQuestionScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[
-              styles.headerModeButton,
-              { 
-                borderColor: colors.primary,
-                backgroundColor: matchMode === 'all' ? colors.primary : 'transparent'
-              }
-            ]}
-            onPress={() => {
-              SoundManager.play('decide');
-              setMatchMode(matchMode === 'all' ? 'any' : 'all');
-            }}
-          >
-            <Text style={[
-              styles.headerModeButtonText,
-              { 
-                color: matchMode === 'all' 
-                  ? (isCyberpunk ? '#000000' : '#ffffff') 
-                  : colors.primary
-              }
-            ]}>
-              {locale === 'ja' ? '両解' : 'Multi'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.headerModeButton,
-              { 
-                borderColor: colors.primary,
-                backgroundColor: showTagInput ? colors.primary : 'transparent'
-              }
-            ]}
-            onPress={() => {
-              SoundManager.play('decide');
-              setShowTagInput(!showTagInput);
-            }}
-          >
-            <Text style={[
-              styles.headerModeButtonText,
-              { 
-                color: showTagInput 
-                  ? (isCyberpunk ? '#000000' : '#ffffff') 
-                  : colors.primary
-              }
-            ]}>
-              🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-            <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
+          <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* タグ入力エリア（ヘッダー下） */}
@@ -262,6 +212,61 @@ export default function CreateQuestionScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+
+        {/* 問題入力欄のすぐ下に両解モード・タグ追加ボタンを配置 */}
+        <View style={[styles.inlineButtons, { flexDirection: 'row', gap: 10, marginBottom: 16 }]}>
+          <TouchableOpacity
+            style={[
+              styles.inlineModeButton,
+              { 
+                flex: 1,
+                borderColor: colors.primary,
+                backgroundColor: matchMode === 'all' ? colors.primary : 'transparent'
+              }
+            ]}
+            onPress={() => {
+              SoundManager.play('decide');
+              setMatchMode(matchMode === 'all' ? 'any' : 'all');
+            }}
+          >
+            <Text style={[
+              styles.inlineModeButtonText,
+              { 
+                color: matchMode === 'all' 
+                  ? (isCyberpunk ? '#000000' : '#ffffff') 
+                  : colors.primary
+              }
+            ]}>
+              {locale === 'ja' ? '両解モード' : 'Multi-Answer'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.inlineModeButton,
+              { 
+                flex: 1,
+                borderColor: colors.primary,
+                backgroundColor: showTagInput ? colors.primary : 'transparent'
+              }
+            ]}
+            onPress={() => {
+              SoundManager.play('decide');
+              setShowTagInput(!showTagInput);
+            }}
+          >
+            <Text style={[
+              styles.inlineModeButtonText,
+              { 
+                color: showTagInput 
+                  ? (isCyberpunk ? '#000000' : '#ffffff') 
+                  : colors.primary
+              }
+            ]}>
+              🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {answerType === 'descriptive' && (
           <View>
             {/* 両解モードON時の説明 */}
@@ -476,4 +481,7 @@ const styles = StyleSheet.create({
   imagePreview: { position: 'relative', overflow: 'hidden', marginBottom: 12 },
   matchModeInfo: { padding: 10, borderWidth: 1, marginTop: 8 },
   matchModeInfoText: { fontSize: 12, lineHeight: 18 },
+  inlineButtons: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  inlineModeButton: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  inlineModeButtonText: { fontSize: 14, fontWeight: 'bold' },
 });
