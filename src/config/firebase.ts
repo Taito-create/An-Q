@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getAuth, initializeAuth } from "firebase/auth";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { Platform } from "react-native";
 
 // 正しい接続鍵です！
@@ -17,7 +17,7 @@ const firebaseConfig = {
 // 既に初期化されている場合は既存のアプリを使い、なければ初期化する
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-let firebaseAuth;
+let firebaseAuth: ReturnType<typeof getAuth>;
 
 if (Platform.OS === 'web') {
   // Vercel（Web）環境では、一切スマホ用ライブラリに触れずに初期化
@@ -41,12 +41,17 @@ if (Platform.OS === 'web') {
 
 export const auth = firebaseAuth;
 
-// Firestoreのオフラインキャッシュ（永続的ローカルキャッシュ）を有効化
-// これにより、ネットワーク通信を待たずにローカルキャッシュから瞬時にデータを読み込める
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
-});
+// Firestoreの二重初期化を防ぐ
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (e) {
+  // 既に初期化済みの場合は既存のインスタンスを取得
+  db = getFirestore(app);
+}
 
 export { db };

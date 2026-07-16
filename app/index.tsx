@@ -9,7 +9,6 @@ import TooltipButton from './tooltipButton';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import PatternBackground from './patternBackground';
-import LoadingScreen from './LoadingScreen';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -47,13 +46,12 @@ const HomeScreen = () => {
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
   const { user } = useAuth();
-  const { questions: questionsFromHook, loading: questionsLoading } = useQuestionsContext();
+  const { questions: questionsFromHook } = useQuestionsContext();
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [xpProgress, setXpProgress] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -168,24 +166,22 @@ const HomeScreen = () => {
 
   // questionsFromHookが更新されたら問題数を反映
   useEffect(() => {
-    if (questionsFromHook.length > 0 || !questionsLoading) {
+    if (questionsFromHook.length > 0) {
       setTotalQuestions(questionsFromHook.length);
       // 今日の問題も更新
-      if (questionsFromHook.length > 0) {
-        const today = new Date();
-        const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-        const idx = seed % questionsFromHook.length;
-        setTodayQuestion(questionsFromHook[idx]);
-      }
+      const today = new Date();
+      const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+      const idx = seed % questionsFromHook.length;
+      setTodayQuestion(questionsFromHook[idx]);
       // 苦手問題も更新
       const weak = questionsFromHook.filter((q: any) => (q.mistakeCount ?? 0) > 0);
       setWeakQuestionCount(weak.length);
     }
-  }, [questionsFromHook, questionsLoading]);
+  }, [questionsFromHook]);
 
   useEffect(() => {
-    const initializeData = async () => {
-      setIsLoading(true);
+    // 非同期処理をバックグラウンドで実行（ノンブロッキング）
+    const loadAllData = async () => {
       try {
         await loadSettings();
         SoundManager.initialize();
@@ -195,12 +191,10 @@ const HomeScreen = () => {
         await loadUserProgress();
       } catch (error) {
         console.error('Failed to initialize home screen:', error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    initializeData();
+    loadAllData();
 
     // リアルタイム監視（500ms ごと）
     const interval = setInterval(() => {
@@ -878,10 +872,6 @@ const HomeScreen = () => {
       </View>
     );
   };
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, minHeight: '100%' }}>
