@@ -29,7 +29,7 @@ export default function MultiScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
-  const { questions, folders, loading } = useQuestionsContext();
+  const { questions, folders } = useQuestionsContext();
 
   const [shareMode, setShareMode] = useState<'send' | 'receive'>('send');
   const [shareType, setShareType] = useState<'questions' | 'folders'>('questions');
@@ -301,17 +301,6 @@ export default function MultiScreen() {
   };
 
   const canGenerate = shareType === 'questions' ? selectedQuestions.length > 0 : selectedFolders.length > 0;
-
-  // ローディング中の表示
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: colors.text, fontSize: 16 }}>
-          {locale === 'ja' ? '読み込み中...' : 'Loading...'}
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

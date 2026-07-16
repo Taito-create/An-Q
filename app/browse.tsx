@@ -21,7 +21,6 @@ export default function BrowseQuestionsScreen() {
   const { 
     questions, 
     folders, 
-    loading, 
     deleteQuestion, 
     updateQuestion, 
     addTagToQuestions,

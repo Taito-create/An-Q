@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeAuth, getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { Platform } from "react-native";
 
 // 正しい接続鍵です！
@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: "an-q-77a3f",
   storageBucket: "an-q-77a3f.firebasestorage.app",
   messagingSenderId: "211342470418",
-  appId: "1:211342470418:web:7955a86694880684d0d7cb",
+  appId: "1:211342470418:web:684d0d7cb",
   measurementId: "G-03Y08B7NEY"
 };
 
@@ -40,15 +40,13 @@ if (Platform.OS === 'web') {
 }
 
 export const auth = firebaseAuth;
-export const db = getFirestore(app);
 
-// Firestore オフライン永続性を有効化（Web環境のみ）
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Firestore persistence failed: Multiple tabs open');
-    } else if (err.code === 'unimplemented') {
-      console.warn('Firestore persistence not available in this browser');
-    }
-  });
-}
+// Firestoreのオフラインキャッシュ（永続的ローカルキャッシュ）を有効化
+// これにより、ネットワーク通信を待たずにローカルキャッシュから瞬時にデータを読み込める
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
+
+export { db };

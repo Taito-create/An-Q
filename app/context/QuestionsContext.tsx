@@ -21,7 +21,6 @@ import { Alert } from 'react-native';
 interface QuestionsContextType {
   questions: Question[];
   folders: Folder[];
-  loading: boolean;
   isMigrating: boolean;
   loadQuestions: () => Promise<void>;
   saveQuestions: (questions: Question[]) => Promise<void>;
@@ -44,7 +43,6 @@ const QuestionsContext = createContext<QuestionsContextType | undefined>(undefin
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isMigrating, setIsMigrating] = useState(false);
   const { user } = useAuth();
 
@@ -251,43 +249,34 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user]);
 
   // 問題を読み込み（マイグレーション付き）
+  // Firestoreのオフラインキャッシュが有効なので、瞬時にデータを読み込める
   const loadQuestions = useCallback(async () => {
+    // 未ログイン時はローカルのみ
+    if (!user) {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
+      if (data) {
+        const allQuestions: Question[] = JSON.parse(data);
+        const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
+        setQuestions(filteredQuestions);
+      } else {
+        setQuestions([]);
+      }
+      
+      const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
+      if (folderData) {
+        setFolders(JSON.parse(folderData));
+      } else {
+        setFolders([]);
+      }
+      
+      return;
+    }
+
+    // ログイン時はFirestoreから読み込み（オフラインキャッシュ優先）
     try {
-      setLoading(true);
+      const firestoreQuestions = await loadQuestionsFromFirestore();
+      const firestoreFolders = await loadFoldersFromFirestore();
       
-      if (!user) {
-        // 未ログイン時はローカルのみ
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
-        if (data) {
-          const allQuestions: Question[] = JSON.parse(data);
-          const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
-          setQuestions(filteredQuestions);
-        } else {
-          setQuestions([]);
-        }
-        
-        // フォルダもローカルのみ
-        const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
-        if (folderData) {
-          setFolders(JSON.parse(folderData));
-        } else {
-          setFolders([]);
-        }
-        
-        return;
-      }
-
-      // ログイン時はFirestoreから読み込み
-      let firestoreQuestions: Question[] = [];
-      let firestoreFolders: Folder[] = [];
-      
-      try {
-        firestoreQuestions = await loadQuestionsFromFirestore();
-        firestoreFolders = await loadFoldersFromFirestore();
-      } catch (error) {
-        console.error('Firestore load failed, falling back to local:', error);
-      }
-
       // ローカルにデータがある場合は移行を試みる
       const localQuestionsData = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
       const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
@@ -301,12 +290,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const migrated = await migrateLocalQuestionsToFirestore(filteredLocal);
           
           if (migrated) {
-            // 移行成功時はFirestoreのデータを使用
             setQuestions(filteredLocal);
-            // ローカルデータをクリア
             await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
           } else {
-            // 移行失敗時はローカルデータを使用
             setQuestions(filteredLocal);
             Alert.alert(
               '同期エラー',
@@ -314,15 +300,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreQuestions.length > 0) {
-          // Firestoreにデータがある場合
           setQuestions(firestoreQuestions);
-          // ローカルデータをクリア
           await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
         } else {
           setQuestions([]);
         }
       } else {
-        // ローカルデータがない場合
         setQuestions(firestoreQuestions);
       }
 
@@ -331,7 +314,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const localFolders: Folder[] = JSON.parse(localFoldersData);
         
         if (localFolders.length > 0 && firestoreFolders.length === 0) {
-          // Firestoreにフォルダがない場合、ローカルから移行
           const migrated = await migrateLocalFoldersToFirestore(localFolders);
           
           if (migrated) {
@@ -345,7 +327,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreFolders.length > 0) {
-          // Firestoreにフォルダがある場合
           setFolders(firestoreFolders);
           await AsyncStorage.removeItem(STORAGE_KEYS.QUESTION_FOLDERS);
         } else {
@@ -357,8 +338,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (e) {
       console.error('Failed to load questions:', e);
       Alert.alert('エラー', 'データの読み込みに失敗しました。');
-    } finally {
-      setLoading(false);
     }
   }, [user, loadQuestionsFromFirestore, loadFoldersFromFirestore, migrateLocalQuestionsToFirestore, migrateLocalFoldersToFirestore]);
 
@@ -668,7 +647,6 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value: QuestionsContextType = {
     questions,
     folders,
-    loading,
     isMigrating,
     loadQuestions,
     saveQuestions,
