@@ -15,6 +15,7 @@ import { incrementStat, recordQuizAnswers } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useQuestions } from './hooks/useQuestions';
+import { useQuestionsContext } from './context/QuestionsContext';
 import { checkDescriptiveAnswer, getAnswerText } from './utils/answerUtils';
 import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
@@ -67,6 +68,7 @@ export default function QuizScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
+  const { folders } = useQuestionsContext();
   const { user } = useAuth();
   const screenWidth = Dimensions.get('window').width;
 
@@ -153,6 +155,9 @@ export default function QuizScreen() {
   const [currentLives, setCurrentLives] = useState(3);
   const [comboCount, setComboCount] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
+
+  // フォルダ選択用 state
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
 
   // タイマー選択用 state
   const [preTimerMinutes, setPreTimerMinutes] = useState<number | null>(null);
@@ -384,15 +389,29 @@ export default function QuizScreen() {
     }
   };
 
-  // 選択したタグでフィルタリングされた問題
+  // 選択したタグとフォルダでフィルタリングされた問題
   const getFilteredQuestions = () => {
-    if (selectedTags.length === allTags.length) {
-      return allQuestions;
+    // まずタグでフィルタリング
+    let filtered = allQuestions;
+    if (selectedTags.length < allTags.length) {
+      filtered = allQuestions.filter(q => {
+        if (!q.tags || q.tags.length === 0) return selectedTags.length === allTags.length;
+        return q.tags.some(tag => selectedTags.includes(tag));
+      });
     }
-    return allQuestions.filter(q => {
-      if (!q.tags || q.tags.length === 0) return selectedTags.length === allTags.length;
-      return q.tags.some(tag => selectedTags.includes(tag));
-    });
+    // 次にフォルダでフィルタリング（フォルダが1つ以上選択されている場合）
+    if (selectedFolderIds.length > 0) {
+      // 選択されたフォルダに含まれる全問題IDを収集
+      const selectedQuestionIds = new Set<number>();
+      folders
+        .filter(f => selectedFolderIds.includes(f.id))
+        .forEach(f => f.questionIds.forEach(qid => selectedQuestionIds.add(qid)));
+      
+      if (selectedQuestionIds.size > 0) {
+        filtered = filtered.filter(q => selectedQuestionIds.has(q.id));
+      }
+    }
+    return filtered;
   };
 
 
@@ -944,7 +963,114 @@ export default function QuizScreen() {
             </Text>
           </View>
 
-          {/* リバースモードトグル */}
+          {/* 📁 問題集（フォルダ）で絞り込み */}
+          {folders.length > 0 && (
+            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+              <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
+                📁 {locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {folders.map(folder => {
+                    const isSelected = selectedFolderIds.includes(folder.id);
+                    return (
+                      <TouchableOpacity
+                        key={folder.id}
+                        style={[{
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 20,
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: isSelected ? colors.primary : 'transparent',
+                        }]}
+                        onPress={() => {
+                          SoundManager.play('select');
+                          setSelectedFolderIds(prev =>
+                            prev.includes(folder.id)
+                              ? prev.filter(id => id !== folder.id)
+                              : [...prev, folder.id]
+                          );
+                        }}
+                      >
+                        <Text style={[{
+                          color: isSelected ? '#fff' : colors.text,
+                          fontWeight: '600',
+                          fontSize: 13,
+                        }]}>
+                          📁 {folder.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+              {selectedFolderIds.length > 0 && (
+                <Text style={[{ fontSize: 11, color: colors.textSecondary, marginTop: 8 }]}>
+                  {locale === 'ja'
+                    ? `${selectedFolderIds.length}個のフォルダを選択中`
+                    : `${selectedFolderIds.length} folder(s) selected`}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* 🏷️ タグで絞り込み（リバースモードの上に移動） */}
+          {allTags.length > 0 && (
+            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
+                  🏷️ {locale === 'ja' ? 'タグで絞り込み' : 'Filter by Tag'}
+                </Text>
+              </View>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
+                  {selectedTags.length === 0
+                    ? `選択なし = すべての問題（全${allQuestions.length}問）`
+                    : `${selectedTags.length}個タグ選択中（最大${filtered.length}問）`
+                  }
+                </Text>
+              </View>
+              
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {allTags.map(tag => {
+                  const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[{
+                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+                        borderWidth: 1.5,
+                        borderColor: colors.primary,
+                        backgroundColor: isSelected ? colors.primary : 'transparent',
+                      }]}
+                      onPress={() => {
+                        SoundManager.play('select');
+                        setSelectedTags(prev =>
+                          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                        );
+                      }}
+                    >
+                      <Text style={[{
+                        color: isSelected ? '#fff' : colors.primary,
+                        fontWeight: '600',
+                        fontSize: 13,
+                      }]}>
+                        {tag}
+                        <Text style={[{ fontSize: 11, opacity: 0.8 }]}>
+                          {' '}({count})
+                        </Text>
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* 🔄 リバースモードトグル */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: 16 }}>
@@ -1032,46 +1158,6 @@ export default function QuizScreen() {
                 : '⚠ Other modes are disabled during Auto Play'}
             </Text>
           )}
-
-          {/* タイマー設定 */}
-          <View
-            pointerEvents={autoPlayMode ? 'none' : 'auto'}
-            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
-              autoPlayMode && { opacity: 0.3 }
-            ]}
-          >
-            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
-              ⏱ {locale === 'ja' ? '制限時間' : 'Time Limit'}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {presetTimers.map((preset, i) => {
-                  const isSelected = preTimerMinutes === preset.value;
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      style={[{
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 20,
-                        borderWidth: 1.5,
-                        borderColor: colors.primary,
-                        backgroundColor: isSelected ? colors.primary : 'transparent',
-                      }]}
-                      onPress={() => {
-                        SoundManager.play('select');
-                        setPreTimerMinutes(preset.value);
-                      }}
-                    >
-                      <Text style={[{ color: isSelected ? '#fff' : colors.primary, fontWeight: '600', fontSize: 13 }]}>
-                        {preset.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
 
           {/* チャレンジモード */}
           <View
@@ -1173,62 +1259,6 @@ export default function QuizScreen() {
               </View>
             )}
           </View>
-
-          {/* タグ絞り込み */}
-          {allTags.length > 0 && (
-            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 24 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🏷️ {locale === 'ja' ? 'タグで絞り込み' : 'Filter by Tag'}
-                </Text>
-              </View>
-              
-              {/* タグ選択状況の表示（filtered.length で分子が変化） */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
-                  {selectedTags.length === 0
-                    ? `選択なし = すべての問題（全${allQuestions.length}問）`
-                    : `${selectedTags.length}個タグ選択中（最大${filtered.length}問）`
-                  }
-                </Text>
-              </View>
-              
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {allTags.map(tag => {
-                  const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
-                  const isSelected = selectedTags.includes(tag);
-                  return (
-                    <TouchableOpacity
-                      key={tag}
-                      style={[{
-                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                        borderWidth: 1.5,
-                        borderColor: colors.primary,
-                        backgroundColor: isSelected ? colors.primary : 'transparent',
-                      }]}
-                      onPress={() => {
-                        SoundManager.play('select');
-                        setSelectedTags(prev =>
-                          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                        );
-                      }}
-                    >
-                      <Text style={[{
-                        color: isSelected ? '#fff' : colors.primary,
-                        fontWeight: '600',
-                        fontSize: 13,
-                      }]}>
-                        {tag}
-                        <Text style={[{ fontSize: 11, opacity: 0.8 }]}>
-                          {' '}({count})
-                        </Text>
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
 
           {/* スタートボタン */}
           <TouchableOpacity

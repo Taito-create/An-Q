@@ -311,7 +311,7 @@ export default function CreateQuestionScreen() {
             
             {/* 回答追加ボタン */}
             <TouchableOpacity
-              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
               onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
             >
               <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
@@ -391,7 +391,7 @@ export default function CreateQuestionScreen() {
             />
           </View>
         )}
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.secondary : undefined }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{t.createQuestion}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.primary : undefined, marginTop: 8 }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{t.createQuestion}</Text></TouchableOpacity>
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
