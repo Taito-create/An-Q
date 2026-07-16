@@ -34,6 +34,7 @@ interface QuestionsContextType {
   deleteFolder: (folderId: string) => Promise<Folder[]>;
   addQuestionsToFolder: (folderId: string, questionIds: number[]) => Promise<Folder[]>;
   removeQuestionsFromFolder: (folderId: string, questionIds: number[]) => Promise<Folder[]>;
+  cleanupOrphanFolders: () => Promise<number>;
 }
 
 // Contextの作成
@@ -640,6 +641,24 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return updated;
   }, [folders, saveFolders]);
 
+  // ゴーストフォルダ（実体のないフォルダ）のクリーンアップ
+  const cleanupOrphanFolders = useCallback(async (): Promise<number> => {
+    // フォルダに紐づく問題が存在するかチェック
+    const validFolders = folders.filter(folder => {
+      const hasValidQuestions = folder.questionIds && folder.questionIds.length > 0 &&
+        folder.questionIds.some(qid => questions.some(q => q.id === qid));
+      return hasValidQuestions;
+    });
+
+    const removedCount = folders.length - validFolders.length;
+    
+    if (removedCount > 0) {
+      await saveFolders(validFolders);
+    }
+    
+    return removedCount;
+  }, [folders, questions, saveFolders]);
+
   // 初回読み込み
   useEffect(() => {
     loadQuestions();
@@ -662,6 +681,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     deleteFolder,
     addQuestionsToFolder,
     removeQuestionsFromFolder,
+    cleanupOrphanFolders,
   };
 
   return (

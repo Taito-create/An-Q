@@ -28,7 +28,8 @@ export default function BrowseQuestionsScreen() {
     createFolder,
     deleteFolder,
     addQuestionsToFolder,
-    removeQuestionsFromFolder
+    removeQuestionsFromFolder,
+    cleanupOrphanFolders
   } = useQuestionsContext();
 
   // タグ編集用 state
@@ -454,6 +455,24 @@ export default function BrowseQuestionsScreen() {
           >
             <Text style={[styles.headerBtnText, { color: isSelectionMode ? onPrimary : colors.primary }]}>
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, { borderColor: colors.error, backgroundColor: isFolderDeleteMode ? colors.error : 'transparent' }]}
+            onPress={async () => {
+              const removedCount = await cleanupOrphanFolders();
+              if (removedCount > 0) {
+                Alert.alert(
+                  locale === 'ja' ? 'クリーンアップ完了' : 'Cleanup Complete',
+                  locale === 'ja'
+                    ? `実体のない問題集を${removedCount}件削除し、データを最適化しました`
+                    : `Removed ${removedCount} orphan folders and optimized data`
+                );
+              }
+            }}
+          >
+            <Text style={[styles.headerBtnText, { color: isFolderDeleteMode ? onPrimary : colors.error }]}>
+              🧹
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

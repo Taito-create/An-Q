@@ -404,12 +404,28 @@ export default function MultiScreen() {
               </>
             ) : (
               <>
-                {folders.filter(f => !f.isShared).length === 0 ? (
-                  <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
-                    {locale === 'ja' ? '共有可能な問題集がありません' : 'No folders to share'}
-                  </Text>
-                ) : (
-                  folders.filter(f => !f.isShared).map((f) => (
+                {/* フォルダ: 実体のある問題集のみ表示（ゴーストフォルダ除外） */}
+                {(() => {
+                  const validFolders = folders.filter(f => {
+                    // isSharedがtrueのものは除外
+                    if (f.isShared) return false;
+                    // フォルダに紐づく問題が存在するかチェック
+                    if (!f.questionIds || f.questionIds.length === 0) return false;
+                    const hasValidQuestions = f.questionIds.some(qid => 
+                      questions.some(q => q.id === qid)
+                    );
+                    return hasValidQuestions;
+                  });
+                  
+                  if (validFolders.length === 0) {
+                    return (
+                      <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>
+                        {locale === 'ja' ? '共有可能な問題集がありません' : 'No folders to share'}
+                      </Text>
+                    );
+                  }
+                  
+                  return validFolders.map((f) => (
                     <TouchableOpacity
                       key={f.id}
                       style={[styles.questionItem, {
@@ -434,8 +450,8 @@ export default function MultiScreen() {
                         </Text>
                       </View>
                     </TouchableOpacity>
-                  ))
-                )}
+                  ));
+                })()}
               </>
             )}
 
