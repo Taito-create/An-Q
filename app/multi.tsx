@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, StyleSheet, Share } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,7 @@ import { db } from '../src/config/firebase';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
+import { useQuestionsContext } from './context/QuestionsContext';
 import { STORAGE_KEYS } from './constants/storageKeys';
 
 // ランダムな6文字の英数字IDを生成
@@ -28,6 +29,7 @@ export default function MultiScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
+  const { questions, folders, loading } = useQuestionsContext();
 
   const [shareMode, setShareMode] = useState<'send' | 'receive'>('send');
   const [shareType, setShareType] = useState<'questions' | 'folders'>('questions');
@@ -35,19 +37,6 @@ export default function MultiScreen() {
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [generatedCode, setGeneratedCode] = useState('');  // 送信用コード（短縮ID）
   const [receiveCode, setReceiveCode] = useState('');      // 受信用入力
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [folders, setFolders] = useState<any[]>([]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    const questionsRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
-    const foldersRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
-    setQuestions(questionsRaw ? JSON.parse(questionsRaw) : []);
-    setFolders(foldersRaw ? JSON.parse(foldersRaw) : []);
-  };
 
   // Firestoreに共有データを保存して短縮IDを取得
   const generateShareCode = async () => {
@@ -312,6 +301,17 @@ export default function MultiScreen() {
   };
 
   const canGenerate = shareType === 'questions' ? selectedQuestions.length > 0 : selectedFolders.length > 0;
+
+  // ローディング中の表示
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.text, fontSize: 16 }}>
+          {locale === 'ja' ? '読み込み中...' : 'Loading...'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

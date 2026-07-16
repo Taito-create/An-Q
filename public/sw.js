@@ -43,11 +43,15 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // POSTなどの非GETリクエストはキャッシュしない
   if (event.request.method !== 'GET') {
-    event.respondWith(fetch(event.request));
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return new Response('', { status: 503, statusText: 'Service Unavailable' });
+      })
+    );
     return;
   }
 
-  // キャッシュ優先からネットワーク優先に変更
+  // ネットワーク優先でキャッシュフォールバック
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -63,7 +67,16 @@ self.addEventListener('fetch', event => {
       })
       .catch(() => {
         // ネットワークエラー時はキャッシュをフォールバック
-        return caches.match(event.request);
+        return caches.match(event.request).then(cachedResponse => {
+          // キャッシュも見つからない場合はオフライン用のレスポンスを返す
+          if (!cachedResponse) {
+            return new Response(JSON.stringify({ error: 'Offline' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          return cachedResponse;
+        });
       })
   );
 });
