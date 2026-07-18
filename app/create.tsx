@@ -172,14 +172,23 @@ export default function CreateQuestionScreen() {
       const cropW = Math.max(10, Math.abs(cropArea.width)) * scaleX;
       const cropH = Math.max(10, Math.abs(cropArea.height)) * scaleY;
 
+      // 🟢 解像度向上のため3倍に拡大
+      const scaleFactor = 3;
       const canvas = document.createElement('canvas');
-      canvas.width = cropW;
-      canvas.height = cropH;
+      canvas.width = cropW * scaleFactor;
+      canvas.height = cropH * scaleFactor;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Canvas context is null");
 
-      ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
-      return canvas.toDataURL('image/jpeg');
+      // 高品質な画像拡大を設定
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // 3倍に拡大して描画
+      ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW * scaleFactor, cropH * scaleFactor);
+      
+      // 高品質なJPEGで出力
+      return canvas.toDataURL('image/jpeg', 0.95);
     } catch (err) {
       console.error("OCR Crop Canvas Error:", err);
       Alert.alert("エラー", "画像の切り抜き処理中にエラーが発生しました。");
@@ -428,64 +437,8 @@ export default function CreateQuestionScreen() {
     }
   };
 
-  // OCR処理の共通ロジック
-  const processOcr = async (file: File) => {
-    try {
-      setOcrLoading(true);
-      setOcrProgress(0);
-
-      const processedImageDataUrl = await preprocessImage(file);
-
-      const worker = await Tesseract.createWorker('jpn', 1, {
-        langPath: 'https://tessdata.projectnaptha.com/4.0.0_best/',
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-          console.log(m);
-        },
-      });
-
-      try {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '4' as any,
-        });
-
-        const result = await worker.recognize(processedImageDataUrl);
-        const extractedText = result.data.text.trim();
-        if (!extractedText) {
-          Alert.alert(
-            locale === 'ja' ? '文字が見つかりません' : 'No text found',
-            locale === 'ja' ? '画像から文字を検出できませんでした。別の画像をお試しください。' : 'Could not detect text from the image. Please try another image.'
-          );
-          return;
-        }
-
-        setQuestion(prev => {
-          if (prev.trim()) {
-            return prev + '\n' + extractedText;
-          }
-          return extractedText;
-        });
-
-        setShowCropUI(false);
-        setSelectedImage(null);
-
-        SoundManager.play('complete');
-      } finally {
-        await worker.terminate();
-      }
-    } catch (error) {
-      console.error('OCR error:', error);
-      Alert.alert(
-        locale === 'ja' ? 'OCRエラー' : 'OCR Error',
-        locale === 'ja' ? '文字の解析中にエラーが発生しました。もう一度お試しください。' : 'An error occurred during text recognition. Please try again.'
-      );
-    } finally {
-      setOcrLoading(false);
-      setOcrProgress(0);
-    }
-  };
+  // OCR処理の共通ロジック（旧バージョン - 削除）
+  // この関数は未使用です。processOcrFromDataUrlに統合されました。
 
   // クロップUIをキャンセル
   const cancelCrop = () => {
