@@ -113,8 +113,8 @@ export default function CreateQuestionScreen() {
     setCropArea({ x: 0, y: 0, width: 0, height: 0 });
   };
 
-  // マウス/タッチイベントハンドラ
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // ポインターイベントハンドラ（マウス・タッチ両対応）
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current || !imageRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -124,7 +124,7 @@ export default function CreateQuestionScreen() {
     setCropArea({ x, y, width: 0, height: 0 });
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -139,7 +139,7 @@ export default function CreateQuestionScreen() {
     });
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     setIsDragging(false);
   };
 
@@ -356,19 +356,18 @@ export default function CreateQuestionScreen() {
     // クロップUI表示中は、選択範囲でOCR実行
     const deltaX = Math.abs(cropArea.width);
     const deltaY = Math.abs(cropArea.height);
-    
     console.log("OCR Triggered - Crop Dimensions:", { deltaX, deltaY });
 
-    if (!selectedImage) return;
-    
-    const croppedImage = cropImage();
-    if (!croppedImage) {
+    // 1. 画像切り抜き
+    const croppedDataUrl = cropImage();
+    if (!croppedDataUrl) {
       console.error("OCR Error: cropImage returned null");
       return;
     }
 
-    console.log('Starting OCR from cropped image...');
-    await processOcrFromDataUrl(croppedImage);
+    console.log("OCR: Redirecting to verified processOcrFromDataUrl flow...");
+    // 2. 正常動作が確認されている統合関数へデータを渡す
+    await processOcrFromDataUrl(croppedDataUrl);
   };
 
   // DataURLからOCR処理を実行
@@ -379,8 +378,9 @@ export default function CreateQuestionScreen() {
     let worker: any = null;
     try {
       console.log("OCR: Creating Tesseract Worker...");
-      // Tesseract.js v7 の初期化（言語を指定、langPathは使用しない）
+      // 第一引数に言語を明示して型定義エラーを解消します
       worker = await Tesseract.createWorker('jpn', 1, {
+        langPath: 'https://tessdata.projectnaptha.com/4.0.0_best/',
         logger: (m: any) => {
           if (m.status === 'recognizing text') {
             setOcrProgress(Math.round(m.progress * 100));
@@ -388,32 +388,29 @@ export default function CreateQuestionScreen() {
         },
       });
 
-      console.log("OCR: Setting parameters...");
-      // ページセグメンテーションモード(PSM 4)の設定
+      console.log("OCR: Setting parameters (PSM 4)...");
       await worker.setParameters({
-        tessedit_pageseg_mode: '4',
+        tessedit_pageseg_mode: '4' as any,
       });
 
       console.log("OCR: Recognizing text...");
       const { data: { text } } = await worker.recognize(dataUrl);
       
+      console.log("OCR Result:", text);
+
       if (text && text.trim().length > 0) {
-        // 既存の入力値がある場合は改行して追加
         setQuestion(prev => prev ? `${prev}\n${text.trim()}` : text.trim());
-        
-        // 抽出が成功したらクロップUIを閉じてプレビューに戻す
         setShowCropUI(false);
         setSelectedImage(null);
         Alert.alert(t.success || 'Success', '文字の抽出が完了しました！');
       } else {
-        Alert.alert(t.error || 'Error', '画像から文字を検出できませんでした。別の範囲をお試しください。');
+        Alert.alert(t.error || 'Error', '画像から文字を検出できませんでした。範囲を少し広げてお試しください。');
       }
 
     } catch (err) {
-      console.error("OCR Final Critical Error:", err);
-      Alert.alert("OCRエラー", "文字認識処理中にエラーが発生しました。インターネット接続や画像を確認してください。");
+      console.error("OCR Critical Catch:", err);
+      Alert.alert("OCRエラー", "文字認識中にエラーが発生しました。");
     } finally {
-      // 🟢 成功・失敗に関わらず、必ずローディング状態を解除してボタンを復帰させる
       if (worker) {
         await worker.terminate();
       }
@@ -653,11 +650,11 @@ export default function CreateQuestionScreen() {
             <div
               ref={containerRef as any}
               className="crop-image-container"
-              style={{ borderColor: colors.border }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              style={{ borderColor: colors.border, touchAction: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
             >
               <img
                 ref={imageRef}
