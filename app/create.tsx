@@ -417,7 +417,11 @@ export default function CreateQuestionScreen() {
       console.log("OCR Result:", text);
 
       if (text && text.trim().length > 0) {
-        setQuestion(prev => prev ? `${prev}\n${text.trim()}` : text.trim());
+        // 🟢 日本語や句読点に挟まれた不要な半角スペースだけを自動削除する（英単語間のスペースは維持）
+        const cleanedText = text.trim().replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])\s+(?=[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])/g, '$1');
+
+        // 既存の反映ロジック（cleanedTextをセットする）
+        setQuestion(prev => prev ? `${prev}\n${cleanedText}` : cleanedText);
         setShowCropUI(false);
         setSelectedImage(null);
         Alert.alert(t.success || 'Success', '文字の抽出が完了しました！');
