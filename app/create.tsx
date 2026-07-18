@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -18,6 +19,7 @@ import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
+import Tesseract from 'tesseract.js';
 import './create.css';
 
 export default function CreateQuestionScreen() {
@@ -47,6 +49,10 @@ export default function CreateQuestionScreen() {
   const [tagInput, setTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
   const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');  // 両解モード
+
+  // OCR関連のstate
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
 
   // 両解モード切り替えハンドラ（useEffectではなく、トグル押下時に直接配列操作）
   const toggleMatchMode = () => {
@@ -91,6 +97,73 @@ export default function CreateQuestionScreen() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // OCR: 画像からテキストを抽出
+  const handleOcrExtract = () => {
+    // ファイル選択用のinput要素を作成
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        Alert.alert('エラー', locale === 'ja' ? '画像は10MB以下にしてください' : 'Image must be less than 10MB');
+        return;
+      }
+
+      try {
+        setOcrLoading(true);
+        setOcrProgress(0);
+
+        const result = await Tesseract.recognize(
+          file,
+          'jpn+eng',
+          {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                setOcrProgress(Math.round(m.progress * 100));
+              }
+              console.log(m);
+            },
+          }
+        );
+
+        const extractedText = result.data.text.trim();
+        if (!extractedText) {
+          Alert.alert(
+            locale === 'ja' ? '文字が見つかりません' : 'No text found',
+            locale === 'ja' ? '画像から文字を検出できませんでした。別の画像をお試しください。' : 'Could not detect text from the image. Please try another image.'
+          );
+          return;
+        }
+
+        // 抽出した文字列を問題文の末尾に追加（既存の文字がある場合は改行で区切る）
+        setQuestion(prev => {
+          if (prev.trim()) {
+            return prev + '\n' + extractedText;
+          }
+          return extractedText;
+        });
+
+        SoundManager.play('complete');
+      } catch (error) {
+        console.error('OCR error:', error);
+        Alert.alert(
+          locale === 'ja' ? 'OCRエラー' : 'OCR Error',
+          locale === 'ja' ? '文字の解析中にエラーが発生しました。もう一度お試しください。' : 'An error occurred during text recognition. Please try again.'
+        );
+      } finally {
+        setOcrLoading(false);
+        setOcrProgress(0);
+        // ファイル選択をリセット（同じファイルを再選択できるように）
+        input.value = '';
+      }
+    };
+    input.click();
   };
 
   const saveQuestion = async (newQuestionData: Partial<Question>): Promise<boolean> => {
@@ -216,6 +289,37 @@ export default function CreateQuestionScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+
+        {/* 📷 OCRボタン：写真や画像から文字を抽出 */}
+        <TouchableOpacity
+          style={[
+            styles.ocrButton,
+            {
+              backgroundColor: ocrLoading ? colors.textSecondary : colors.primary,
+              borderColor: colors.primary,
+              borderRadius: cpR ?? 12,
+              opacity: ocrLoading ? 0.7 : 1,
+            }
+          ]}
+          onPress={handleOcrExtract}
+          disabled={ocrLoading}
+        >
+          {ocrLoading ? (
+            <View style={styles.ocrButtonContent}>
+              <ActivityIndicator size="small" color={isCyberpunk ? '#000000' : '#ffffff'} />
+              <Text style={[styles.ocrButtonText, { color: isCyberpunk ? '#000000' : '#ffffff', marginLeft: 8 }]}>
+                {locale === 'ja' ? `解析中 (${ocrProgress}%)...` : `Processing (${ocrProgress}%)...`}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.ocrButtonContent}>
+              <Text style={[styles.ocrButtonIcon]}>📷</Text>
+              <Text style={[styles.ocrButtonText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
+                {locale === 'ja' ? '写真や画像から文字を抽出' : 'Extract text from image'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* 問題入力欄のすぐ下に両解モード・タグ追加ボタンを配置 */}
         <View style={[styles.inlineButtons, { flexDirection: 'row', gap: 10, marginBottom: 16 }]}>
@@ -454,6 +558,10 @@ const styles = StyleSheet.create({
   section: { padding: 20, marginBottom: 25, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
   input: { borderWidth: 1, padding: 10, marginBottom: 10, fontSize: 16 },
+  ocrButton: { padding: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 2 },
+  ocrButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  ocrButtonIcon: { fontSize: 20, marginRight: 8 },
+  ocrButtonText: { fontSize: 15, fontWeight: '700' },
   createButton: { padding: 15, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 5 },
   button: { padding: 12, alignItems: 'center' },
   buttonText: { fontWeight: 'bold', fontSize: 16 },

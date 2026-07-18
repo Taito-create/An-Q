@@ -67,13 +67,13 @@ export const getAnswerText = (question: Question): string => {
         if (answers.length === 0) return '';
         
         if (question.matchMode === 'all') {
-          // 両解モード：①回答1、②回答2、③回答3... の丸数字形式（設定された数だけ表示）
+          // 両解モード：①回答1\n②回答2\n③回答3... の丸数字形式（改行で結合）
           const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
-          return answers.map((a, i) => `${circledNumbers[i] || i + 1}${a}`).join('、');
+          return answers.map((a, i) => `${circledNumbers[i] || i + 1}${a}`).join('\n');
         } else if (answers.length > 1) {
           // 複数正解（matchMode !== 'all'で複数回答）：
-          // ・回答1、・回答2、・回答3... の箇条書き形式（設定された数だけ改行または並べて表示）
-          return answers.map(a => `・${a}`).join('、');
+          // ・回答1\n・回答2\n・回答3... の箇条書き形式（改行で縦に並べる）
+          return answers.map(a => `・${a}`).join('\n');
         }
         // 単一回答
         return answers[0];
