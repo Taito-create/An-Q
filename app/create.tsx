@@ -48,12 +48,21 @@ export default function CreateQuestionScreen() {
   const [showTagInput, setShowTagInput] = useState(false);
   const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');  // 両解モード
 
-  // 両解モードがONのとき、回答が2つ未満なら自動的に2つにする
-  useEffect(() => {
-    if (matchMode === 'all' && descriptiveAnswers.length < 2) {
-      setDescriptiveAnswers(['', '']);
+  // 両解モード切り替えハンドラ（useEffectではなく、トグル押下時に直接配列操作）
+  const toggleMatchMode = () => {
+    SoundManager.play('decide');
+    if (matchMode === 'all') {
+      // OFFにする: 配列を正解1のみ（要素数1）に縮小
+      setMatchMode('any');
+      setDescriptiveAnswers([descriptiveAnswers[0]]);
+    } else {
+      // ONにする: 2つ未満なら2つに増やす
+      setMatchMode('all');
+      if (descriptiveAnswers.length < 2) {
+        setDescriptiveAnswers(['', '']);
+      }
     }
-  }, [matchMode]);
+  };
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
@@ -132,16 +141,11 @@ export default function CreateQuestionScreen() {
     }
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
-      // 複数の正解を配列として保存（両解モード対応）
+      // すべての回答を配列として保存（両解モードON/OFF問わず常に配列）
       const answers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
       if (answers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
       
-      // 両解モードの場合は配列として保存、通常モードは単一文字列
-      if (matchMode === 'all') {
-        dataToSave.descriptiveAnswer = answers;  // 配列で保存
-      } else {
-        dataToSave.descriptiveAnswer = answers[0];  // 単一文字列
-      }
+      dataToSave.descriptiveAnswer = answers;  // 常に配列で保存
       dataToSave.matchMode = matchMode;  // 両解モードを保存
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
@@ -224,10 +228,7 @@ export default function CreateQuestionScreen() {
                 backgroundColor: matchMode === 'all' ? colors.primary : 'transparent'
               }
             ]}
-            onPress={() => {
-              SoundManager.play('decide');
-              setMatchMode(matchMode === 'all' ? 'any' : 'all');
-            }}
+            onPress={toggleMatchMode}
           >
             <Text style={[
               styles.inlineModeButtonText,
@@ -280,11 +281,8 @@ export default function CreateQuestionScreen() {
               </View>
             )}
 
-            {/* 動的回答入力欄 */}
-            {descriptiveAnswers.map((answer, index) => {
-              // 両解モードOFF時は正解1（index=0）のみ表示、正解2以降は完全非表示
-              if (matchMode !== 'all' && index > 0) return null;
-              return (
+            {/* 動的回答入力欄（配列の要素数分だけ常に表示） */}
+            {descriptiveAnswers.map((answer, index) => (
               <View key={index} style={styles.descriptiveAnswerRow}>
                 <TextInput
                   style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
@@ -298,14 +296,14 @@ export default function CreateQuestionScreen() {
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
-                {descriptiveAnswers.length > 1 && index > 0 && (
+                {/* 正解1（index=0）の×ボタンは常に非表示。index>=1には常に表示 */}
+                {index > 0 && (
                   <TouchableOpacity
                     style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
                     onPress={() => {
-                      const newAnswers = descriptiveAnswers.filter((_, i) => i !== index);
-                      setDescriptiveAnswers(newAnswers.length > 0 ? newAnswers : ['']);
-                      // 正解2（index=1）が削除されたら両解モードをOFFにする
-                      if (index === 1 && matchMode === 'all') {
+                      // ×ボタン押下: 配列を正解1のみ（要素数1）に縮小し、両解モードOFFに連動
+                      setDescriptiveAnswers([descriptiveAnswers[0]]);
+                      if (matchMode === 'all') {
                         setMatchMode('any');
                       }
                     }}
@@ -314,20 +312,17 @@ export default function CreateQuestionScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-              );
-            })}
+            ))}
             
-            {/* 両解モードON時は回答追加ボタン非表示（固定2つ） */}
-            {matchMode !== 'all' && (
-              <TouchableOpacity
-                style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
-                onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
-              >
-                <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
-                  + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {/* 「＋正解を追加」ボタン（常にタップ可能） */}
+            <TouchableOpacity
+              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
+              onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
+            >
+              <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
+                + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
         {answerType === 'truefalse' && (
