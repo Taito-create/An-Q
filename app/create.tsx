@@ -143,44 +143,48 @@ export default function CreateQuestionScreen() {
     setIsDragging(false);
   };
 
-  // 画像をクロップ
-  const cropImage = (imageSrc: string, crop: { x: number; y: number; width: number; height: number }): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) { throw new Error('Canvas context not available'); }
+  // 画像をクロップ（エラー安全版）
+  const cropImage = (): string | null => {
+    const img = imageRef.current;
+    if (!img) {
+      console.error("OCR Error: imageRef.current is null");
+      Alert.alert("エラー", "画像要素が見つかりません。");
+      return null;
+    }
 
-          // 表示サイズと実際の画像サイズの比率を計算
-          const scaleX = img.width / (imageRef.current?.clientWidth || img.width);
-          const scaleY = img.height / (imageRef.current?.clientHeight || img.height);
+    // naturalWidth が 0 や undefined の場合のフォールバックを徹底
+    const imgWidth = img.naturalWidth || img.width || 0;
+    const imgHeight = img.naturalHeight || img.height || 0;
 
-          // クロップ領域を実際の画像サイズに変換
-          const actualX = crop.x * scaleX;
-          const actualY = crop.y * scaleY;
-          const actualWidth = crop.width * scaleX;
-          const actualHeight = crop.height * scaleY;
+    if (imgWidth === 0 || imgHeight === 0) {
+      console.error("OCR Error: Image dimensions are 0", { imgWidth, imgHeight });
+      Alert.alert("エラー", "画像のサイズを正常に取得できませんでした。画像の読み込み完了を待つか、別の画像でお試しください。");
+      return null;
+    }
 
-          canvas.width = actualWidth;
-          canvas.height = actualHeight;
+    try {
+      const rect = img.getBoundingClientRect();
+      const scaleX = imgWidth / (rect.width || 1);
+      const scaleY = imgHeight / (rect.height || 1);
 
-          // クロップした領域を描画
-          ctx.drawImage(
-            img,
-            actualX, actualY, actualWidth, actualHeight,
-            0, 0, actualWidth, actualHeight
-          );
+      const startX = Math.max(0, Math.min(cropArea.x, cropArea.x + cropArea.width)) * scaleX;
+      const startY = Math.max(0, Math.min(cropArea.y, cropArea.y + cropArea.height)) * scaleY;
+      const cropW = Math.max(10, Math.abs(cropArea.width)) * scaleX;
+      const cropH = Math.max(10, Math.abs(cropArea.height)) * scaleY;
 
-          resolve(canvas.toDataURL('image/png'));
-        } catch (err) {
-          reject(err);
-        }
-      };
-      img.onerror = () => reject(new Error('Failed to load image for cropping'));
-      img.src = imageSrc;
-    });
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Canvas context is null");
+
+      ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+      return canvas.toDataURL('image/jpeg');
+    } catch (err) {
+      console.error("OCR Crop Canvas Error:", err);
+      Alert.alert("エラー", "画像の切り抜き処理中にエラーが発生しました。");
+      return null;
+    }
   };
 
   /** 大津の二値化による最適な閾値を計算 */
@@ -227,16 +231,45 @@ export default function CreateQuestionScreen() {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
+      
+      console.log('Preprocessing image, file size:', file.size);
+      
       img.onload = () => {
         try {
+          console.log('Image loaded for preprocessing:', { 
+            width: img.width, 
+            height: img.height 
+          });
+
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
           const ctx = canvas.getContext('2d');
-          if (!ctx) { throw new Error('Canvas context not available'); }
+          if (!ctx) { 
+            console.error('Failed to get canvas 2d context for preprocessing');
+            URL.revokeObjectURL(url);
+            reject(new Error('Canvas context not available')); 
+            return; 
+          }
 
           ctx.drawImage(img, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          console.log('Image drawn to canvas');
+
+          let imageData;
+          try {
+            imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            console.log('Image data retrieved:', { 
+              dataLength: imageData.data.length,
+              width: imageData.width,
+              height: imageData.height 
+            });
+          } catch (err) {
+            console.error('Failed to get image data:', err);
+            URL.revokeObjectURL(url);
+            reject(new Error('Failed to get image data from canvas'));
+            return;
+          }
+
           const data = imageData.data;
 
           // グレースケール値を収集
@@ -245,9 +278,11 @@ export default function CreateQuestionScreen() {
             const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
             grayValues.push(gray);
           }
+          console.log('Gray values collected:', grayValues.length);
 
           // 大津の二値化で最適な閾値を計算
           const threshold = computeOtsuThreshold(grayValues);
+          console.log('Otsu threshold calculated:', threshold);
 
           // 計算した閾値で二値化
           for (let i = 0; i < data.length; i += 4) {
@@ -259,18 +294,27 @@ export default function CreateQuestionScreen() {
           }
 
           ctx.putImageData(imageData, 0, 0);
+          console.log('Image data put back to canvas');
+
           const processedDataUrl = canvas.toDataURL('image/png');
+          console.log('Processed image data URL created, length:', processedDataUrl.length);
+          
           URL.revokeObjectURL(url);
           resolve(processedDataUrl);
         } catch (err) {
+          console.error('Preprocessing error:', err);
           URL.revokeObjectURL(url);
           reject(err);
         }
       };
-      img.onerror = () => {
+      
+      img.onerror = (err) => {
+        console.error('Failed to load image for preprocessing:', err);
         URL.revokeObjectURL(url);
         reject(new Error('Failed to load image for preprocessing'));
       };
+      
+      console.log('Loading image for preprocessing from URL:', url);
       img.src = url;
     });
   };
@@ -310,49 +354,69 @@ export default function CreateQuestionScreen() {
     }
 
     // クロップUI表示中は、選択範囲でOCR実行
-    if (cropArea.width < 10 || cropArea.height < 10) {
-      Alert.alert(
-        locale === 'ja' ? '範囲を選択してください' : 'Please select an area',
-        locale === 'ja' ? '文字を抽出したい範囲をドラッグで選択してください。' : 'Drag to select the area you want to extract text from.'
-      );
-      return;
-    }
+    const deltaX = Math.abs(cropArea.width);
+    const deltaY = Math.abs(cropArea.height);
+    
+    console.log("OCR Triggered - Crop Dimensions:", { deltaX, deltaY });
 
     if (!selectedImage) return;
     
-    let imageToProcess = selectedImage;
-    try {
-      imageToProcess = await cropImage(selectedImage, cropArea);
-    } catch (error) {
-      console.error('Crop error:', error);
-      Alert.alert(
-        locale === 'ja' ? 'クロップエラー' : 'Crop Error',
-        locale === 'ja' ? '画像の切り抜きに失敗しました' : 'Failed to crop image'
-      );
+    const croppedImage = cropImage();
+    if (!croppedImage) {
+      console.error("OCR Error: cropImage returned null");
       return;
     }
 
-    await processOcrFromDataUrl(imageToProcess);
+    console.log('Starting OCR from cropped image...');
+    await processOcrFromDataUrl(croppedImage);
   };
 
   // DataURLからOCR処理を実行
   const processOcrFromDataUrl = async (dataUrl: string) => {
+    setOcrLoading(true);
+    setOcrProgress(0);
+
+    let worker: any = null;
     try {
-      setOcrLoading(true);
-      setOcrProgress(0);
+      console.log("OCR: Creating Tesseract Worker...");
+      // Tesseract.js v7 の初期化（言語を指定、langPathは使用しない）
+      worker = await Tesseract.createWorker('jpn', 1, {
+        logger: (m: any) => {
+          if (m.status === 'recognizing text') {
+            setOcrProgress(Math.round(m.progress * 100));
+          }
+        },
+      });
 
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'cropped-image.png', { type: 'image/png' });
+      console.log("OCR: Setting parameters...");
+      // ページセグメンテーションモード(PSM 4)の設定
+      await worker.setParameters({
+        tessedit_pageseg_mode: '4',
+      });
 
-      await processOcr(file);
-    } catch (error) {
-      console.error('OCR error:', error);
-      Alert.alert(
-        locale === 'ja' ? 'OCRエラー' : 'OCR Error',
-        locale === 'ja' ? '文字の解析中にエラーが発生しました。もう一度お試しください。' : 'An error occurred during text recognition. Please try again.'
-      );
+      console.log("OCR: Recognizing text...");
+      const { data: { text } } = await worker.recognize(dataUrl);
+      
+      if (text && text.trim().length > 0) {
+        // 既存の入力値がある場合は改行して追加
+        setQuestion(prev => prev ? `${prev}\n${text.trim()}` : text.trim());
+        
+        // 抽出が成功したらクロップUIを閉じてプレビューに戻す
+        setShowCropUI(false);
+        setSelectedImage(null);
+        Alert.alert(t.success || 'Success', '文字の抽出が完了しました！');
+      } else {
+        Alert.alert(t.error || 'Error', '画像から文字を検出できませんでした。別の範囲をお試しください。');
+      }
+
+    } catch (err) {
+      console.error("OCR Final Critical Error:", err);
+      Alert.alert("OCRエラー", "文字認識処理中にエラーが発生しました。インターネット接続や画像を確認してください。");
     } finally {
+      // 🟢 成功・失敗に関わらず、必ずローディング状態を解除してボタンを復帰させる
+      if (worker) {
+        await worker.terminate();
+      }
       setOcrLoading(false);
       setOcrProgress(0);
     }
