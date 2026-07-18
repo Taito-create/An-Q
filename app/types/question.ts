@@ -17,7 +17,7 @@ export interface Question {
   id: number;
   question: string;
   answerType: 'descriptive' | 'truefalse' | 'multiple';
-  descriptiveAnswer?: string;
+  descriptiveAnswer?: string | string[];
   trueFalseAnswer?: boolean;
   multipleChoice?: MultipleChoice;
   enabled: boolean;

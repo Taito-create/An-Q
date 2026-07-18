@@ -55,8 +55,16 @@ const Loading = () => <LoadingScreen />;
 
 export default function App() {
   const [showUpdatePrompt, setShowUpdatePrompt] = React.useState(false);
+  const updateAvailableRef = React.useRef(false);
 
   useEffect(() => {
+    // マウントから500ms後にアップデート確認（Safari等のフォーカスイベントとの競合を回避）
+    const timer = setTimeout(() => {
+      if (updateAvailableRef.current) {
+        setShowUpdatePrompt(true);
+      }
+    }, 500);
+
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
         registration.update();
@@ -71,13 +79,15 @@ export default function App() {
       // Service Workerからの更新メッセージをリッスン
       const handleMessage = (event: MessageEvent) => {
         if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
-          setShowUpdatePrompt(true);
+          // フラグのみ保存し、表示タイミングはマウント時のタイマーに任せる
+          updateAvailableRef.current = true;
         }
       };
 
       navigator.serviceWorker.addEventListener('message', handleMessage);
 
       return () => {
+        clearTimeout(timer);
         navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
         navigator.serviceWorker.removeEventListener('message', handleMessage);
       };
@@ -93,6 +103,8 @@ export default function App() {
     } else if (!cachedVersion) {
       localStorage.setItem('app_version', CURRENT_APP_VERSION);
     }
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleUpdate = () => {

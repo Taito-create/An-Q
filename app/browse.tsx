@@ -308,7 +308,12 @@ export default function BrowseQuestionsScreen() {
   const startEditQuestion = (question: Question) => {
     setEditingQuestionFull(question);
     setEditQuestionText(question.question);
-    setEditAnswerText(question.descriptiveAnswer || '');
+    // 配列の回答はカンマ区切りで表示
+    if (question.answerType === 'descriptive' && Array.isArray(question.descriptiveAnswer)) {
+      setEditAnswerText(question.descriptiveAnswer.join('、'));
+    } else {
+      setEditAnswerText(typeof question.descriptiveAnswer === 'string' ? question.descriptiveAnswer : '');
+    }
     setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
     setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
     setEditMultipleCorrect(question.multipleChoice?.correctAnswer ?? 0);
@@ -318,10 +323,20 @@ export default function BrowseQuestionsScreen() {
   const saveEditedQuestion = async () => {
     if (!editingQuestionFull || !editQuestionText.trim()) return;
 
+    let updatedDescriptiveAnswer = editingQuestionFull.descriptiveAnswer;
+    if (editingQuestionFull.answerType === 'descriptive') {
+      if (Array.isArray(editingQuestionFull.descriptiveAnswer)) {
+        // 元が配列なら、編集後のテキストを配列に戻す
+        updatedDescriptiveAnswer = editAnswerText.split(/[、,]/).map(s => s.trim()).filter(Boolean);
+      } else {
+        updatedDescriptiveAnswer = editAnswerText.trim();
+      }
+    }
+
     const updated: Question = {
       ...editingQuestionFull,
       question: editQuestionText.trim(),
-      descriptiveAnswer: editingQuestionFull.answerType === 'descriptive' ? editAnswerText.trim() : editingQuestionFull.descriptiveAnswer,
+      descriptiveAnswer: updatedDescriptiveAnswer,
       trueFalseAnswer: editingQuestionFull.answerType === 'truefalse' ? editTrueFalseAnswer : editingQuestionFull.trueFalseAnswer,
       multipleChoice: editingQuestionFull.answerType === 'multiple'
         ? { options: editMultipleOptions, correctAnswer: editMultipleCorrect }

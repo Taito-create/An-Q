@@ -22,7 +22,7 @@ import './create.css';
 
 export default function CreateQuestionScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, isCyberpunk } = useTheme();
+  const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions, saveQuestions } = useQuestionsContext();
@@ -281,7 +281,10 @@ export default function CreateQuestionScreen() {
             )}
 
             {/* 動的回答入力欄 */}
-            {descriptiveAnswers.map((answer, index) => (
+            {descriptiveAnswers.map((answer, index) => {
+              // 両解モードOFF時は正解1（index=0）のみ表示、正解2以降は完全非表示
+              if (matchMode !== 'all' && index > 0) return null;
+              return (
               <View key={index} style={styles.descriptiveAnswerRow}>
                 <TextInput
                   style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
@@ -295,29 +298,36 @@ export default function CreateQuestionScreen() {
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
-                {descriptiveAnswers.length > 1 && (
+                {descriptiveAnswers.length > 1 && index > 0 && (
                   <TouchableOpacity
                     style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
                     onPress={() => {
                       const newAnswers = descriptiveAnswers.filter((_, i) => i !== index);
                       setDescriptiveAnswers(newAnswers.length > 0 ? newAnswers : ['']);
+                      // 正解2（index=1）が削除されたら両解モードをOFFにする
+                      if (index === 1 && matchMode === 'all') {
+                        setMatchMode('any');
+                      }
                     }}
                   >
                     <Text style={[styles.removeAnswerButtonText, { color: '#fff' }]}>×</Text>
                   </TouchableOpacity>
                 )}
               </View>
-            ))}
+              );
+            })}
             
-            {/* 回答追加ボタン */}
-            <TouchableOpacity
-              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
-              onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
-            >
-              <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
-                + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
-              </Text>
-            </TouchableOpacity>
+            {/* 両解モードON時は回答追加ボタン非表示（固定2つ） */}
+            {matchMode !== 'all' && (
+              <TouchableOpacity
+                style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
+                onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
+              >
+                <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
+                  + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {answerType === 'truefalse' && (
@@ -391,7 +401,7 @@ export default function CreateQuestionScreen() {
             />
           </View>
         )}
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.primary : undefined, marginTop: 8 }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>{t.createQuestion}</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.primary : undefined, marginTop: 8 }]} onPress={handleManualCreate}><Text style={[styles.buttonText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#ffffff' }]}>{t.createQuestion}</Text></TouchableOpacity>
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>

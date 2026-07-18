@@ -61,13 +61,22 @@ export const getAnswerText = (question: Question): string => {
       const correctOption = question.multipleChoice?.options[correctIdx] || '';
       return `${correctIdx + 1}. ${correctOption}`;
     case 'descriptive':
-      // 配列の場合はカンマ区切りで表示（両解モードの場合は「両方正解」と明示）
+      // 配列の場合はフォーマット分けして表示
       if (Array.isArray(question.descriptiveAnswer)) {
-        const answers = question.descriptiveAnswer;
-        if (question.matchMode === 'all' && answers.length > 1) {
-          return `${answers.join('、')}（両方正解）`;
+        const answers = question.descriptiveAnswer.filter(a => a.trim().length > 0);
+        if (answers.length === 0) return '';
+        
+        if (question.matchMode === 'all') {
+          // 両解モード：①回答1、②回答2、③回答3... の丸数字形式（設定された数だけ表示）
+          const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+          return answers.map((a, i) => `${circledNumbers[i] || i + 1}${a}`).join('、');
+        } else if (answers.length > 1) {
+          // 複数正解（matchMode !== 'all'で複数回答）：
+          // ・回答1、・回答2、・回答3... の箇条書き形式（設定された数だけ改行または並べて表示）
+          return answers.map(a => `・${a}`).join('、');
         }
-        return answers.join('、');
+        // 単一回答
+        return answers[0];
       }
       return question.descriptiveAnswer || '';
     default:
