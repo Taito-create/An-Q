@@ -377,16 +377,17 @@ export default function CreateQuestionScreen() {
 
     let worker: any = null;
     try {
-      console.log("OCR: Creating Tesseract Worker...");
-      // 第一引数に言語を明示して型定義エラーを解消します
-      worker = await Tesseract.createWorker('jpn', 1, {
-        langPath: 'https://tessdata.projectnaptha.com/4.0.0_best/',
-        logger: (m: any) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        },
-      });
+    console.log("OCR: Creating Tesseract Worker...");
+    // 第一引数に言語を明示して型定義エラーを解消します
+    worker = await Tesseract.createWorker('jpn', 1, {
+      // 🟢 WASMのクラッシュを防ぐため、v5/v7互換の最新langPathへ修正
+      langPath: 'https://cdn.jsdelivr.net/npm/@trevorstarick/tessdata@1.0.3/',
+      logger: (m: any) => {
+        if (m.status === 'recognizing text') {
+          setOcrProgress(Math.round(m.progress * 100));
+        }
+      },
+    });
 
       console.log("OCR: Setting parameters (PSM 4)...");
       await worker.setParameters({
