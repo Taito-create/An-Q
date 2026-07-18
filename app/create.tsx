@@ -277,28 +277,11 @@ export default function CreateQuestionScreen() {
 
   // OCR: 画像からテキストを抽出
   const handleOcrExtract = async () => {
-    if (!selectedImage) return;
-
-    let imageToProcess = selectedImage;
-    
-    if (showCropUI && cropArea.width > 10 && cropArea.height > 10) {
-      try {
-        imageToProcess = await cropImage(selectedImage, cropArea);
-      } catch (error) {
-        console.error('Crop error:', error);
-        Alert.alert(
-          locale === 'ja' ? 'クロップエラー' : 'Crop Error',
-          locale === 'ja' ? '画像の切り抜きに失敗しました' : 'Failed to crop image'
-        );
-        return;
-      }
-    }
-
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
+    // クロップUIが表示されていない場合は、ファイル選択を開く
     if (!showCropUI) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
       input.onchange = async (e: Event) => {
         const target = e.target as HTMLInputElement;
         const file = target.files?.[0];
@@ -309,13 +292,47 @@ export default function CreateQuestionScreen() {
           return;
         }
 
-        await processOcr(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          setSelectedImage(base64);
+          setShowCropUI(true);
+          SoundManager.play('decide');
+        };
+        reader.onerror = () => {
+          Alert.alert('エラー', locale === 'ja' ? '画像の読み込みに失敗しました' : 'Failed to load image');
+        };
+        reader.readAsDataURL(file);
         input.value = '';
       };
       input.click();
-    } else {
-      await processOcrFromDataUrl(imageToProcess);
+      return;
     }
+
+    // クロップUI表示中は、選択範囲でOCR実行
+    if (cropArea.width < 10 || cropArea.height < 10) {
+      Alert.alert(
+        locale === 'ja' ? '範囲を選択してください' : 'Please select an area',
+        locale === 'ja' ? '文字を抽出したい範囲をドラッグで選択してください。' : 'Drag to select the area you want to extract text from.'
+      );
+      return;
+    }
+
+    if (!selectedImage) return;
+    
+    let imageToProcess = selectedImage;
+    try {
+      imageToProcess = await cropImage(selectedImage, cropArea);
+    } catch (error) {
+      console.error('Crop error:', error);
+      Alert.alert(
+        locale === 'ja' ? 'クロップエラー' : 'Crop Error',
+        locale === 'ja' ? '画像の切り抜きに失敗しました' : 'Failed to crop image'
+      );
+      return;
+    }
+
+    await processOcrFromDataUrl(imageToProcess);
   };
 
   // DataURLからOCR処理を実行
