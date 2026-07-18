@@ -378,10 +378,18 @@ export default function CreateQuestionScreen() {
     let worker: any = null;
     try {
     console.log("OCR: Creating Tesseract Worker...");
-    // 第一引数に言語を明示して型定義エラーを解消します
+    // 🟢 Tesseractのワーカーを作成
     worker = await Tesseract.createWorker('jpn', 1, {
-      // 🟢 WASMのクラッシュを防ぐため、v5/v7互換の最新langPathへ修正
+      // 1. WASMのクラッシュを防ぐため、v5/v7互換の最新langPathへ修正
       langPath: 'https://cdn.jsdelivr.net/npm/@trevorstarick/tessdata@1.0.3/',
+
+      // 2. 🔥 【重要】古い破損・不整合キャッシュを読み込まないように無効化
+      cacheMethod: 'none',
+
+      // 3. 念のためコアとワーカーの配信元もCDN経由の最新v7に足並みを揃えて固定
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/dist/worker.min.js',
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/tesseract-core-relaxedsimd-lstm.wasm.js',
+
       logger: (m: any) => {
         if (m.status === 'recognizing text') {
           setOcrProgress(Math.round(m.progress * 100));
