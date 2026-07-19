@@ -79,71 +79,104 @@ export default function CreateQuestionScreen() {
     }
   };
 
-  const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
-  const [annotationColor, setAnnotationColor] = useState('#FFFFFF');
-  const [annotationOpacity, setAnnotationOpacity] = useState(80);
-
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        Alert.alert('エラー', locale === 'ja' ? '画像は5MB以下にしてください' : 'Image must be less than 5MB');
-        return;
-      }
-      if (!file.type.startsWith('image/')) {
-        Alert.alert('エラー', locale === 'ja' ? '画像ファイルを選択してください' : 'Please select an image file');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setSelectedImage(base64);
-        setShowCropUI(true); // 画像選択後、クロップUIを表示
-        SoundManager.play('decide');
-      };
-      reader.onerror = () => {
-        Alert.alert('エラー', locale === 'ja' ? '画像の読み込みに失敗しました' : 'Failed to load image');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  // 🟢 画像添付UIを削除（OCR機能のみ使用）
 
   // クロップ範囲のリセット
   const resetCropArea = () => {
     setCropArea({ x: 0, y: 0, width: 0, height: 0 });
   };
 
+  // 🟢 デバッグログ関数
+  const logDebug = (label: string, data: Record<string, any>) => {
+    console.log(`[OCR Debug] ${label}:`, JSON.stringify(data, null, 2));
+  };
+
   // ポインターイベントハンドラ（マウス・タッチ両対応）
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current || !imageRef.current) return;
+    
+    // Pointer Capture: ドラッグ中はこの要素がポインターを独占
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    
+    // 🟢 コンテナ基準で座標を取得（Overlayもコンテナ基準で配置される）
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    
+    logDebug("PointerDown", {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      rectLeft: rect.left,
+      rectTop: rect.top,
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+      displayX: x,
+      displayY: y,
+      naturalWidth: imageRef.current.naturalWidth,
+      naturalHeight: imageRef.current.naturalHeight,
+      clientWidth: imageRef.current.clientWidth,
+      clientHeight: imageRef.current.clientHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      visualViewportScale: window.visualViewport?.scale,
+    });
+    
     setIsDragging(true);
     setDragStart({ x, y });
     setCropArea({ x, y, width: 0, height: 0 });
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !containerRef.current) return;
+    if (!isDragging || !containerRef.current || !imageRef.current) return;
+    
+    // 🟢 コンテナ基準で座標を取得（Overlayと完全に一致）
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const width = x - dragStart.x;
     const height = y - dragStart.y;
-    setCropArea({
+    
+    const displayCrop = {
       x: width < 0 ? x : dragStart.x,
       y: height < 0 ? y : dragStart.y,
       width: Math.abs(width),
       height: Math.abs(height),
+    };
+    
+    // 🟢 natural座標への変換倍率を計算
+    const imgRect = imageRef.current.getBoundingClientRect();
+    const scaleX = imageRef.current.naturalWidth / imgRect.width;
+    const scaleY = imageRef.current.naturalHeight / imgRect.height;
+    
+    const naturalCrop = {
+      x: displayCrop.x * scaleX,
+      y: displayCrop.y * scaleY,
+      width: displayCrop.width * scaleX,
+      height: displayCrop.height * scaleY,
+    };
+    
+    logDebug("PointerMove", {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      rectLeft: rect.left,
+      rectTop: rect.top,
+      displayCrop,
+      naturalCrop,
+      scaleX,
+      scaleY,
     });
+    
+    setCropArea(displayCrop);
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Pointer Capture 解放
+    try {
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    } catch (_) {}
     setIsDragging(false);
   };
 
-  // 画像をクロップ（エラー安全版）
+  // 画像をクロップ（natural座標に変換してCanvasに描画）
   const cropImage = (): string | null => {
     const img = imageRef.current;
     if (!img) {
@@ -152,42 +185,52 @@ export default function CreateQuestionScreen() {
       return null;
     }
 
-    // naturalWidth が 0 や undefined の場合のフォールバックを徹底
-    const imgWidth = img.naturalWidth || img.width || 0;
-    const imgHeight = img.naturalHeight || img.height || 0;
-
-    if (imgWidth === 0 || imgHeight === 0) {
-      console.error("OCR Error: Image dimensions are 0", { imgWidth, imgHeight });
-      Alert.alert("エラー", "画像のサイズを正常に取得できませんでした。画像の読み込み完了を待つか、別の画像でお試しください。");
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (nw === 0 || nh === 0) {
+      console.error("OCR Error: Image natural dimensions are 0", { nw, nh });
+      Alert.alert("エラー", "画像のサイズを取得できませんでした。");
       return null;
     }
 
     try {
-      const rect = img.getBoundingClientRect();
-      const scaleX = imgWidth / (rect.width || 1);
-      const scaleY = imgHeight / (rect.height || 1);
+      // 🟢 表示座標 → natural座標への倍率
+      const imgRect = img.getBoundingClientRect();
+      const scaleX = nw / imgRect.width;
+      const scaleY = nh / imgRect.height;
 
-      const startX = Math.max(0, Math.min(cropArea.x, cropArea.x + cropArea.width)) * scaleX;
-      const startY = Math.max(0, Math.min(cropArea.y, cropArea.y + cropArea.height)) * scaleY;
-      const cropW = Math.max(10, Math.abs(cropArea.width)) * scaleX;
-      const cropH = Math.max(10, Math.abs(cropArea.height)) * scaleY;
+      // 🟢 cropArea（表示座標）を natural座標に変換
+      const nx = Math.max(0, Math.min(cropArea.x, cropArea.x + cropArea.width)) * scaleX;
+      const ny = Math.max(0, Math.min(cropArea.y, cropArea.y + cropArea.height)) * scaleY;
+      const nw2 = Math.max(10, Math.abs(cropArea.width)) * scaleX;
+      const nh2 = Math.max(10, Math.abs(cropArea.height)) * scaleY;
 
-      // 🟢 解像度向上のため3倍に拡大
-      const scaleFactor = 3;
+      logDebug("CropImage", {
+        displayCrop: { x: cropArea.x, y: cropArea.y, w: cropArea.width, h: cropArea.height },
+        naturalCrop: { x: nx, y: ny, w: nw2, h: nh2 },
+        scaleX,
+        scaleY,
+        naturalWidth: nw,
+        naturalHeight: nh,
+        imgRectWidth: imgRect.width,
+        imgRectHeight: imgRect.height,
+        canvasWidth: nw2,
+        canvasHeight: nh2,
+      });
+
+      // 🟢 natural座標でCanvasに直接描画（表示サイズCanvasは経由しない）
       const canvas = document.createElement('canvas');
-      canvas.width = cropW * scaleFactor;
-      canvas.height = cropH * scaleFactor;
+      canvas.width = nw2;
+      canvas.height = nh2;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Canvas context is null");
 
-      // 高品質な画像拡大を設定
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // 3倍に拡大して描画
-      ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW * scaleFactor, cropH * scaleFactor);
+      // 🟢 natural座標でdrawImage（元画像の実ピクセルを正確に切り抜き）
+      ctx.drawImage(img, nx, ny, nw2, nh2, 0, 0, nw2, nh2);
       
-      // 高品質なJPEGで出力
       return canvas.toDataURL('image/jpeg', 0.95);
     } catch (err) {
       console.error("OCR Crop Canvas Error:", err);
@@ -338,7 +381,13 @@ export default function CreateQuestionScreen() {
       input.onchange = async (e: Event) => {
         const target = e.target as HTMLInputElement;
         const file = target.files?.[0];
-        if (!file) return;
+        
+        // 🟢 ファイル選択後に即座にinputをリセット（再選択可能にする）
+        if (target) target.value = '';
+
+        if (!file) {
+          return;
+        }
 
         if (file.size > 10 * 1024 * 1024) {
           Alert.alert('エラー', locale === 'ja' ? '画像は10MB以下にしてください' : 'Image must be less than 10MB');
@@ -356,7 +405,6 @@ export default function CreateQuestionScreen() {
           Alert.alert('エラー', locale === 'ja' ? '画像の読み込みに失敗しました' : 'Failed to load image');
         };
         reader.readAsDataURL(file);
-        input.value = '';
       };
       input.click();
       return;
@@ -379,51 +427,47 @@ export default function CreateQuestionScreen() {
     await processOcrFromDataUrl(croppedDataUrl);
   };
 
-  // DataURLからOCR処理を実行
+  // DataURLからOCR処理を実行（シンプルなTesseract.recognize直接呼び出し）
   const processOcrFromDataUrl = async (dataUrl: string) => {
     setOcrLoading(true);
     setOcrProgress(0);
 
-    let worker: any = null;
     try {
-    console.log("OCR: Creating Tesseract Worker...");
-    // 🟢 Tesseractのワーカーを作成
-    worker = await Tesseract.createWorker('jpn', 1, {
-      // 1. 公式のtessdata_fast配信元（v7互換）
-      langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/jpn/',
-
-      // 2. 🔥 【重要】古い破損・不整合キャッシュを読み込まないように無効化
-      cacheMethod: 'none',
-
-      // 3. コアとワーカーの配信元をCDN経由の最新v7に固定
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@v7.0.0/dist/worker.min.js',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@v7.0.0/tesseract-core-relaxedsimd-lstm.wasm.js',
-
-      logger: (m: any) => {
-        if (m.status === 'recognizing text') {
-          setOcrProgress(Math.round(m.progress * 100));
+      console.log("OCR: Starting text recognition using Tesseract.recognize...");
+      
+      // 🟢 最も安定する直接呼び出し形式に変更（複雑なCDN指定を排除）
+      const { data: { text } } = await Tesseract.recognize(
+        dataUrl,
+        'jpn',
+        {
+          logger: (m: any) => {
+            if (m.status === 'recognizing text') {
+              setOcrProgress(Math.round(m.progress * 100));
+            } else {
+              // ロード中もフリーズしていないことを示すため、わずかに進捗を出す
+              setOcrProgress(5);
+            }
+          },
         }
-      },
-    });
-
-      console.log("OCR: Setting parameters (PSM 4)...");
-      await worker.setParameters({
-        tessedit_pageseg_mode: '4' as any,
-      });
-
-      console.log("OCR: Recognizing text...");
-      const { data: { text } } = await worker.recognize(dataUrl);
+      );
       
       console.log("OCR Result:", text);
+      setOcrProgress(100);
 
       if (text && text.trim().length > 0) {
         // 🟢 日本語や句読点に挟まれた不要な半角スペースだけを自動削除する（英単語間のスペースは維持）
         const cleanedText = text.trim().replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])\s+(?=[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])/g, '$1');
 
-        // 既存の反映ロジック（cleanedTextをセットする）
+        // 🟢 確実にテキストを反映（コールバック形式で最新のstateを参照）
         setQuestion(prev => prev ? `${prev}\n${cleanedText}` : cleanedText);
-        setShowCropUI(false);
-        setSelectedImage(null);
+        console.log("Question updated with OCR text");
+        
+        // 少し遅延させてからUIを閉じる
+        setTimeout(() => {
+          setShowCropUI(false);
+          setSelectedImage(null);
+        }, 100);
+        
         Alert.alert(t.success || 'Success', '文字の抽出が完了しました！');
       } else {
         Alert.alert(t.error || 'Error', '画像から文字を検出できませんでした。範囲を少し広げてお試しください。');
@@ -431,11 +475,8 @@ export default function CreateQuestionScreen() {
 
     } catch (err) {
       console.error("OCR Critical Catch:", err);
-      Alert.alert("OCRエラー", "文字認識中にエラーが発生しました。");
+      Alert.alert("OCRエラー", "文字認識中にエラーが発生しました。お使いのブラウザの制限やネットワーク環境をご確認ください。");
     } finally {
-      if (worker) {
-        await worker.terminate();
-      }
       setOcrLoading(false);
       setOcrProgress(0);
     }
@@ -474,9 +515,7 @@ export default function CreateQuestionScreen() {
         ...newQuestionData,
         question: newQuestionData.question || '',
         image: selectedImage || newQuestionData.image || null,
-        imageAnnotations: imageAnnotations && imageAnnotations.length > 0
-          ? imageAnnotations
-          : (newQuestionData.imageAnnotations || []),
+        imageAnnotations: [],
       };
       await saveQuestions([...questions, newQuestion]);
       await incrementStat('questionsCreated', 1);
@@ -519,7 +558,7 @@ export default function CreateQuestionScreen() {
       Alert.alert(t.success, t.questionSaved);
       setQuestion(''); setDescriptiveAnswers(['']); setTags([]); setTagInput(''); setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
-      setSelectedImage(null); setImageAnnotations([]); setShowTagInput(false); setMatchMode('any');
+      setSelectedImage(null); setShowTagInput(false); setMatchMode('any');
     }
   };
 
@@ -531,13 +570,22 @@ export default function CreateQuestionScreen() {
   };
   const removeTag = (tagToRemove: string) => setTags(tags.filter(tag => tag !== tagToRemove));
 
-  const addAnnotation = () => {
-    const newAnnotation: ImageAnnotation = { id: Date.now().toString(), x: 50, y: 50, width: 100, height: 50, color: annotationColor, opacity: annotationOpacity / 100 };
-    setImageAnnotations([...imageAnnotations, newAnnotation]);
-  };
-
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* 🟢 ローディングを最前面に表示 */}
+      {ocrLoading && (
+        <View style={styles.ocrLoadingOverlay}>
+          <View style={[styles.ocrLoadingContent, { backgroundColor: colors.card }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.ocrLoadingText, { color: colors.text }]}>
+              {locale === 'ja' ? `解析中 (${ocrProgress}%)...` : `Processing (${ocrProgress}%)...`}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+
       <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0 }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
@@ -842,46 +890,9 @@ export default function CreateQuestionScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>📸 {locale === 'ja' ? '画像を添付（オプション）' : 'Attach Image (Optional)'}</Text>
-        {!selectedImage ? (
-          <TouchableOpacity style={[styles.imageUploadBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '10', borderRadius: cpR ?? 12 }]} onPress={() => document.getElementById('image-input')?.click()}>
-            <Text style={[{ fontSize: 24, marginBottom: 8 }]}>📷</Text>
-            <Text style={[styles.imageUploadText, { color: colors.primary }]}>{locale === 'ja' ? '画像をアップロード' : 'Upload Image'}</Text>
-            <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>JPG, PNG, WebP（{locale === 'ja' ? '最大 5MB' : 'Max 5MB'}）</Text>
-          </TouchableOpacity>
-        ) : (
-          <View>
-            <View style={[styles.imagePreview, { backgroundColor: colors.background, borderRadius: cpR ?? 8, overflow: 'hidden', marginBottom: 12 }]}>
-              <img src={selectedImage} alt="preview" className="question-image-preview" />
-              {imageAnnotations.map((annotation) => (<View key={annotation.id} style={{ position: 'absolute', left: annotation.x, top: annotation.y, width: annotation.width, height: annotation.height, backgroundColor: annotation.color, opacity: annotation.opacity, borderWidth: 1, borderColor: 'rgba(0,0,0,0.3)', borderRadius: 4 }} />))}
-            </View>
-            <TouchableOpacity style={[styles.button, { backgroundColor: colors.error, borderRadius: cpR ?? 8, marginBottom: 12 }]} onPress={() => { setSelectedImage(null); setImageAnnotations([]); }}>
-              <Text style={[styles.buttonText, { color: '#fff' }]}>{locale === 'ja' ? '画像を削除' : 'Remove Image'}</Text>
-            </TouchableOpacity>
-            <View style={[{ backgroundColor: colors.card, borderRadius: cpR ?? 8, padding: 12, borderWidth: cpB ?? 1, borderColor: colors.border }]}>
-              <Text style={[{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 10 }]}>✏️ {locale === 'ja' ? '隠すボックスを追加' : 'Add Hiding Box'}</Text>
-              <View style={[{ gap: 10 }]}>
-                <View style={[{ flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
-                  <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>{locale === 'ja' ? '色' : 'Color'}</Text>
-                  <View style={[{ flexDirection: 'row', gap: 6 }]}>
-                    {['#FFFFFF', '#000000', '#FFC107', '#4CAF50', '#2196F3'].map((color) => (<TouchableOpacity key={color} style={[{ width: 32, height: 32, borderRadius: cpR ?? 16, backgroundColor: color, borderWidth: cpB ?? 2, borderColor: annotationColor === color ? colors.primary : colors.border }]} onPress={() => setAnnotationColor(color)} />))}
-                  </View>
-                </View>
-                <View style={[{ flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
-                  <Text style={[{ fontSize: 12, color: colors.textSecondary, width: 60 }]}>{locale === 'ja' ? '透明度' : 'Opacity'}</Text>
-                  <input type="range" min="0" max="100" value={annotationOpacity} onChange={(e) => setAnnotationOpacity(parseInt(e.target.value, 10))} className="crop-range" aria-label={locale === 'ja' ? '透明度を調整' : 'Adjust opacity'} />
-                </View>
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary, borderRadius: cpR ?? 8 }]} onPress={addAnnotation}>
-                  <Text style={[styles.buttonText, { color: onPrimary, fontSize: 13 }]}>＋ {locale === 'ja' ? 'ボックスを追加' : 'Add Box'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-        <input id="image-input" type="file" accept="image/*" onChange={handleImageSelect} className="hidden-file-input" aria-label={locale === 'ja' ? '画像をアップロード' : 'Upload image'} />
-      </View>
+      {/* 🟢 画像添付UIを削除（OCR機能のみ使用） */}
     </ScrollView>
+    </View>
   );
 }
 
@@ -944,4 +955,8 @@ const styles = StyleSheet.create({
   cropButtons: { flexDirection: 'row', justifyContent: 'center' },
   cropButton: { paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', minWidth: 120 },
   cropButtonText: { fontSize: 14, fontWeight: 'bold' },
+  // 🟢 ローディングオーバーレイ用スタイル
+  ocrLoadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999999 },
+  ocrLoadingContent: { padding: 30, borderRadius: 20, alignItems: 'center', minWidth: 200 },
+  ocrLoadingText: { fontSize: 16, fontWeight: 'bold', marginTop: 15 },
 });

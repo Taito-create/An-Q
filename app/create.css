@@ -15,9 +15,12 @@
 }
 
 .crop-image-container {
+  position: relative;
   cursor: crosshair;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
+  overflow: hidden;
 }
 
 .crop-image {
