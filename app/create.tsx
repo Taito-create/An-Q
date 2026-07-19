@@ -58,8 +58,9 @@ export default function CreateQuestionScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCropUI, setShowCropUI] = useState(false);
   const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  // 🟢 ドラッグ状態はuseRefで管理（React Stateの非同期更新によるスマホでの遅延を防止）
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +104,10 @@ export default function CreateQuestionScreen() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // 🟢 useRefに即座に保存（React Stateの非同期更新による遅延を防止）
+    dragStartRef.current = { x, y };
+    isDraggingRef.current = true;
+    
     logDebug("PointerDown", {
       clientX: e.clientX,
       clientY: e.clientY,
@@ -120,60 +125,44 @@ export default function CreateQuestionScreen() {
       visualViewportScale: window.visualViewport?.scale,
     });
     
-    setIsDragging(true);
-    setDragStart({ x, y });
     setCropArea({ x, y, width: 0, height: 0 });
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !containerRef.current || !imageRef.current) return;
+    // 🟢 useRefで即座に判定（React Stateの非同期更新に依存しない）
+    if (!isDraggingRef.current || !containerRef.current) return;
+    
+    console.log("MOVE_EVENT_TRIGGERED", e.clientX, e.clientY, isDraggingRef.current);
     
     // 🟢 コンテナ基準で座標を取得（Overlayと完全に一致）
     const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const width = x - dragStart.x;
-    const height = y - dragStart.y;
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    // 🟢 useRefの開始位置から差分を計算（純粋なCSS座標のみ）
+    const startX = dragStartRef.current.x;
+    const startY = dragStartRef.current.y;
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
     
     const displayCrop = {
-      x: width < 0 ? x : dragStart.x,
-      y: height < 0 ? y : dragStart.y,
-      width: Math.abs(width),
-      height: Math.abs(height),
+      x: deltaX < 0 ? currentX : startX,
+      y: deltaY < 0 ? currentY : startY,
+      width: Math.abs(deltaX),
+      height: Math.abs(deltaY),
     };
-    
-    // 🟢 natural座標への変換倍率を計算
-    const imgRect = imageRef.current.getBoundingClientRect();
-    const scaleX = imageRef.current.naturalWidth / imgRect.width;
-    const scaleY = imageRef.current.naturalHeight / imgRect.height;
-    
-    const naturalCrop = {
-      x: displayCrop.x * scaleX,
-      y: displayCrop.y * scaleY,
-      width: displayCrop.width * scaleX,
-      height: displayCrop.height * scaleY,
-    };
-    
-    logDebug("PointerMove", {
-      clientX: e.clientX,
-      clientY: e.clientY,
-      rectLeft: rect.left,
-      rectTop: rect.top,
-      displayCrop,
-      naturalCrop,
-      scaleX,
-      scaleY,
-    });
     
     setCropArea(displayCrop);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 🟢 useRefで即座にfalse設定
+    isDraggingRef.current = false;
+    
     // Pointer Capture 解放
     try {
       (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
     } catch (_) {}
-    setIsDragging(false);
   };
 
   // 画像をクロップ（natural座標に変換してCanvasに描画）
