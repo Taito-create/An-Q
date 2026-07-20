@@ -39,12 +39,27 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
   }
 
   // デフォルト（matchMode: 'any' または未指定）は完全一致または部分一致
-  const correctAnswerStr = typeof question.descriptiveAnswer === 'string'
+  let correctAnswerStr = typeof question.descriptiveAnswer === 'string'
     ? question.descriptiveAnswer
     : (question.descriptiveAnswer as string[])[0] || '';
-  const correctAnswerLower = correctAnswerStr.trim().toLowerCase();
   
-  return userAnswerLower === correctAnswerLower || userAnswerLower.includes(correctAnswerLower);
+  // 正解文字列から「・」や余分な空白を除去
+  // 複数正解が「・ことば\n・論理\n・理性」のような形式の場合、各候補をクリーニング
+  const correctAnswers = correctAnswerStr
+    .split('\n')
+    .map(ans => ans.replace(/^[・]\s*/, '').trim())
+    .filter(ans => ans.length > 0);
+  
+  // ユーザー回答をトリム
+  const userAnswerTrimmed = userAnswerLower.trim();
+  
+  // クリーニング済みの正解候補と比較
+  const correctAnswersLower = correctAnswers.map(ans => ans.toLowerCase());
+  
+  // 完全一致または部分一致をチェック
+  return correctAnswersLower.some(
+    correct => userAnswerTrimmed === correct || userAnswerTrimmed.includes(correct)
+  );
 };
 
 /**
