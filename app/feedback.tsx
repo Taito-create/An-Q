@@ -43,7 +43,7 @@ export default function FeedbackScreen() {
   const navigate = useNavigate();
   const { colors } = useTheme();
   const locale = useLocale();
-  const t = translations[locale];
+  const t = translations[locale] as Record<string, any>;
   
   const [results, setResults] = useState<QuizResult[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -192,12 +192,12 @@ export default function FeedbackScreen() {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.emptyEmoji}>📋</Text>
-        <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{t.noResultsYet}</Text>
-        <TouchableOpacity style={styles.startBtn} onPress={() => navigate('/quiz')}>
-          <Text style={styles.startBtnText}>{t.takeQuizChallenge}</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t.noResultsYet}</Text>
+        <TouchableOpacity style={[styles.startBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
+          <Text style={[styles.startBtnText, { color: '#fff' }]}>{t.takeQuizChallenge}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigate('/')}>
-          <Text style={styles.homeLinkText}>{t.backHome}</Text>
+          <Text style={[styles.homeLinkText, { color: colors.primary }]}>{t.backHome}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -208,29 +208,29 @@ export default function FeedbackScreen() {
       <Text style={[styles.headerTitle, { color: colors.text }]}>{t.quizPerformance}</Text>
 
       {/* Score Card */}
-      <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary }]}>
         <View style={styles.bigScore}>
-          <Text style={styles.bigScoreNum}>{correctCount}</Text>
-          <Text style={styles.bigScoreSlash}>/</Text>
-          <Text style={styles.bigScoreTotal}>{total}</Text>
+          <Text style={[styles.bigScoreNum, { color: colors.primary }]}>{correctCount}</Text>
+          <Text style={[styles.bigScoreSlash, { color: colors.textSecondary }]}>/</Text>
+          <Text style={[styles.bigScoreTotal, { color: colors.textSecondary }]}>{total}</Text>
         </View>
-        <Text style={styles.pctText}>{pct}% {t.correct}</Text>
+        <Text style={[styles.pctText, { color: colors.text }]}>{pct}% {t.correct}</Text>
         <Text style={[styles.gradeText, { color: grade.color }]}>{grade.label}</Text>
 
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
           <View style={styles.statBox}>
-            <Text style={styles.statVal}>{formatTime(totalTime)}</Text>
-            <Text style={styles.statLbl}>{t.timeSpent}</Text>
+            <Text style={[styles.statVal, { color: colors.text }]}>{formatTime(totalTime)}</Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>{t.timeSpent}</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statBox}>
-            <Text style={styles.statVal}>{avgTime}s</Text>
-            <Text style={styles.statLbl}>{t.avgTimePerQuestion}</Text>
+            <Text style={[styles.statVal, { color: colors.text }]}>{avgTime}s</Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>{t.avgTimePerQuestion}</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statBox}>
-            <Text style={[styles.statVal, { color: '#F44336' }]}>{incorrectCount}</Text>
-            <Text style={styles.statLbl}>{t.mistakes}</Text>
+            <Text style={[styles.statVal, { color: colors.error }]}>{incorrectCount}</Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>{t.mistakes}</Text>
           </View>
         </View>
       </View>
@@ -322,12 +322,12 @@ export default function FeedbackScreen() {
       )}
 
       {wrongResults.length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={styles.sectionTitle}>⚠️ {t.questionsToReview}</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>⚠️ {t.questionsToReview}</Text>
           {wrongResults.map((r, i) => (
-            <View key={i} style={styles.wrongCard}>
-              <Text style={styles.wrongQuestion}>{r.question}</Text>
-              <Text style={styles.correctHint}>
+            <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '20', borderLeftColor: colors.error }]}>
+              <Text style={[styles.wrongQuestion, { color: colors.text }]}>{r.question}</Text>
+              <Text style={[styles.correctHint, { color: colors.error }]}>
                 {t.correctAnswer}: {typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '×') : String(r.correctAnswer)}
               </Text>
             </View>
@@ -335,16 +335,16 @@ export default function FeedbackScreen() {
         </View>
       )}
 
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
+      <View style={[styles.section, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
         <TouchableOpacity style={styles.toggleHeader} onPress={() => setShowAll(!showAll)}>
-          <Text style={styles.sectionTitle}>{t.viewAllAnswers}</Text>
-          <Text style={styles.toggleArrow}>{showAll ? `▲ ${t.hide}` : `▼ ${t.expand}`}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.viewAllAnswers}</Text>
+          <Text style={[styles.toggleArrow, { color: colors.primary }]}>{showAll ? `▲ ${t.hide}` : `▼ ${t.expand}`}</Text>
         </TouchableOpacity>
 
         {showAll && results.map((r, i) => (
-          <View key={i} style={[styles.resultItem, r.isCorrect ? styles.resultCorrect : styles.resultWrong]}>
-            <Text style={styles.resultQuestion}>Q{i+1}: {r.question}</Text>
-            <Text style={[styles.resultStatus, { color: r.isCorrect ? '#4CAF50' : '#F44336' }]}>
+          <View key={i} style={[styles.resultItem, { backgroundColor: r.isCorrect ? colors.success + '20' : colors.error + '20', borderBottomColor: colors.border }]}>
+            <Text style={[styles.resultQuestion, { color: colors.text }]}>Q{i+1}: {r.question}</Text>
+            <Text style={[styles.resultStatus, { color: r.isCorrect ? colors.success : colors.error }]}>
               {r.isCorrect 
                 ? `${t.correct} ○` 
                 : `${t.incorrect} × (${t.correctAnswer}: ${typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '×') : String(r.correctAnswer)})`}
@@ -354,15 +354,15 @@ export default function FeedbackScreen() {
       </View>
 
       {history.length > 0 && (
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <Text style={styles.sectionTitle}>📈 {t.progressHistory}</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>📈 {t.progressHistory}</Text>
           {history.map((h, i) => (
             <View key={i} style={styles.historyRow}>
-              <Text style={styles.historyDate}>{h.date}</Text>
-              <View style={styles.historyBar}>
-                <View style={[styles.historyFill, { width: `${h.percentage}%` }]} />
+              <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{h.date}</Text>
+              <View style={[styles.historyBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.historyFill, { width: `${h.percentage}%`, backgroundColor: colors.primary }]} />
               </View>
-              <Text style={styles.historyPct}>{h.percentage}%</Text>
+              <Text style={[styles.historyPct, { color: colors.text }]}>{h.percentage}%</Text>
             </View>
           ))}
         </View>
@@ -370,14 +370,14 @@ export default function FeedbackScreen() {
 
       {/* ボタン */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigate('/quiz')}>
-          <Text style={styles.primaryBtnText}>{t.takeAgain}</Text>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
+          <Text style={[styles.primaryBtnText, { color: '#fff' }]}>{t.takeAgain}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigate('/')}>
-          <Text style={styles.secondaryBtnText}>{t.backHome}</Text>
+        <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: colors.success }]} onPress={() => navigate('/')}>
+          <Text style={[styles.secondaryBtnText, { color: '#fff' }]}>{t.backHome}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>
-          <Text style={styles.dangerBtnText}>{t.deleteAllHistory}</Text>
+          <Text style={[styles.dangerBtnText, { color: colors.error }]}>{t.deleteAllHistory}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

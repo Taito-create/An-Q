@@ -1342,6 +1342,7 @@ export default function QuizScreen() {
               styles.pauseBtn, 
               { 
                 backgroundColor: isPaused ? colors.success : colors.primary,
+                borderRadius: isCyberpunk ? 0 : 999,
                 transform: [{ scale: pressed ? 0.95 : 1 }]
               }
             ]} 
@@ -1351,7 +1352,7 @@ export default function QuizScreen() {
               setIsTimerActive(isPaused);
             }}
           >
-            <Text style={[styles.pauseBtnText, { color: '#fff', fontWeight: 'bold' }]}>
+            <Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>
               {isPaused ? '▶ 再開' : '⏸ 一時停止'}
             </Text>
           </Pressable>
@@ -1362,6 +1363,7 @@ export default function QuizScreen() {
               styles.quitBtnTop, 
               { 
                 backgroundColor: pressed ? colors.error : colors.primary,
+                borderRadius: isCyberpunk ? 0 : 20,
                 transform: [{ scale: pressed ? 0.95 : 1 }]
               }
             ]} 
@@ -1370,7 +1372,7 @@ export default function QuizScreen() {
               setShowConfirmModal(true);
             }}
           >
-            <Text style={[styles.quitBtnTopText, { color: '#fff', fontWeight: 'bold', fontSize: 14 }]}>
+            <Text style={[styles.quitBtnTopText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold', fontSize: 14 }]}>
               {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz'}
             </Text>
           </Pressable>
@@ -1593,16 +1595,21 @@ export default function QuizScreen() {
                     {correctKeywords.map((keyword, index) => (
                       <TextInput
                         key={index}
-                        style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
+                        style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card, color: colors.text }]}
                         value={userDescriptiveAnswers[index] || ''}
                         onChangeText={(text) => {
                           const newAnswers = [...userDescriptiveAnswers];
                           newAnswers[index] = text;
                           setUserDescriptiveAnswers(newAnswers);
                         }}
-                        placeholder={locale === 'ja' ? `キーワード ${index + 1}` : `Keyword ${index + 1}`}
+                        placeholder={locale === 'ja' ? `回答${index + 1}` : `Answer ${index + 1}`}
                         placeholderTextColor="#999"
                         editable={!answered && !isPaused}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        keyboardType="visible-password"
+                        textContentType="none"
                         onSubmitEditing={() => {
                           // 最後の入力欄でEnterを押したら回答を送信
                           if (index === correctKeywords.length - 1) {
@@ -1628,26 +1635,31 @@ export default function QuizScreen() {
                   // 通常モード：単一の入力欄
                   <View style={{ width: '100%' }}>
                     <TextInput
-                      style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card }]}
+                      style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card, color: colors.text }]}
                       value={userDescriptiveAnswer}
                       onChangeText={setUserDescriptiveAnswer}
-                      placeholder={locale === 'ja' ? '回答を入力' : 'Enter your answer'}
+                      placeholder={locale === 'ja' ? '回答を入力（空欄でスキップ可）' : 'Enter answer (leave empty to skip)'}
                       placeholderTextColor="#999"
                       multiline
                       editable={!answered && !isPaused}
+                      autoCorrect={false}
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      keyboardType="visible-password"
+                      textContentType="none"
                       onSubmitEditing={() => {
-                        // Enterキーで回答送信
+                        // Enterキーで回答送信（空欄でも送信可能）
                         handleAnswer(userDescriptiveAnswer);
                       }}
                       returnKeyType="go"
                     />
-                    <TouchableOpacity
-                      style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => handleAnswer(userDescriptiveAnswer)}
-                      disabled={answered || isPaused}
-                    >
-                      <Text style={styles.descriptiveBtnText}>{t.checkAnswer}</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => handleAnswer(userDescriptiveAnswer)}
+                        disabled={answered || isPaused}
+                      >
+                        <Text style={styles.descriptiveBtnText}>{userDescriptiveAnswer.trim() ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}</Text>
+                      </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -1874,19 +1886,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10, 
-    paddingHorizontal: 20, 
-    borderRadius: 20,
+    paddingHorizontal: 20,
   },
   quitBtnTopText: { fontSize: 14, fontWeight: '600' },
   timer: { fontSize: 20, fontWeight: 'bold', minWidth: 72, letterSpacing: 0.2 },
   pauseBtn: {
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pauseBtnText: { fontSize: 13, color: '#555', fontWeight: '600' },
+  pauseBtnText: { fontSize: 13, fontWeight: '600' },
   questionCounter: { fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
   questionCounterBadge: {
     position: 'absolute',
@@ -2112,10 +2122,11 @@ const styles = StyleSheet.create({
   },
   descriptiveInput: {
     flex: 1,
-    minHeight: 112,
+    minHeight: 48,
+    maxHeight: 120,
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     fontSize: 16,
     textAlignVertical: 'top',
   },
