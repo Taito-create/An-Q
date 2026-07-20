@@ -1,6 +1,6 @@
 // app/sound.tsx - 修正版
 
-export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong';
+export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong' | 'delete';
 export type BGMType = 'BGM1' | 'BGM2' | 'BGM3' | 'BGM4';
 export type SEType = 'effect1' | 'effect2' | 'effect3' | 'effect4';
 
