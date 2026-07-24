@@ -1,5 +1,7 @@
 // app/sound.tsx - 修正版
 
+import { safeParseObject } from './utils/storageUtils';
+
 export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong' | 'delete';
 export type BGMType = 'BGM1' | 'BGM2' | 'BGM3' | 'BGM4';
 export type SEType = 'effect1' | 'effect2' | 'effect3' | 'effect4';
@@ -168,13 +170,9 @@ class SoundManager {
   }
 
   static async getBGMSettings() {
-    try {
-      const saved = localStorage.getItem('bgm_settings');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {}
-    return { enabled: true, currentBGM: 'BGM1' };
+    const defaultSettings = { enabled: true, currentBGM: 'BGM1' };
+    const saved = localStorage.getItem('bgm_settings');
+    return safeParseObject(saved, defaultSettings);
   }
 
   private static async saveBGMSettings() {

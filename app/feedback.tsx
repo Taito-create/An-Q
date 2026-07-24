@@ -9,6 +9,7 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import { safeParseArray } from './utils/storageUtils';
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -41,7 +42,7 @@ interface QuizFeedback {
 // ──────────────────────────────────────────────
 export default function FeedbackScreen() {
   const navigate = useNavigate();
-  const { colors, isCyberpunk, currentTheme } = useTheme();
+  const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale] as Record<string, any>;
   
@@ -65,7 +66,7 @@ export default function FeedbackScreen() {
       ]);
 
       if (resultsRaw) {
-        const loadedResults: QuizResult[] = JSON.parse(resultsRaw);
+        const loadedResults: QuizResult[] = safeParseArray(resultsRaw, []);
         setResults(loadedResults);
 
         // 履歴への追加処理（この画面が開かれた時に一度だけ実行）
@@ -74,9 +75,7 @@ export default function FeedbackScreen() {
         }
       }
 
-      if (historyRaw) {
-        setHistory(JSON.parse(historyRaw));
-      }
+      setHistory(safeParseArray(historyRaw, []));
     } catch (e) {
       console.error('FeedbackScreen loadData error:', e);
     }
@@ -88,7 +87,7 @@ export default function FeedbackScreen() {
 
   const appendHistory = async (currentResults: QuizResult[], historyRaw: string | null) => {
     try {
-      const history: HistoryEntry[] = historyRaw ? JSON.parse(historyRaw) : [];
+      const history: HistoryEntry[] = safeParseArray(historyRaw, []);
       const correct = currentResults.filter(r => r.isCorrect).length;
       const total = currentResults.length;
       
@@ -132,7 +131,7 @@ export default function FeedbackScreen() {
 
       // Save feedback to AsyncStorage
       const existingFeedback = await AsyncStorage.getItem('quizFeedbacks');
-      const feedbacks = existingFeedback ? JSON.parse(existingFeedback) : [];
+      const feedbacks = safeParseArray<QuizFeedback>(existingFeedback, []);
       feedbacks.unshift(feedback);
       
       // Keep only last 50 feedbacks
@@ -194,7 +193,7 @@ export default function FeedbackScreen() {
         <Text style={styles.emptyEmoji}>📋</Text>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>{t.noResultsYet}</Text>
         <TouchableOpacity style={[styles.startBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
-          <Text style={[styles.startBtnText, { color: '#fff' }]}>{t.takeQuizChallenge}</Text>
+          <Text style={[styles.startBtnText, { color: onPrimary }]}>{t.takeQuizChallenge}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigate('/')}>
           <Text style={[styles.homeLinkText, { color: colors.primary }]}>{t.backHome}</Text>
@@ -238,7 +237,7 @@ export default function FeedbackScreen() {
       {/* Feedback Section */}
       {!feedbackSubmitted && (
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.feedbackToggle, { backgroundColor: colors.primary + '15' }]}
             onPress={() => setShowFeedbackForm(!showFeedbackForm)}
           >
@@ -249,7 +248,7 @@ export default function FeedbackScreen() {
           {showFeedbackForm && (
             <View style={[styles.feedbackForm, { backgroundColor: colors.background }]}>
               <Text style={[styles.feedbackTitle, { color: colors.text }]}>{t.rateThisQuiz}</Text>
-              
+
               {/* Star Rating */}
               <View style={styles.starContainer}>
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -287,7 +286,7 @@ export default function FeedbackScreen() {
                       difficulty === level && [
                         styles.difficultyTextActive,
                         // 🟢 サイバーパンク/ダークで背景がネオン色になる場合は黒文字に切り替え
-                        { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' },
+                        { color: (isCyberpunk || currentTheme === 'dark') ? colors.text : onPrimary },
                       ],
                     ]}>
                       {level === 'easy' ? t.easy : level === 'medium' ? t.medium : t.hard}
@@ -310,12 +309,12 @@ export default function FeedbackScreen() {
               />
 
               {/* Submit Button */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.submitFeedbackBtn, { backgroundColor: colors.primary }, rating === 0 && styles.submitFeedbackBtnDisabled]}
                 onPress={submitFeedback}
                 disabled={rating === 0}
               >
-                <Text style={[styles.submitFeedbackBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>{t.submitFeedback}</Text>
+                <Text style={[styles.submitFeedbackBtnText, { color: onPrimary }]}>{t.submitFeedback}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -323,8 +322,8 @@ export default function FeedbackScreen() {
       )}
 
       {feedbackSubmitted && (
-        <View style={styles.feedbackThankYou}>
-          <Text style={styles.feedbackThankYouText}>{t.thankYouFeedback}</Text>
+        <View style={[styles.feedbackThankYou, { backgroundColor: colors.success + '20' }]}>
+          <Text style={[styles.feedbackThankYouText, { color: colors.success }]}>{t.thankYouFeedback}</Text>
         </View>
       )}
 
@@ -378,10 +377,10 @@ export default function FeedbackScreen() {
       {/* ボタン */}
       <View style={styles.actions}>
         <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
-          <Text style={[styles.primaryBtnText, { color: '#fff' }]}>{t.takeAgain}</Text>
+          <Text style={[styles.primaryBtnText, { color: onPrimary }]}>{t.takeAgain}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: colors.success }]} onPress={() => navigate('/')}>
-          <Text style={[styles.secondaryBtnText, { color: '#fff' }]}>{t.backHome}</Text>
+          <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>
           <Text style={[styles.dangerBtnText, { color: colors.error }]}>{t.deleteAllHistory}</Text>
@@ -392,17 +391,16 @@ export default function FeedbackScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F8FA' },
+  container: { flex: 1 },
   content: { padding: 20, paddingTop: 60, paddingBottom: 50 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#1A1A1A' },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, paddingTop: 100 },
   emptyEmoji: { fontSize: 60, marginBottom: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#888', marginBottom: 20 },
-  startBtn: { backgroundColor: '#4CAF50', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },
-  startBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  homeLinkText: { color: '#007AFF', fontSize: 14 },
+  emptyTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
+  startBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },
+  startBtnText: { fontSize: 16, fontWeight: 'bold' },
+  homeLinkText: { fontSize: 14 },
   summaryCard: { 
-    backgroundColor: '#fff', 
     borderRadius: 20, 
     padding: 25, 
     marginBottom: 20, 
@@ -417,40 +415,40 @@ const styles = StyleSheet.create({
     elevation: 5, 
   },
   bigScore: { flexDirection: 'row', alignItems: 'baseline' },
-  bigScoreNum: { fontSize: 60, fontWeight: 'bold', color: '#007AFF' },
-  bigScoreSlash: { fontSize: 30, color: '#CCC', marginHorizontal: 5 },
-  bigScoreTotal: { fontSize: 30, color: '#999' },
-  pctText: { fontSize: 22, fontWeight: '600', color: '#444' },
+  bigScoreNum: { fontSize: 60, fontWeight: 'bold' },
+  bigScoreSlash: { fontSize: 30, marginHorizontal: 5 },
+  bigScoreTotal: { fontSize: 30 },
+  pctText: { fontSize: 22, fontWeight: '600' },
   gradeText: { fontSize: 18, fontWeight: 'bold', marginVertical: 10, textAlign: 'center' },
-  statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 20, width: '100%', justifyContent: 'space-around' },
+  statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, paddingTop: 20, width: '100%', justifyContent: 'space-around' },
   statBox: { alignItems: 'center' },
   statVal: { fontSize: 18, fontWeight: 'bold' },
-  statLbl: { fontSize: 12, color: '#888' },
-  statDivider: { width: 1, height: 30, backgroundColor: '#EEE' },
-  section: { backgroundColor: '#fff', borderRadius: 15, padding: 15, marginBottom: 15 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#333' },
-  wrongCard: { backgroundColor: '#FFF5F5', padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1 },
-  wrongQuestion: { fontSize: 14, color: '#333', marginBottom: 5 },
-  correctHint: { fontSize: 13, fontWeight: 'bold', color: '#F44336' },
+  statLbl: { fontSize: 12 },
+  statDivider: { width: 1, height: 30 },
+  section: { borderRadius: 15, padding: 15, marginBottom: 15 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },
+  wrongCard: { padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1 },
+  wrongQuestion: { fontSize: 14, marginBottom: 5 },
+  correctHint: { fontSize: 13, fontWeight: 'bold' },
   toggleHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  toggleArrow: { color: '#007AFF', fontWeight: 'bold' },
-  resultItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  toggleArrow: { fontWeight: 'bold' },
+  resultItem: { padding: 10, borderBottomWidth: 1 },
   resultCorrect: { backgroundColor: '#F9FFF9' },
   resultWrong: { backgroundColor: '#FFF9F9' },
-  resultQuestion: { fontSize: 14, color: '#444' },
+  resultQuestion: { fontSize: 14 },
   resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 3 },
   historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  historyDate: { fontSize: 10, color: '#888', width: 80 },
-  historyBar: { flex: 1, height: 8, backgroundColor: '#EEE', borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },
-  historyFill: { height: '100%', backgroundColor: '#007AFF' },
+  historyDate: { fontSize: 10, width: 80 },
+  historyBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },
+  historyFill: { height: '100%' },
   historyPct: { fontSize: 12, fontWeight: 'bold', width: 35 },
   actions: { gap: 12 },
-  primaryBtn: { backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  secondaryBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 15, alignItems: 'center' },
-  secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  primaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
+  primaryBtnText: { fontSize: 16, fontWeight: 'bold' },
+  secondaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },
+  secondaryBtnText: { fontSize: 16, fontWeight: 'bold' },
   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
-  dangerBtnText: { color: '#FF3B30', fontSize: 13 },
+  dangerBtnText: { fontSize: 13 },
   
   // Feedback Form Styles
   feedbackToggle: { 
@@ -458,57 +456,50 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', 
     alignItems: 'center', 
     padding: 15, 
-    backgroundColor: '#F0F8FF', 
     borderRadius: 10 
   },
-  feedbackToggleText: { fontSize: 16, fontWeight: '600', color: '#007AFF' },
-  feedbackToggleArrow: { fontSize: 14, color: '#007AFF', fontWeight: 'bold' },
-  feedbackForm: { padding: 20, backgroundColor: '#FAFAFA', borderRadius: 10, marginTop: 10 },
-  feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#333' },
+  feedbackToggleText: { fontSize: 16, fontWeight: '600' },
+  feedbackToggleArrow: { fontSize: 14, fontWeight: 'bold' },
+  feedbackForm: { padding: 20, borderRadius: 10, marginTop: 10 },
+  feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   starContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 20 },
   starButton: { padding: 5, marginHorizontal: 5 },
   starText: { fontSize: 30 },
   starActive: { color: '#FFD700' },
   starInactive: { color: '#DDD' },
-  difficultyLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: '#333' },
+  difficultyLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
   difficultyContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
   difficultyButton: { 
     paddingVertical: 8, 
     paddingHorizontal: 20, 
     borderRadius: 20, 
-    backgroundColor: '#E0E0E0' 
   },
-  difficultyActive: { backgroundColor: '#007AFF' },
-  difficultyText: { fontSize: 14, fontWeight: '600', color: '#666' },
+  difficultyActive: {},
+  difficultyText: { fontSize: 14, fontWeight: '600' },
   difficultyTextActive: { color: '#FFF' },
-  memoLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: '#333' },
+  memoLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10 },
   memoInput: { 
     borderWidth: 1, 
-    borderColor: '#DDD', 
     borderRadius: 8, 
     padding: 12, 
     fontSize: 14, 
-    backgroundColor: '#FFF', 
     minHeight: 80, 
     marginBottom: 20 
   },
   submitFeedbackBtn: { 
-    backgroundColor: '#007AFF', 
     padding: 15, 
     borderRadius: 10, 
     alignItems: 'center' 
   },
-  submitFeedbackBtnDisabled: { backgroundColor: '#CCC' },
-  submitFeedbackBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  submitFeedbackBtnDisabled: { opacity: 0.6 },
+  submitFeedbackBtnText: { fontSize: 16, fontWeight: 'bold' },
   feedbackThankYou: { 
     padding: 20, 
-    backgroundColor: '#E8F5E8', 
     borderRadius: 10, 
     alignItems: 'center' 
   },
   feedbackThankYouText: { 
     fontSize: 16, 
-    color: '#4CAF50', 
     textAlign: 'center', 
     fontWeight: '600' 
   },

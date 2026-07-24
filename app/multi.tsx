@@ -14,6 +14,7 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import { safeParseArray } from './utils/storageUtils';
 
 // ランダムな6文字の英数字IDを生成
 const generateShortId = (): string => {
@@ -215,14 +216,8 @@ export default function MultiScreen() {
         return;
       }
 
-      // 受信ボックスに保存
-      let inboxItems: any[] = [];
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
-        inboxItems = raw ? JSON.parse(raw) : [];
-      } catch (e) {
-        inboxItems = [];
-      }
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
+      const inboxItems: any[] = safeParseArray(raw, []);
 
       // 重複チェック
       const itemsToCheck = receivedData.data;

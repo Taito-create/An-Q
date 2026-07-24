@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadAllTracksFromDB, saveTrackToDB, deleteTrackFromDB } from './musicDB';
 import { SoundManager } from './sound';
+import { safeParseArray } from './utils/storageUtils';
 
 export interface CustomTrack {
   id: string;
@@ -99,8 +100,17 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
     }
 
     AsyncStorage.getItem(PLAYLIST_KEY).then(raw => {
-      if (raw) setPlaylists(JSON.parse(raw));
-    }).catch(() => {});
+      const playlists = safeParseArray(raw, []);
+      if (raw && playlists.length === 0) {
+        Alert.alert(
+          'データ破損',
+          'プレイリストデータが破損しています。初期化されました。'
+        );
+      }
+      setPlaylists(playlists);
+    }).catch((error) => {
+      console.error('Failed to load playlists:', error);
+    });
   }, []);
 
   const savePlaylists = async (pls: CustomPlaylist[]) => {

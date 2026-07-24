@@ -8,6 +8,7 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { useQuestions } from './hooks/useQuestions';
+import { safeParseArray } from './utils/storageUtils';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -71,11 +72,11 @@ export default function StatisticsScreen() {
       const questionsCreated = allQuestions.filter(q => (q.createdAt ?? 0) > weekAgo).length;
 
       const historyRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY);
-      const history = historyRaw ? JSON.parse(historyRaw) : [];
+      const history = safeParseArray(historyRaw, []);
       const quizPlayed = history.filter((h: any) => new Date(h.date).getTime() > weekAgo).length;
 
       const resultsRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_RESULTS);
-      const allResults = resultsRaw ? JSON.parse(resultsRaw) : [];
+      const allResults = safeParseArray(resultsRaw, []);
       const weekResults = allResults.filter((r: any) => new Date(r.date || Date.now()).getTime() > weekAgo);
       const correctCount = weekResults.filter((r: any) => r.isCorrect).length;
       const correctRate = weekResults.length > 0 ? Math.round((correctCount / weekResults.length) * 100) : 0;
@@ -125,7 +126,7 @@ export default function StatisticsScreen() {
     try {
       const days: number[] = [];
       const now = new Date();
-      const history = JSON.parse(await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY) || '[]');
+      const history = safeParseArray(await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY), []);
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);

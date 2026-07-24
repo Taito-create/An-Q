@@ -1,0 +1,1214 @@
+warning: in the working copy of 'app/calendar.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/feedback.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/manage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/results.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app/calendar.tsx b/app/calendar.tsx[m
+[1mindex be987fec..077500bb 100644[m
+[1m--- a/app/calendar.tsx[m
+[1m+++ b/app/calendar.tsx[m
+[36m@@ -6,6 +6,7 @@[m [mimport { useTheme } from './theme';[m
+ import { SoundManager } from './sound';[m
+ import { useLocale } from './hooks/useLocale';[m
+ import { translations } from './translations';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ const { width: windowWidth } = Dimensions.get('window');[m
+ [m
+[36m@@ -73,12 +74,11 @@[m [mexport default function CalendarScreen() {[m
+   const loadEvents = async () => {[m
+     try {[m
+       const saved = await AsyncStorage.getItem('calendar_events');[m
+[31m-      if (saved) {[m
+[31m-        const parsed = JSON.parse(saved);[m
+[31m-        setEvents(parsed);[m
+[31m-      }[m
+[32m+[m[32m      const parsed = safeParseArray(saved, []);[m
+[32m+[m[32m      setEvents(parsed);[m
+     } catch (e) {[m
+       console.error('Load failed:', e);[m
+[32m+[m[32m      setEvents([]);[m
+     }[m
+   };[m
+ [m
+[36m@@ -248,7 +248,7 @@[m [mexport default function CalendarScreen() {[m
+           onPress: async () => {[m
+             try {[m
+               const saved = await AsyncStorage.getItem('calendar_events');[m
+[31m-              const currentEvents = saved ? JSON.parse(saved) : [];[m
+[32m+[m[32m              const currentEvents = safeParseArray(saved, []);[m
+               const newEvents = currentEvents.filter((e: ScheduledEvent) => String(e.id) !== String(eventId));[m
+               [m
+               if (newEvents.length === currentEvents.length) {[m
+[1mdiff --git a/app/context/QuestionsContext.tsx b/app/context/QuestionsContext.tsx[m
+[1mindex 061ad599..2a14eac0 100644[m
+[1m--- a/app/context/QuestionsContext.tsx[m
+[1m+++ b/app/context/QuestionsContext.tsx[m
+[36m@@ -16,6 +16,7 @@[m [mimport { useAuth } from '../auth/AuthContext';[m
+ import { STORAGE_KEYS } from '../constants/storageKeys';[m
+ import { Question, Folder } from '../types/question';[m
+ import { Alert } from 'react-native';[m
+[32m+[m[32mimport { safeParseArray } from '../utils/storageUtils';[m
+ [m
+ // Contextの型定義[m
+ interface QuestionsContextType {[m
+[36m@@ -254,20 +255,13 @@[m [mexport const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi[m
+     // 未ログイン時はローカルのみ[m
+     if (!user) {[m
+       const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);[m
+[31m-      if (data) {[m
+[31m-        const allQuestions: Question[] = JSON.parse(data);[m
+[31m-        const filteredQuestions = allQuestions.filter((q: any) => q.answerType);[m
+[31m-        setQuestions(filteredQuestions);[m
+[31m-      } else {[m
+[31m-        setQuestions([]);[m
+[31m-      }[m
+[32m+[m[32m      const allQuestions: Question[] = safeParseArray(data, []);[m
+[32m+[m[32m      const filteredQuestions = allQuestions.filter((q: any) => q.answerType);[m
+[32m+[m[32m      setQuestions(filteredQuestions);[m
+       [m
+       const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);[m
+[31m-      if (folderData) {[m
+[31m-        setFolders(JSON.parse(folderData));[m
+[31m-      } else {[m
+[31m-        setFolders([]);[m
+[31m-      }[m
+[32m+[m[32m      const folders: Folder[] = safeParseArray(folderData, []);[m
+[32m+[m[32m      setFolders(folders);[m
+       [m
+       return;[m
+     }[m
+[36m@@ -282,7 +276,7 @@[m [mexport const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi[m
+       const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);[m
+       [m
+       if (localQuestionsData) {[m
+[31m-        const localQuestions: Question[] = JSON.parse(localQuestionsData);[m
+[32m+[m[32m        const localQuestions: Question[] = safeParseArray(localQuestionsData, []);[m
+         const filteredLocal = localQuestions.filter((q: any) => q.answerType);[m
+         [m
+         if (filteredLocal.length > 0 && firestoreQuestions.length === 0) {[m
+[36m@@ -311,7 +305,7 @@[m [mexport const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi[m
+ [m
+       // フォルダの移行処理[m
+       if (localFoldersData) {[m
+[31m-        const localFolders: Folder[] = JSON.parse(localFoldersData);[m
+[32m+[m[32m        const localFolders: Folder[] = safeParseArray(localFoldersData, []);[m
+         [m
+         if (localFolders.length > 0 && firestoreFolders.length === 0) {[m
+           const migrated = await migrateLocalFoldersToFirestore(localFolders);[m
+[1mdiff --git a/app/customBGMContext.tsx b/app/customBGMContext.tsx[m
+[1mindex 90660b0f..de85ee65 100644[m
+[1m--- a/app/customBGMContext.tsx[m
+[1m+++ b/app/customBGMContext.tsx[m
+[36m@@ -1,8 +1,9 @@[m
+ import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';[m
+[31m-import { Platform } from 'react-native';[m
+[32m+[m[32mimport { Platform, Alert } from 'react-native';[m
+ import AsyncStorage from '@react-native-async-storage/async-storage';[m
+ import { loadAllTracksFromDB, saveTrackToDB, deleteTrackFromDB } from './musicDB';[m
+ import { SoundManager } from './sound';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ export interface CustomTrack {[m
+   id: string;[m
+[36m@@ -99,8 +100,17 @@[m [mexport function CustomBGMProvider({ children }: { children: React.ReactNode }) {[m
+     }[m
+ [m
+     AsyncStorage.getItem(PLAYLIST_KEY).then(raw => {[m
+[31m-      if (raw) setPlaylists(JSON.parse(raw));[m
+[31m-    }).catch(() => {});[m
+[32m+[m[32m      const playlists = safeParseArray(raw, []);[m
+[32m+[m[32m      if (raw && playlists.length === 0) {[m
+[32m+[m[32m        Alert.alert([m
+[32m+[m[32m          'データ破損',[m
+[32m+[m[32m          'プレイリストデータが破損しています。初期化されました。'[m
+[32m+[m[32m        );[m
+[32m+[m[32m      }[m
+[32m+[m[32m      setPlaylists(playlists);[m
+[32m+[m[32m    }).catch((error) => {[m
+[32m+[m[32m      console.error('Failed to load playlists:', error);[m
+[32m+[m[32m    });[m
+   }, []);[m
+ [m
+   const savePlaylists = async (pls: CustomPlaylist[]) => {[m
+[1mdiff --git a/app/feedback.tsx b/app/feedback.tsx[m
+[1mindex 090df3d0..c2af35c5 100644[m
+[1m--- a/app/feedback.tsx[m
+[1m+++ b/app/feedback.tsx[m
+[36m@@ -9,6 +9,7 @@[m [mimport { useTheme } from './theme';[m
+ import { translations } from './translations';[m
+ import { useLocale } from './hooks/useLocale';[m
+ import { STORAGE_KEYS } from './constants/storageKeys';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ // ──────────────────────────────────────────────[m
+ // 型定義[m
+[36m@@ -41,7 +42,7 @@[m [minterface QuizFeedback {[m
+ // ──────────────────────────────────────────────[m
+ export default function FeedbackScreen() {[m
+   const navigate = useNavigate();[m
+[31m-  const { colors, isCyberpunk, currentTheme } = useTheme();[m
+[32m+[m[32m  const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();[m
+   const locale = useLocale();[m
+   const t = translations[locale] as Record<string, any>;[m
+   [m
+[36m@@ -65,7 +66,7 @@[m [mexport default function FeedbackScreen() {[m
+       ]);[m
+ [m
+       if (resultsRaw) {[m
+[31m-        const loadedResults: QuizResult[] = JSON.parse(resultsRaw);[m
+[32m+[m[32m        const loadedResults: QuizResult[] = safeParseArray(resultsRaw, []);[m
+         setResults(loadedResults);[m
+ [m
+         // 履歴への追加処理（この画面が開かれた時に一度だけ実行）[m
+[36m@@ -74,9 +75,7 @@[m [mexport default function FeedbackScreen() {[m
+         }[m
+       }[m
+ [m
+[31m-      if (historyRaw) {[m
+[31m-        setHistory(JSON.parse(historyRaw));[m
+[31m-      }[m
+[32m+[m[32m      setHistory(safeParseArray(historyRaw, []));[m
+     } catch (e) {[m
+       console.error('FeedbackScreen loadData error:', e);[m
+     }[m
+[36m@@ -88,7 +87,7 @@[m [mexport default function FeedbackScreen() {[m
+ [m
+   const appendHistory = async (currentResults: QuizResult[], historyRaw: string | null) => {[m
+     try {[m
+[31m-      const history: HistoryEntry[] = historyRaw ? JSON.parse(historyRaw) : [];[m
+[32m+[m[32m      const history: HistoryEntry[] = safeParseArray(historyRaw, []);[m
+       const correct = currentResults.filter(r => r.isCorrect).length;[m
+       const total = currentResults.length;[m
+       [m
+[36m@@ -132,7 +131,7 @@[m [mexport default function FeedbackScreen() {[m
+ [m
+       // Save feedback to AsyncStorage[m
+       const existingFeedback = await AsyncStorage.getItem('quizFeedbacks');[m
+[31m-      const feedbacks = existingFeedback ? JSON.parse(existingFeedback) : [];[m
+[32m+[m[32m      const feedbacks = safeParseArray<QuizFeedback>(existingFeedback, []);[m
+       feedbacks.unshift(feedback);[m
+       [m
+       // Keep only last 50 feedbacks[m
+[36m@@ -194,7 +193,7 @@[m [mexport default function FeedbackScreen() {[m
+         <Text style={styles.emptyEmoji}>📋</Text>[m
+         <Text style={[styles.emptyTitle, { color: colors.text }]}>{t.noResultsYet}</Text>[m
+         <TouchableOpacity style={[styles.startBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>[m
+[31m-          <Text style={[styles.startBtnText, { color: '#fff' }]}>{t.takeQuizChallenge}</Text>[m
+[32m+[m[32m          <Text style={[styles.startBtnText, { color: onPrimary }]}>{t.takeQuizChallenge}</Text>[m
+         </TouchableOpacity>[m
+         <TouchableOpacity onPress={() => navigate('/')}>[m
+           <Text style={[styles.homeLinkText, { color: colors.primary }]}>{t.backHome}</Text>[m
+[36m@@ -238,7 +237,7 @@[m [mexport default function FeedbackScreen() {[m
+       {/* Feedback Section */}[m
+       {!feedbackSubmitted && ([m
+         <View style={[styles.section, { backgroundColor: colors.card }]}>[m
+[31m-          <TouchableOpacity [m
+[32m+[m[32m          <TouchableOpacity[m
+             style={[styles.feedbackToggle, { backgroundColor: colors.primary + '15' }]}[m
+             onPress={() => setShowFeedbackForm(!showFeedbackForm)}[m
+           >[m
+[36m@@ -249,7 +248,7 @@[m [mexport default function FeedbackScreen() {[m
+           {showFeedbackForm && ([m
+             <View style={[styles.feedbackForm, { backgroundColor: colors.background }]}>[m
+               <Text style={[styles.feedbackTitle, { color: colors.text }]}>{t.rateThisQuiz}</Text>[m
+[31m-              [m
+[32m+[m
+               {/* Star Rating */}[m
+               <View style={styles.starContainer}>[m
+                 {[1, 2, 3, 4, 5].map((star) => ([m
+[36m@@ -287,7 +286,7 @@[m [mexport default function FeedbackScreen() {[m
+                       difficulty === level && [[m
+                         styles.difficultyTextActive,[m
+                         // 🟢 サイバーパンク/ダークで背景がネオン色になる場合は黒文字に切り替え[m
+[31m-                        { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' },[m
+[32m+[m[32m                        { color: (isCyberpunk || currentTheme === 'dark') ? colors.text : onPrimary },[m
+                       ],[m
+                     ]}>[m
+                       {level === 'easy' ? t.easy : level === 'medium' ? t.medium : t.hard}[m
+[36m@@ -310,12 +309,12 @@[m [mexport default function FeedbackScreen() {[m
+               />[m
+ [m
+               {/* Submit Button */}[m
+[31m-              <TouchableOpacity [m
+[32m+[m[32m              <TouchableOpacity[m
+                 style={[styles.submitFeedbackBtn, { backgroundColor: colors.primary }, rating === 0 && styles.submitFeedbackBtnDisabled]}[m
+                 onPress={submitFeedback}[m
+                 disabled={rating === 0}[m
+               >[m
+[31m-                <Text style={[styles.submitFeedbackBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>{t.submitFeedback}</Text>[m
+[32m+[m[32m                <Text style={[styles.submitFeedbackBtnText, { color: onPrimary }]}>{t.submitFeedback}</Text>[m
+               </TouchableOpacity>[m
+             </View>[m
+           )}[m
+[36m@@ -323,8 +322,8 @@[m [mexport default function FeedbackScreen() {[m
+       )}[m
+ [m
+       {feedbackSubmitted && ([m
+[31m-        <View style={styles.feedbackThankYou}>[m
+[31m-          <Text style={styles.feedbackThankYouText}>{t.thankYouFeedback}</Text>[m
+[32m+[m[32m        <View style={[styles.feedbackThankYou, { backgroundColor: colors.success + '20' }]}>[m
+[32m+[m[32m          <Text style={[styles.feedbackThankYouText, { color: colors.success }]}>{t.thankYouFeedback}</Text>[m
+         </View>[m
+       )}[m
+ [m
+[36m@@ -378,10 +377,10 @@[m [mexport default function FeedbackScreen() {[m
+       {/* ボタン */}[m
+       <View style={styles.actions}>[m
+         <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>[m
+[31m-          <Text style={[styles.primaryBtnText, { color: '#fff' }]}>{t.takeAgain}</Text>[m
+[32m+[m[32m          <Text style={[styles.primaryBtnText, { color: onPrimary }]}>{t.takeAgain}</Text>[m
+         </TouchableOpacity>[m
+         <TouchableOpacity style={[styles.secondaryBtn, { backgroundColor: colors.success }]} onPress={() => navigate('/')}>[m
+[31m-          <Text style={[styles.secondaryBtnText, { color: '#fff' }]}>{t.backHome}</Text>[m
+[32m+[m[32m          <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>[m
+         </TouchableOpacity>[m
+         <TouchableOpacity style={styles.dangerBtn} onPress={clearResults}>[m
+           <Text style={[styles.dangerBtnText, { color: colors.error }]}>{t.deleteAllHistory}</Text>[m
+[36m@@ -392,17 +391,16 @@[m [mexport default function FeedbackScreen() {[m
+ }[m
+ [m
+ const styles = StyleSheet.create({[m
+[31m-  container: { flex: 1, backgroundColor: '#F7F8FA' },[m
+[32m+[m[32m  container: { flex: 1 },[m
+   content: { padding: 20, paddingTop: 60, paddingBottom: 50 },[m
+[31m-  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#1A1A1A' },[m
+[32m+[m[32m  headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },[m
+   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, paddingTop: 100 },[m
+   emptyEmoji: { fontSize: 60, marginBottom: 20 },[m
+[31m-  emptyTitle: { fontSize: 20, fontWeight: 'bold', color: '#888', marginBottom: 20 },[m
+[31m-  startBtn: { backgroundColor: '#4CAF50', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },[m
+[31m-  startBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },[m
+[31m-  homeLinkText: { color: '#007AFF', fontSize: 14 },[m
+[32m+[m[32m  emptyTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },[m
+[32m+[m[32m  startBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 12, marginBottom: 20 },[m
+[32m+[m[32m  startBtnText: { fontSize: 16, fontWeight: 'bold' },[m
+[32m+[m[32m  homeLinkText: { fontSize: 14 },[m
+   summaryCard: { [m
+[31m-    backgroundColor: '#fff', [m
+     borderRadius: 20, [m
+     padding: 25, [m
+     marginBottom: 20, [m
+[36m@@ -417,40 +415,40 @@[m [mconst styles = StyleSheet.create({[m
+     elevation: 5, [m
+   },[m
+   bigScore: { flexDirection: 'row', alignItems: 'baseline' },[m
+[31m-  bigScoreNum: { fontSize: 60, fontWeight: 'bold', color: '#007AFF' },[m
+[31m-  bigScoreSlash: { fontSize: 30, color: '#CCC', marginHorizontal: 5 },[m
+[31m-  bigScoreTotal: { fontSize: 30, color: '#999' },[m
+[31m-  pctText: { fontSize: 22, fontWeight: '600', color: '#444' },[m
+[32m+[m[32m  bigScoreNum: { fontSize: 60, fontWeight: 'bold' },[m
+[32m+[m[32m  bigScoreSlash: { fontSize: 30, marginHorizontal: 5 },[m
+[32m+[m[32m  bigScoreTotal: { fontSize: 30 },[m
+[32m+[m[32m  pctText: { fontSize: 22, fontWeight: '600' },[m
+   gradeText: { fontSize: 18, fontWeight: 'bold', marginVertical: 10, textAlign: 'center' },[m
+[31m-  statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 20, width: '100%', justifyContent: 'space-around' },[m
+[32m+[m[32m  statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, paddingTop: 20, width: '100%', justifyContent: 'space-around' },[m
+   statBox: { alignItems: 'center' },[m
+   statVal: { fontSize: 18, fontWeight: 'bold' },[m
+[31m-  statLbl: { fontSize: 12, color: '#888' },[m
+[31m-  statDivider: { width: 1, height: 30, backgroundColor: '#EEE' },[m
+[31m-  section: { backgroundColor: '#fff', borderRadius: 15, padding: 15, marginBottom: 15 },[m
+[31m-  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#333' },[m
+[31m-  wrongCard: { backgroundColor: '#FFF5F5', padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1 },[m
+[31m-  wrongQuestion: { fontSize: 14, color: '#333', marginBottom: 5 },[m
+[31m-  correctHint: { fontSize: 13, fontWeight: 'bold', color: '#F44336' },[m
+[32m+[m[32m  statLbl: { fontSize: 12 },[m
+[32m+[m[32m  statDivider: { width: 1, height: 30 },[m
+[32m+[m[32m  section: { borderRadius: 15, padding: 15, marginBottom: 15 },[m
+[32m+[m[32m  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15 },[m
+[32m+[m[32m  wrongCard: { padding: 12, borderRadius: 10, marginBottom: 10, borderWidth: 1 },[m
+[32m+[m[32m  wrongQuestion: { fontSize: 14, marginBottom: 5 },[m
+[32m+[m[32m  correctHint: { fontSize: 13, fontWeight: 'bold' },[m
+   toggleHeader: { flexDirection: 'row', justifyContent: 'space-between' },[m
+[31m-  toggleArrow: { color: '#007AFF', fontWeight: 'bold' },[m
+[31m-  resultItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },[m
+[32m+[m[32m  toggleArrow: { fontWeight: 'bold' },[m
+[32m+[m[32m  resultItem: { padding: 10, borderBottomWidth: 1 },[m
+   resultCorrect: { backgroundColor: '#F9FFF9' },[m
+   resultWrong: { backgroundColor: '#FFF9F9' },[m
+[31m-  resultQuestion: { fontSize: 14, color: '#444' },[m
+[32m+[m[32m  resultQuestion: { fontSize: 14 },[m
+   resultStatus: { fontSize: 12, fontWeight: 'bold', marginTop: 3 },[m
+   historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },[m
+[31m-  historyDate: { fontSize: 10, color: '#888', width: 80 },[m
+[31m-  historyBar: { flex: 1, height: 8, backgroundColor: '#EEE', borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },[m
+[31m-  historyFill: { height: '100%', backgroundColor: '#007AFF' },[m
+[32m+[m[32m  historyDate: { fontSize: 10, width: 80 },[m
+[32m+[m[32m  historyBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },[m
+[32m+[m[32m  historyFill: { height: '100%' },[m
+   historyPct: { fontSize: 12, fontWeight: 'bold', width: 35 },[m
+   actions: { gap: 12 },[m
+[31m-  primaryBtn: { backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center' },[m
+[31m-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },[m
+[31m-  secondaryBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 15, alignItems: 'center' },[m
+[31m-  secondaryBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },[m
+[32m+[m[32m  primaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },[m
+[32m+[m[32m  primaryBtnText: { fontSize: 16, fontWeight: 'bold' },[m
+[32m+[m[32m  secondaryBtn: { padding: 18, borderRadius: 15, alignItems: 'center' },[m
+[32m+[m[32m  secondaryBtnText: { fontSize: 16, fontWeight: 'bold' },[m
+   dangerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },[m
+[31m-  dangerBtnText: { color: '#FF3B30', fontSize: 13 },[m
+[32m+[m[32m  dangerBtnText: { fontSize: 13 },[m
+   [m
+   // Feedback Form Styles[m
+   feedbackToggle: { [m
+[36m@@ -458,57 +456,50 @@[m [mconst styles = StyleSheet.create({[m
+     justifyContent: 'space-between', [m
+     alignItems: 'center', [m
+     padding: 15, [m
+[31m-    backgroundColor: '#F0F8FF', [m
+     borderRadius: 10 [m
+   },[m
+[31m-  feedbackToggleText: { fontSize: 16, fontWeight: '600', color: '#007AFF' },[m
+[31m-  feedbackToggleArrow: { fontSize: 14, color: '#007AFF', fontWeight: 'bold' },[m
+[31m-  feedbackForm: { padding: 20, backgroundColor: '#FAFAFA', borderRadius: 10, marginTop: 10 },[m
+[31m-  feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center', color: '#333' },[m
+[32m+[m[32m  feedbackToggleText: { fontSize: 16, fontWeight: '600' },[m
+[32m+[m[32m  feedbackToggleArrow: { fontSize: 14, fontWeight: 'bold' },[m
+[32m+[m[32m  feedbackForm: { padding: 20, borderRadius: 10, marginTop: 10 },[m
+[32m+[m[32m  feedbackTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },[m
+   starContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 20 },[m
+   starButton: { padding: 5, marginHorizontal: 5 },[m
+   starText: { fontSize: 30 },[m
+   starActive: { color: '#FFD700' },[m
+   starInactive: { color: '#DDD' },[m
+[31m-  difficultyLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: '#333' },[m
+[32m+[m[32m  difficultyLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10 },[m
+   difficultyContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },[m
+   difficultyButton: { [m
+     paddingVertical: 8, [m
+     paddingHorizontal: 20, [m
+     borderRadius: 20, [m
+[31m-    backgroundColor: '#E0E0E0' [m
+   },[m
+[31m-  difficultyActive: { backgroundColor: '#007AFF' },[m
+[31m-  difficultyText: { fontSize: 14, fontWeight: '600', color: '#666' },[m
+[32m+[m[32m  difficultyActive: {},[m
+[32m+[m[32m  difficultyText: { fontSize: 14, fontWeight: '600' },[m
+   difficultyTextActive: { color: '#FFF' },[m
+[31m-  memoLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10, color: '#333' },[m
+[32m+[m[32m  memoLabel: { fontSize: 16, fontWeight: '600', marginBottom: 10 },[m
+   memoInput: { [m
+     borderWidth: 1, [m
+[31m-    borderColor: '#DDD', [m
+     borderRadius: 8, [m
+     padding: 12, [m
+     fontSize: 14, [m
+[31m-    backgroundColor: '#FFF', [m
+     minHeight: 80, [m
+     marginBottom: 20 [m
+   },[m
+   submitFeedbackBtn: { [m
+[31m-    backgroundColor: '#007AFF', [m
+     padding: 15, [m
+     borderRadius: 10, [m
+     alignItems: 'center' [m
+   },[m
+[31m-  submitFeedbackBtnDisabled: { backgroundColor: '#CCC' },[m
+[31m-  submitFeedbackBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },[m
+[32m+[m[32m  submitFeedbackBtnDisabled: { opacity: 0.6 },[m
+[32m+[m[32m  submitFeedbackBtnText: { fontSize: 16, fontWeight: 'bold' },[m
+   feedbackThankYou: { [m
+     padding: 20, [m
+[31m-    backgroundColor: '#E8F5E8', [m
+     borderRadius: 10, [m
+     alignItems: 'center' [m
+   },[m
+   feedbackThankYouText: { [m
+     fontSize: 16, [m
+[31m-    color: '#4CAF50', [m
+     textAlign: 'center', [m
+     fontWeight: '600' [m
+   },[m
+[1mdiff --git a/app/inbox.tsx b/app/inbox.tsx[m
+[1mindex 1a763297..d44826be 100644[m
+[1m--- a/app/inbox.tsx[m
+[1m+++ b/app/inbox.tsx[m
+[36m@@ -7,6 +7,7 @@[m [mimport { SoundManager } from './sound';[m
+ import { translations } from './translations';[m
+ import { useLocale } from './hooks/useLocale';[m
+ import { STORAGE_KEYS } from './constants/storageKeys';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ interface ReceivedItem {[m
+   id: string;[m
+[36m@@ -24,6 +25,7 @@[m [mexport default function InboxScreen() {[m
+ [m
+   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);[m
+   const [selectedItems, setSelectedItems] = useState<string[]>([]);[m
+[32m+[m[32m  const [isTransferring, setIsTransferring] = useState(false);[m
+ [m
+   // 削除確認モーダル用 state[m
+   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);[m
+[36m@@ -36,7 +38,7 @@[m [mexport default function InboxScreen() {[m
+   const loadReceivedItems = async () => {[m
+     try {[m
+       const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);[m
+[31m-      const items = raw ? JSON.parse(raw) : [];[m
+[32m+[m[32m      const items = safeParseArray(raw, []);[m
+       setReceivedItems(items);[m
+     } catch (error) {[m
+       console.error('Failed to load inbox:', error);[m
+[36m@@ -66,116 +68,168 @@[m [mexport default function InboxScreen() {[m
+       return;[m
+     }[m
+ [m
+[32m+[m[32m    if (isTransferring) {[m
+[32m+[m[32m      return; // 二重実行防止[m
+[32m+[m[32m    }[m
+[32m+[m
+     try {[m
+[32m+[m[32m      setIsTransferring(true);[m
+[32m+[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      // フェーズ1: 全ての既存データを読み込む[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      const [existingQuestionsRaw, existingFoldersRaw, inboxItemsRaw] = await Promise.all([[m
+[32m+[m[32m        AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS),[m
+[32m+[m[32m        AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS),[m
+[32m+[m[32m        AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS),[m
+[32m+[m[32m      ]);[m
+[32m+[m
+[32m+[m[32m      const existingQuestions: any[] = safeParseArray(existingQuestionsRaw, []);[m
+[32m+[m[32m      const existingFolders: any[] = safeParseArray(existingFoldersRaw, []);[m
+[32m+[m[32m      const inboxItems: ReceivedItem[] = safeParseArray(inboxItemsRaw, []);[m
+[32m+[m
+[32m+[m[32m      // 重複チェック用のIDセットを作成[m
+[32m+[m[32m      const existingQuestionIds = new Set(existingQuestions.map(q => q.id));[m
+[32m+[m[32m      const existingFolderIds = new Set(existingFolders.map(f => f.id));[m
+[32m+[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      // フェーズ2: メモリ上でデータをマージ[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+       const itemsToTransfer = receivedItems.filter(item => selectedItems.includes(item.id));[m
+       let totalAdded = 0;[m
+[31m-[m
+[31m-      // 1. 問題（question）を転送[m
+[31m-      const questionsToAdd = itemsToTransfer[m
+[31m-        .filter(item => item.type === 'question')[m
+[31m-        .map(item => ({[m
+[32m+[m[32m      const newQuestions: any[] = [];[m
+[32m+[m[32m      const newFolders: any[] = [];[m
+[32m+[m
+[32m+[m[32m      // 問題（question）を処理[m
+[32m+[m[32m      const questionItems = itemsToTransfer.filter(item => item.type === 'question');[m
+[32m+[m[32m      questionItems.forEach(item => {[m
+[32m+[m[32m        // 重複IDの場合はスキップ（冪等性確保）[m
+[32m+[m[32m        const newQuestion = {[m
+           ...item.data,[m
+           id: Date.now() + Math.random(),[m
+           isShared: true,[m
+           sharedMark: '🔗',[m
+           originalInboxId: item.id,[m
+[31m-        }));[m
+[32m+[m[32m        };[m
+ [m
+[31m-      if (questionsToAdd.length > 0) {[m
+[31m-        const existingQuestions = JSON.parse([m
+[31m-          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'[m
+[32m+[m[32m        // 内容の重複もチェック（質問テキスト + 送信者コード）[m
+[32m+[m[32m        const isDuplicateContent = existingQuestions.some([m
+[32m+[m[32m          q => q.question === item.data.question && q.senderCode === item.senderCode[m
+         );[m
+[31m-        await AsyncStorage.setItem([m
+[31m-          STORAGE_KEYS.QUIZ_QUESTIONS,[m
+[31m-          JSON.stringify([...existingQuestions, ...questionsToAdd])[m
+[31m-        );[m
+[31m-        totalAdded += questionsToAdd.length;[m
+[31m-      }[m
+ [m
+[31m-      // 2. 問題集（folder）を転送[m
+[32m+[m[32m        if (!isDuplicateContent) {[m
+[32m+[m[32m          newQuestions.push(newQuestion);[m
+[32m+[m[32m          totalAdded++;[m
+[32m+[m[32m        }[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // 問題集（folder）を処理[m
+       const folderItems = itemsToTransfer.filter(item => item.type === 'folder');[m
+       const createId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);[m
+       const folderIdMap = new Map<string, string>();[m
+ [m
+       folderItems.forEach(item => {[m
+         const originalFolderId = String(item.data?.id ?? item.id);[m
+[31m-        folderIdMap.set(originalFolderId, createId());[m
+[32m+[m[32m        const newFolderId = createId();[m
+[32m+[m[32m        folderIdMap.set(originalFolderId, newFolderId);[m
+       });[m
+ [m
+[31m-      const foldersToAdd = folderItems.map(item => {[m
+[32m+[m[32m      folderItems.forEach(item => {[m
+         const folderData = item.data;[m
+         const originalFolderId = String(folderData.id ?? item.id);[m
+         const newFolderId = folderIdMap.get(originalFolderId) || createId();[m
+ [m
+         const newQuestionIds: number[] = [];[m
+[31m-        const newQuestions: any[] = [];[m
+[32m+[m[32m        const folderQuestions: any[] = [];[m
+ [m
+[32m+[m[32m        // フォルダ内の問題を処理[m
+         (folderData.questions || []).forEach((q: any) => {[m
+           const newQuestionId = Date.now() + Math.random();[m
+[31m-          newQuestions.push({[m
+[32m+[m[32m          const newQuestion = {[m
+             ...q,[m
+             id: newQuestionId,[m
+             isShared: true,[m
+             sharedMark: '🔗',[m
+             originalFolderId: newFolderId,[m
+[31m-          });[m
+[31m-          newQuestionIds.push(newQuestionId);[m
+[31m-        });[m
+[31m-[m
+[31m-        const parentId = folderData.parentId ? folderIdMap.get(String(folderData.parentId)) : undefined;[m
+[32m+[m[32m          };[m
+ [m
+[31m-        return {[m
+[31m-          name: folderData.name,[m
+[31m-          description: folderData.description || '',[m
+[31m-          id: newFolderId,[m
+[31m-          questionIds: newQuestionIds,[m
+[31m-          questions: newQuestions,[m
+[31m-          isShared: true,[m
+[31m-          originalInboxId: item.id,[m
+[31m-          parentId,[m
+[31m-        };[m
+[31m-      });[m
+[32m+[m[32m          // 問題の重複チェック[m
+[32m+[m[32m          const isDuplicateQuestion = existingQuestions.some([m
+[32m+[m[32m            eq => eq.question === q.question && eq.senderCode === item.senderCode[m
+[32m+[m[32m          );[m
+ [m
+[31m-      if (foldersToAdd.length > 0) {[m
+[31m-        const allNewQuestions = foldersToAdd.flatMap(f => f.questions || []);[m
+[32m+[m[32m          if (!isDuplicateQuestion) {[m
+[32m+[m[32m            folderQuestions.push(newQuestion);[m
+[32m+[m[32m            newQuestionIds.push(newQuestionId);[m
+[32m+[m[32m          }[m
+[32m+[m[32m        });[m
+ [m
+[31m-        const existingQuestions = JSON.parse([m
+[31m-          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'[m
+[31m-        );[m
+[31m-        await AsyncStorage.setItem([m
+[31m-          STORAGE_KEYS.QUIZ_QUESTIONS,[m
+[31m-          JSON.stringify([...existingQuestions, ...allNewQuestions])[m
+[32m+[m[32m        // フォルダ自体の重複チェック[m
+[32m+[m[32m        const isDuplicateFolder = existingFolders.some([m
+[32m+[m[32m          f => f.name === folderData.name && f.senderCode === item.senderCode[m
+         );[m
+ [m
+[31m-        const foldersToSave = foldersToAdd.map(({ questions, ...folder }) => folder);[m
+[32m+[m[32m        if (!isDuplicateFolder && folderQuestions.length > 0) {[m
+[32m+[m[32m          const parentId = folderData.parentId ? folderIdMap.get(String(folderData.parentId)) : undefined;[m
+ [m
+[31m-        const existingFolders = JSON.parse([m
+[31m-          await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS) || '[]'[m
+[31m-        );[m
+[31m-        await AsyncStorage.setItem([m
+[31m-          STORAGE_KEYS.QUESTION_FOLDERS,[m
+[31m-          JSON.stringify([...existingFolders, ...foldersToSave])[m
+[32m+[m[32m          newFolders.push({[m
+[32m+[m[32m            name: folderData.name,[m
+[32m+[m[32m            description: folderData.description || '',[m
+[32m+[m[32m            id: newFolderId,[m
+[32m+[m[32m            questionIds: newQuestionIds,[m
+[32m+[m[32m            isShared: true,[m
+[32m+[m[32m            originalInboxId: item.id,[m
+[32m+[m[32m            parentId,[m
+[32m+[m[32m          });[m
+[32m+[m[32m          totalAdded++;[m
+[32m+[m
+[32m+[m[32m          // フォルダ内の問題も全体リストに追加[m
+[32m+[m[32m          newQuestions.push(...folderQuestions);[m
+[32m+[m[32m        }[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // 追加するものがない場合は早期終了[m
+[32m+[m[32m      if (totalAdded === 0) {[m
+[32m+[m[32m        Alert.alert([m
+[32m+[m[32m          locale === 'ja' ? '重複エラー' : 'Duplicate Error',[m
+[32m+[m[32m          locale === 'ja'[m
+[32m+[m[32m            ? '選択したアイテムは既に登録されています。'[m
+[32m+[m[32m            : 'Selected items are already registered.'[m
+         );[m
+[31m-        totalAdded += foldersToAdd.length;[m
+[32m+[m[32m        return;[m
+       }[m
+ [m
+[31m-      // 3. 転送済みアイテムを受信ボックスから削除[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      // フェーズ3: 全てをまとめて保存[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      await AsyncStorage.multiSet([[m
+[32m+[m[32m        [STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify([...existingQuestions, ...newQuestions])],[m
+[32m+[m[32m        [STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify([...existingFolders, ...newFolders])],[m
+[32m+[m[32m        [STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(inboxItems.filter(item => !selectedItems.includes(item.id)))],[m
+[32m+[m[32m      ]);[m
+[32m+[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+[32m+[m[32m      // フェーズ4: 状態を更新[m
+[32m+[m[32m      // ─────────────────────────────────────────[m
+       const remaining = receivedItems.filter(item => !selectedItems.includes(item.id));[m
+[31m-      await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));[m
+[31m-[m
+       setReceivedItems(remaining);[m
+       setSelectedItems([]);[m
+ [m
+       SoundManager.play('complete');[m
+       Alert.alert([m
+         locale === 'ja' ? '転送完了' : 'Transfer Complete',[m
+[31m-        locale === 'ja' [m
+[32m+[m[32m        locale === 'ja'[m
+           ? `${totalAdded}個のアイテムを転送しました`[m
+           : `Transferred ${totalAdded} items`[m
+       );[m
+     } catch (error) {[m
+       console.error('Failed to transfer:', error);[m
+[31m-      Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? '転送に失敗しました' : 'Transfer failed');[m
+[32m+[m[32m      Alert.alert([m
+[32m+[m[32m        locale === 'ja' ? 'エラー' : 'Error',[m
+[32m+[m[32m        locale === 'ja' ? '転送に失敗しました。\nもう一度お試しください。' : 'Transfer failed.\nPlease try again.'[m
+[32m+[m[32m      );[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      setIsTransferring(false);[m
+     }[m
+   };[m
+ [m
+[1mdiff --git a/app/index.tsx b/app/index.tsx[m
+[1mindex ab092cc5..d4e28c84 100644[m
+[1m--- a/app/index.tsx[m
+[1m+++ b/app/index.tsx[m
+[36m@@ -18,6 +18,7 @@[m [mimport { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationM[m
+ import { useAuth } from './auth/AuthContext';[m
+ import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';[m
+ import { useQuestionsContext } from './context/QuestionsContext';[m
+[32m+[m[32mimport { safeParse, safeParseArray } from './utils/storageUtils';[m
+ [m
+ // レスポンシブ判定用フック[m
+ const useResponsive = () => {[m
+[36m@@ -227,7 +228,7 @@[m [mconst HomeScreen = () => {[m
+       [m
+       if (cachedLevel) setUserLevel(parseInt(cachedLevel, 10));[m
+       if (cachedCoins) setUserCoins(parseInt(cachedCoins, 10));[m
+[31m-      if (cachedProfile) setProfile(JSON.parse(cachedProfile));[m
+[32m+[m[32m      if (cachedProfile) setProfile(safeParse(cachedProfile, null));[m
+ [m
+       // 2. その後、裏で Firestore から最新データを取得し、差分があればアップデート！[m
+       if (user?.uid) {[m
+[36m@@ -255,7 +256,7 @@[m [mconst HomeScreen = () => {[m
+     try {[m
+       const stored = await AsyncStorage.getItem('quiz_questions');[m
+       if (stored) {[m
+[31m-        const allQuestions = JSON.parse(stored);[m
+[32m+[m[32m        const allQuestions = safeParseArray(stored, []);[m
+         const weakQuestions = allQuestions.filter((q: any) => q.mistakeCount > 0);[m
+         const shuffled = [...weakQuestions].sort(() => Math.random() - 0.5).slice(0, 3);[m
+         setQuickReviewQuestions(shuffled);[m
+[36m@@ -270,7 +271,7 @@[m [mconst HomeScreen = () => {[m
+       const examDatesRaw = await AsyncStorage.getItem('EXAM_DATES');[m
+       if (!examDatesRaw) return;[m
+       [m
+[31m-      const examDates: Array<{ date: string; name: string }> = JSON.parse(examDatesRaw);[m
+[32m+[m[32m      const examDates = safeParseArray<{ date: string; name: string }>(examDatesRaw, []);[m
+       const today = new Date();[m
+       today.setHours(0, 0, 0, 0);[m
+       [m
+[36m@@ -304,7 +305,7 @@[m [mconst HomeScreen = () => {[m
+     try {[m
+       const saved = await AsyncStorage.getItem('EXAM_DATES');[m
+       if (saved) {[m
+[31m-        setExamDates(JSON.parse(saved));[m
+[32m+[m[32m        setExamDates(safeParseArray(saved, []));[m
+       }[m
+     } catch (error) {[m
+       console.error('Error loading exam dates:', error);[m
+[36m@@ -410,7 +411,7 @@[m [mconst HomeScreen = () => {[m
+       if (!user) {[m
+         const savedQuestions = await AsyncStorage.getItem('quiz_questions');[m
+         if (savedQuestions) {[m
+[31m-          const questions = JSON.parse(savedQuestions);[m
+[32m+[m[32m          const questions = safeParseArray(savedQuestions, []);[m
+           setTotalQuestions(questions.length);[m
+           if (questions.length > 0) {[m
+             const today = new Date();[m
+[1mdiff --git a/app/manage.tsx b/app/manage.tsx[m
+[1mindex c0c1a3d9..27c18ff9 100644[m
+[1m--- a/app/manage.tsx[m
+[1m+++ b/app/manage.tsx[m
+[36m@@ -6,6 +6,7 @@[m [mimport { SoundManager } from './sound';[m
+ import { useTheme } from './theme';[m
+ import { useLocale } from './hooks/useLocale';[m
+ import { translations } from './translations';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ interface CustomTimer {[m
+   id: string;[m
+[36m@@ -33,9 +34,8 @@[m [mexport default function ManageScreen() {[m
+   const loadCustomTimers = async () => {[m
+     try {[m
+       const saved = await AsyncStorage.getItem('CUSTOM_TIMERS');[m
+[31m-      if (saved) {[m
+[31m-        setCustomTimers(JSON.parse(saved));[m
+[31m-      }[m
+[32m+[m[32m      const timers = safeParseArray(saved, []);[m
+[32m+[m[32m      setCustomTimers(timers);[m
+     } catch (error) {[m
+       console.error('Error loading custom timers:', error);[m
+     }[m
+[1mdiff --git a/app/multi.tsx b/app/multi.tsx[m
+[1mindex 97db841a..cd854b63 100644[m
+[1m--- a/app/multi.tsx[m
+[1m+++ b/app/multi.tsx[m
+[36m@@ -14,6 +14,7 @@[m [mimport { useLocale } from './hooks/useLocale';[m
+ import { SoundManager } from './sound';[m
+ import { useQuestionsContext } from './context/QuestionsContext';[m
+ import { STORAGE_KEYS } from './constants/storageKeys';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ // ランダムな6文字の英数字IDを生成[m
+ const generateShortId = (): string => {[m
+[36m@@ -215,14 +216,8 @@[m [mexport default function MultiScreen() {[m
+         return;[m
+       }[m
+ [m
+[31m-      // 受信ボックスに保存[m
+[31m-      let inboxItems: any[] = [];[m
+[31m-      try {[m
+[31m-        const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);[m
+[31m-        inboxItems = raw ? JSON.parse(raw) : [];[m
+[31m-      } catch (e) {[m
+[31m-        inboxItems = [];[m
+[31m-      }[m
+[32m+[m[32m      const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);[m
+[32m+[m[32m      const inboxItems: any[] = safeParseArray(raw, []);[m
+ [m
+       // 重複チェック[m
+       const itemsToCheck = receivedData.data;[m
+[1mdiff --git a/app/profile.tsx b/app/profile.tsx[m
+[1mindex 9196341c..80affe44 100644[m
+[1m--- a/app/profile.tsx[m
+[1m+++ b/app/profile.tsx[m
+[36m@@ -13,6 +13,7 @@[m [mimport { loadStats } from './missions';[m
+ import { useAuth } from './auth/AuthContext';[m
+ import ImageCropper from '../src/components/ImageCropper';[m
+ import { equipTitle, getTitleDisplay, normalizeUserProfileDocument, resolveTitleDefinition, TITLE_LIBRARY } from '../src/utils/userProgress';[m
+[32m+[m[32mimport { safeParse, safeParseArray } from './utils/storageUtils';[m
+ [m
+ interface UserProfile {[m
+   username: string;[m
+[36m@@ -76,10 +77,43 @@[m [mexport default function ProfileScreen() {[m
+   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);[m
+ [m
+   useEffect(() => {[m
+[31m-    loadProfile();[m
+[32m+[m[32m    let isMounted = true;[m
+[32m+[m
+[32m+[m[32m    const loadProfileAsync = async () => {[m
+[32m+[m[32m      await loadProfile();[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    loadProfileAsync();[m
+[32m+[m
+[32m+[m[32m    return () => {[m
+[32m+[m[32m      isMounted = false;[m
+[32m+[m[32m    };[m
+   }, [user]);[m
+ [m
+   const loadProfile = async () => {[m
+[32m+[m[32m    // フォールバック用の最小限のプロフィールデータを事前に準備[m
+[32m+[m[32m    const fallbackProfile: UserProfile = {[m
+[32m+[m[32m      username: 'An-Q Learner',[m
+[32m+[m[32m      bio: '',[m
+[32m+[m[32m      profileImage: null,[m
+[32m+[m[32m      currentTitle: 'apprentice',[m
+[32m+[m[32m      unlockedTitles: ['apprentice', 'memory-monk'],[m
+[32m+[m[32m      level: 1,[m
+[32m+[m[32m      currentXP: 0,[m
+[32m+[m[32m      nextLevelXP: 100,[m
+[32m+[m[32m      totalCoins: 0,[m
+[32m+[m[32m      totalBooks: 0,[m
+[32m+[m[32m      totalQuestionsCreated: 0,[m
+[32m+[m[32m      totalQuizzesPlayed: 0,[m
+[32m+[m[32m      totalCorrectAnswers: 0,[m
+[32m+[m[32m      totalQuestionsAnswered: 0,[m
+[32m+[m[32m      correctRate: 0,[m
+[32m+[m[32m      streakDays: 0,[m
+[32m+[m[32m      joinDate: Date.now(),[m
+[32m+[m[32m      lastLoginDate: Date.now(),[m
+[32m+[m[32m      achievements: [],[m
+[32m+[m[32m    };[m
+[32m+[m
+     try {[m
+       const storedUsername = await AsyncStorage.getItem('user_username') || 'An-Q Learner';[m
+       const storedBio = await AsyncStorage.getItem('user_bio') || '';[m
+[36m@@ -109,13 +143,19 @@[m [mexport default function ProfileScreen() {[m
+       let totalQuestionsAnswered = 0;[m
+       let correctRate = 0;[m
+ [m
+[32m+[m[32m      // quiz_questionsのJSONパースを安全に行う[m
+[32m+[m[32m      let questions: any[] = [];[m
+       const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';[m
+[31m-      const questions = JSON.parse(questionsRaw);[m
+[32m+[m[32m      questions = safeParseArray(questionsRaw, []);[m
+[32m+[m
+       const stats = await loadStats();[m
+[31m-      const resultsRaw = await AsyncStorage.getItem('quizResults') || '[]';[m
+[31m-      let results = [];[m
+[31m-      try { results = JSON.parse(resultsRaw); } catch(e) {}[m
+[31m-      const resultsArr = Array.isArray(results) ? results : results.results || [];[m
+[32m+[m[32m      const resultsRaw = await AsyncStorage.getItem('quizResults');[m
+[32m+[m[32m      const parsedResults = safeParse<any>(resultsRaw, []);[m
+[32m+[m[32m      const results = Array.isArray(parsedResults)[m
+[32m+[m[32m        ? parsedResults[m
+[32m+[m[32m        : (parsedResults?.results ?? []);[m
+[32m+[m
+[32m+[m[32m      const resultsArr = results;[m
+       const localCorrectCount = resultsArr.filter((r: any) => r.isCorrect).length;[m
+       const localAnsweredCount = resultsArr.length;[m
+       totalCorrectAnswers = localCorrectCount;[m
+[36m@@ -208,14 +248,27 @@[m [mexport default function ProfileScreen() {[m
+         streakDays: streakCount,[m
+         joinDate,[m
+         lastLoginDate,[m
+[31m-        achievements: JSON.parse(await AsyncStorage.getItem('achievements') || '[]'),[m
+[32m+[m[32m        achievements: safeParseArray(await AsyncStorage.getItem('achievements'), []),[m
+       });[m
+ [m
+       setEditUsername(username);[m
+       setEditBio(bio);[m
+       setEditProfileImage(profileImage);[m
+     } catch (error) {[m
+[32m+[m[32m      // エラーが発生した場合でも、フォールバックプロフィールを表示[m
+       console.error('Failed to load profile:', error);[m
+[32m+[m[32m      setProfile(fallbackProfile);[m
+[32m+[m[32m      setEditUsername(fallbackProfile.username);[m
+[32m+[m[32m      setEditBio(fallbackProfile.bio);[m
+[32m+[m[32m      setEditProfileImage(fallbackProfile.profileImage);[m
+[32m+[m
+[32m+[m[32m      // ユーザーに通知（オプション）[m
+[32m+[m[32m      Alert.alert([m
+[32m+[m[32m        locale === 'ja' ? 'プロフィール読み込みエラー' : 'Profile Load Error',[m
+[32m+[m[32m        locale === 'ja'[m
+[32m+[m[32m          ? 'プロフィールの読み込みに失敗しました。\n初期状態で表示しています。'[m
+[32m+[m[32m          : 'Failed to load profile.\nShowing default profile.'[m
+[32m+[m[32m      );[m
+     }[m
+   };[m
+ [m
+[1mdiff --git a/app/reorderConfirm.tsx b/app/reorderConfirm.tsx[m
+[1mindex 05300e8e..244ff945 100644[m
+[1m--- a/app/reorderConfirm.tsx[m
+[1m+++ b/app/reorderConfirm.tsx[m
+[36m@@ -5,6 +5,7 @@[m [mimport { Ionicons } from '../src/icons';[m
+ import { useTheme } from './theme';[m
+ import { SoundManager } from './sound';[m
+ import AsyncStorage from '@react-native-async-storage/async-storage';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ [m
+ export default function ReorderConfirmScreen() {[m
+   const navigate = useNavigate();[m
+[36m@@ -13,8 +14,8 @@[m [mexport default function ReorderConfirmScreen() {[m
+ [m
+   const locale = searchParams.get('locale') || 'ja';[m
+   const ja = locale !== 'en';[m
+[31m-  const before: string[] = JSON.parse(searchParams.get('before') || '[]');[m
+[31m-  const after: string[] = JSON.parse(searchParams.get('after') || '[]');[m
+[32m+[m[32m  const before = safeParseArray<string>(searchParams.get('before'), []);[m
+[32m+[m[32m  const after = safeParseArray<string>(searchParams.get('after'), []);[m
+   const mode = searchParams.get('mode') || 'compact';[m
+ [m
+   // ラベル定義[m
+[1mdiff --git a/app/results.tsx b/app/results.tsx[m
+[1mindex e87f6266..a1e7ed07 100644[m
+[1m--- a/app/results.tsx[m
+[1m+++ b/app/results.tsx[m
+[36m@@ -10,6 +10,7 @@[m [mimport { useTheme } from './theme';[m
+ import { translations } from './translations';[m
+ import { useLocale } from './hooks/useLocale';[m
+ import { loadStats, UserStats } from './missions';[m
+[32m+[m[32mimport { safeParse, safeParseArray } from './utils/storageUtils';[m
+ [m
+ // Type definitions[m
+ interface QuizResult {[m
+[36m@@ -75,7 +76,7 @@[m [mexport default function ResultsScreen() {[m
+       total,[m
+       percentage,[m
+     };[m
+[31m-    const existing: HistoryEntry[] = existingHistoryRaw ? JSON.parse(existingHistoryRaw) : [];[m
+[32m+[m[32m    const existing: HistoryEntry[] = safeParseArray(existingHistoryRaw, []);[m
+     existing.push(entry);[m
+     await AsyncStorage.setItem('quizHistory', JSON.stringify(existing));[m
+     setHistory(existing);[m
+[36m@@ -101,18 +102,16 @@[m [mexport default function ResultsScreen() {[m
+       ]);[m
+ [m
+       if (resultsRaw) {[m
+[31m-        const parsed = JSON.parse(resultsRaw);[m
+[32m+[m[32m        const parsed = safeParse<any>(resultsRaw, []);[m
+         // Support both old format (array) and new format ({ results, total, score })[m
+[31m-        const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed.results || []);[m
+[32m+[m[32m        const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed?.results ?? []);[m
+         setResults(loadedResults);[m
+         if (loadedResults.length > 0) {[m
+           await appendHistory(loadedResults, historyRaw);[m
+         }[m
+       }[m
+ [m
+[31m-      if (historyRaw) {[m
+[31m-        setHistory(JSON.parse(historyRaw));[m
+[31m-      }[m
+[32m+[m[32m      setHistory(safeParseArray(historyRaw, []));[m
+     } catch (e) {[m
+       console.error('ResultsScreen loadData error:', e);[m
+     }[m
+[1mdiff --git a/app/sound.tsx b/app/sound.tsx[m
+[1mindex 4f3bbc50..1c4f0d70 100644[m
+[1m--- a/app/sound.tsx[m
+[1m+++ b/app/sound.tsx[m
+[36m@@ -1,5 +1,7 @@[m
+ // app/sound.tsx - 修正版[m
+ [m
+[32m+[m[32mimport { safeParseObject } from './utils/storageUtils';[m
+[32m+[m
+ export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong' | 'delete';[m
+ export type BGMType = 'BGM1' | 'BGM2' | 'BGM3' | 'BGM4';[m
+ export type SEType = 'effect1' | 'effect2' | 'effect3' | 'effect4';[m
+[36m@@ -168,13 +170,9 @@[m [mclass SoundManager {[m
+   }[m
+ [m
+   static async getBGMSettings() {[m
+[31m-    try {[m
+[31m-      const saved = localStorage.getItem('bgm_settings');[m
+[31m-      if (saved) {[m
+[31m-        return JSON.parse(saved);[m
+[31m-      }[m
+[31m-    } catch (e) {}[m
+[31m-    return { enabled: true, currentBGM: 'BGM1' };[m
+[32m+[m[32m    const defaultSettings = { enabled: true, currentBGM: 'BGM1' };[m
+[32m+[m[32m    const saved = localStorage.getItem('bgm_settings');[m
+[32m+[m[32m    return safeParseObject(saved, defaultSettings);[m
+   }[m
+ [m
+   private static async saveBGMSettings() {[m
+[36m@@ -194,4 +192,4 @@[m [mclass SoundManager {[m
+   }[m
+ }[m
+ [m
+[31m-export { SoundManager };[m
+\ No newline at end of file[m
+[32m+[m[32mexport { SoundManager };[m
+[1mdiff --git a/app/statistics.tsx b/app/statistics.tsx[m
+[1mindex d3c974fb..18783d74 100644[m
+[1m--- a/app/statistics.tsx[m
+[1m+++ b/app/statistics.tsx[m
+[36m@@ -8,6 +8,7 @@[m [mimport { useLocale } from './hooks/useLocale';[m
+ import { SoundManager } from './sound';[m
+ import { STORAGE_KEYS } from './constants/storageKeys';[m
+ import { useQuestions } from './hooks/useQuestions';[m
+[32m+[m[32mimport { safeParseArray } from './utils/storageUtils';[m
+ import {[m
+   LineChart, Line, BarChart, Bar,[m
+   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer[m
+[36m@@ -71,11 +72,11 @@[m [mexport default function StatisticsScreen() {[m
+       const questionsCreated = allQuestions.filter(q => (q.createdAt ?? 0) > weekAgo).length;[m
+ [m
+       const historyRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY);[m
+[31m-      const history = historyRaw ? JSON.parse(historyRaw) : [];[m
+[32m+[m[32m      const history = safeParseArray(historyRaw, []);[m
+       const quizPlayed = history.filter((h: any) => new Date(h.date).getTime() > weekAgo).length;[m
+ [m
+       const resultsRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_RESULTS);[m
+[31m-      const allResults = resultsRaw ? JSON.parse(resultsRaw) : [];[m
+[32m+[m[32m      const allResults = safeParseArray(resultsRaw, []);[m
+       const weekResults = allResults.filter((r: any) => new Date(r.date || Date.now()).getTime() > weekAgo);[m
+       const correctCount = weekResults.filter((r: any) => r.isCorrect).length;[m
+       const correctRate = weekResults.length > 0 ? Math.round((correctCount / weekResults.length) * 100) : 0;[m
+[36m@@ -125,7 +126,7 @@[m [mexport default function StatisticsScreen() {[m
+     try {[m
+       const days: number[] = [];[m
+       const now = new Date();[m
+[31m-      const history = JSON.parse(await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY) || '[]');[m
+[32m+[m[32m      const history = safeParseArray(await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY), []);[m
+       for (let i = 6; i >= 0; i--) {[m
+         const date = new Date(now);[m
+         date.setDate(date.getDate() - i);[m
+[1mdiff --git a/app/utils/answerUtils.ts b/app/utils/answerUtils.ts[m
+[1mindex 5397387d..dba413f8 100644[m
+[1m--- a/app/utils/answerUtils.ts[m
+[1m+++ b/app/utils/answerUtils.ts[m
+[36m@@ -3,6 +3,27 @@[m [mimport AsyncStorage from '@react-native-async-storage/async-storage';[m
+ import { Question } from '../types/question';[m
+ import { STORAGE_KEYS } from '../constants/storageKeys';[m
+ [m
+[32m+[m[32m/**[m
+[32m+[m[32m * 回答を正規化して比較用の文字列に変換[m
+[32m+[m[32m * - NFKC正規化（全角英数字→半角、全角カタカナ→半角カタカナなど）[m
+[32m+[m[32m * - trim[m
+[32m+[m[32m * - 空白正規化（連続する空白を1つに、前後の空白を削除）[m
+[32m+[m[32m * - 小文字化[m
+[32m+[m[32m *[m
+[32m+[m[32m * 注意: カタカナ⇔ひらがなの統一は既存仕様への影響が大きいため、[m
+[32m+[m[32m *       必要に応じて別途オプションで検討してください。[m
+[32m+[m[32m *[m
+[32m+[m[32m * @param text 正規化対象の文字列[m
+[32m+[m[32m * @returns 正規化された文字列[m
+[32m+[m[32m */[m
+[32m+[m[32mexport const normalizeForCompare = (text: string): string => {[m
+[32m+[m[32m  return text[m
+[32m+[m[32m    .normalize('NFKC') // 全角英数字・記号を半角に、全角カタカナを半角カタカナに[m
+[32m+[m[32m    .trim() // 前後の空白を削除[m
+[32m+[m[32m    .replace(/\s+/g, ' ') // 連続する空白（全角・半角含む）を1つの半角スペースに[m
+[32m+[m[32m    .toLowerCase(); // 小文字化[m
+[32m+[m[32m};[m
+[32m+[m
+ /**[m
+  * 記述問題の回答を判定する[m
+  * @param userAnswer ユーザーの回答[m
+[36m@@ -14,7 +35,8 @@[m [mexport const checkDescriptiveAnswer = (userAnswer: string, question: Question):[m
+     return false;[m
+   }[m
+ [m
+[31m-  const userAnswerLower = userAnswer.trim().toLowerCase();[m
+[32m+[m[32m  // 正規化されたユーザー回答を取得[m
+[32m+[m[32m  const normalizedUserAnswer = normalizeForCompare(userAnswer);[m
+ [m
+   // matchModeが'all'の場合はすべてのキーワードが含まれているかチェック[m
+   if (question.matchMode === 'all') {[m
+[36m@@ -22,44 +44,54 @@[m [mexport const checkDescriptiveAnswer = (userAnswer: string, question: Question):[m
+     const correctAnswers = Array.isArray(question.descriptiveAnswer)[m
+       ? question.descriptiveAnswer[m
+       : question.descriptiveAnswer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);[m
+[31m-    [m
+[31m-    // ユーザー回答をスペース/カンマで分割[m
+[31m-    const userKeywords = userAnswerLower.split(/[,\s]+/).filter(kw => kw.length > 0);[m
+[31m-    [m
+[32m+[m
+[32m+[m[32m    // 正解キーワードを正規化[m
+[32m+[m[32m    const normalizedCorrectAnswers = correctAnswers.map(kw => normalizeForCompare(kw));[m
+[32m+[m
+[32m+[m[32m    // ユーザー回答をスペース/カンマで分割して正規化[m
+[32m+[m[32m    const userKeywords = normalizedUserAnswer.split(/[,\s]+/).filter(kw => kw.length > 0);[m
+[32m+[m
+     // キーワード数が一致するかチェック[m
+[31m-    if (userKeywords.length !== correctAnswers.length) {[m
+[32m+[m[32m    if (userKeywords.length !== normalizedCorrectAnswers.length) {[m
+       return false;[m
+     }[m
+[31m-    [m
+[32m+[m
+     // 両方をソートして比較（順不同対応）[m
+     const sortedUser = userKeywords.sort();[m
+[31m-    const sortedCorrect = correctAnswers.map(kw => kw.trim().toLowerCase()).sort();[m
+[31m-    [m
+[32m+[m[32m    const sortedCorrect = [...normalizedCorrectAnswers].sort();[m
+[32m+[m
+     return sortedUser.every((kw, i) => kw === sortedCorrect[i]);[m
+   }[m
+ [m
+[31m-  // デフォルト（matchMode: 'any' または未指定）は完全一致または部分一致[m
+[32m+[m[32m  // デフォルト（matchMode: 'any' または未指定）[m
+[32m+[m[32m  // 安全な判定のため、正解が3文字以上の場合は部分一致を許可[m
+[32m+[m[32m  // 1〜2文字の場合は完全一致のみ（誤判定防止）[m
+   let correctAnswerStr = typeof question.descriptiveAnswer === 'string'[m
+     ? question.descriptiveAnswer[m
+     : (question.descriptiveAnswer as string[])[0] || '';[m
+[31m-  [m
+[32m+[m
+   // 正解文字列から「・」や余分な空白を除去[m
+   // 複数正解が「・ことば\n・論理\n・理性」のような形式の場合、各候補をクリーニング[m
+   const correctAnswers = correctAnswerStr[m
+     .split('\n')[m
+     .map(ans => ans.replace(/^[・]\s*/, '').trim())[m
+     .filter(ans => ans.length > 0);[m
+[31m-  [m
+[31m-  // ユーザー回答をトリム[m
+[31m-  const userAnswerTrimmed = userAnswerLower.trim();[m
+[31m-  [m
+[31m-  // クリーニング済みの正解候補と比較[m
+[31m-  const correctAnswersLower = correctAnswers.map(ans => ans.toLowerCase());[m
+[31m-  [m
+[31m-  // 完全一致または部分一致をチェック[m
+[31m-  return correctAnswersLower.some([m
+[31m-    correct => userAnswerTrimmed === correct || userAnswerTrimmed.includes(correct)[m
+[31m-  );[m
+[32m+[m
+[32m+[m[32m  // 正規化された正解候補[m
+[32m+[m[32m  const normalizedCorrectAnswers = correctAnswers.map(ans => normalizeForCompare(ans));[m
+[32m+[m
+[32m+[m[32m  // 安全な判定ロジック[m
+[32m+[m[32m  return normalizedCorrectAnswers.some(correct => {[m
+[32m+[m[32m    const correctLength = correct.length;[m
+[32m+[m
+[32m+[m[32m    // 正解が3文字以上の場合：完全一致または部分一致[m
+[32m+[m[32m    if (correctLength >= 3) {[m
+[32m+[m[32m      return normalizedUserAnswer === correct || normalizedUserAnswer.includes(correct);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // 正解が1〜2文字の場合：完全一致のみ（誤判定防止）[m
+[32m+[m[32m    return normalizedUserAnswer === correct;[m
+[32m+[m[32m  });[m
+ };[m
+ [m
+ /**[m
+[36m@@ -80,7 +112,7 @@[m [mexport const getAnswerText = (question: Question): string => {[m
+       if (Array.isArray(question.descriptiveAnswer)) {[m
+         const answers = question.descriptiveAnswer.filter(a => a.trim().length > 0);[m
+         if (answers.length === 0) return '';[m
+[31m-        [m
+[32m+[m
+         if (question.matchMode === 'all') {[m
+           // 両解モード：①回答1\n②回答2\n③回答3... の丸数字形式（改行で結合）[m
+           const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];[m
+[36m@@ -108,21 +140,45 @@[m [mexport const getAnswerText = (question: Question): string => {[m
+ export const showAnswerAlert = async (questionId: number, locale: 'ja' | 'en'): Promise<void> => {[m
+   try {[m
+     const savedQuestions = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);[m
+[31m-    if (savedQuestions) {[m
+[32m+[m
+[32m+[m[32m    if (!savedQuestions) {[m
+[32m+[m[32m      // 問題データが取得できない場合、ユーザーに通知[m
+[32m+[m[32m      const errorTitle = locale === 'ja' ? 'エラー' : 'Error';[m
+[32m+[m[32m      const errorMessage = locale === 'ja'[m
+[32m+[m[32m        ? '問題データが見つかりません。\n問題を再読み込みしてください。'[m
+[32m+[m[32m        : 'Question data not found.\nPlease reload the questions.';[m
+[32m+[m[32m      Alert.alert(errorTitle, errorMessage);[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    try {[m
+       const allQuestions = JSON.parse(savedQuestions);[m
+       const question = allQuestions.find((q: any) => q.id === questionId);[m
+[32m+[m
+       if (question) {[m
+         const answerText = getAnswerText(question);[m
+         const alertTitle = locale === 'ja' ? '回答' : 'Answer';[m
+[31m-        Alert.alert(alertTitle, answerText);[m
+[32m+[m[32m        Alert.alert(alertTitle, answerText || (locale === 'ja' ? '回答データがありません' : 'No answer available'));[m
+       } else {[m
+         const errorMsg = locale === 'ja' ? '問題が見つかりません' : 'Question not found';[m
+         Alert.alert(errorMsg, '');[m
+       }[m
+[32m+[m[32m    } catch (parseError) {[m
+[32m+[m[32m      // JSONパースエラー[m
+[32m+[m[32m      console.error('回答表示エラー (JSON parse):', parseError);[m
+[32m+[m[32m      const errorTitle = locale === 'ja' ? 'エラー' : 'Error';[m
+[32m+[m[32m      const errorMessage = locale === 'ja'[m
+[32m+[m[32m        ? '問題データの読み込みに失敗しました。\n問題を再読み込みしてください。'[m
+[32m+[m[32m        : 'Failed to parse question data.\nPlease reload the questions.';[m
+[32m+[m[32m      Alert.alert(errorTitle, errorMessage);[m
+     }[m
+   } catch (error) {[m
+[31m-    console.error('回答表示エラー:', error);[m
+[31m-    const errorMsg = locale === 'ja' ? '回答の取得に失敗しました' : 'Failed to get answer';[m
+[31m-    Alert.alert('エラー', errorMsg);[m
+[32m+[m[32m    // AsyncStorageからの取得エラー[m
+[32m+[m[32m    console.error('回答表示エラー (AsyncStorage):', error);[m
+[32m+[m[32m    const errorTitle = locale === 'ja' ? 'エラー' : 'Error';[m
+[32m+[m[32m    const errorMessage = locale === 'ja'[m
+[32m+[m[32m      ? '回答の取得に失敗しました。\nストレージへのアクセスを確認してください。'[m
+[32m+[m[32m      : 'Failed to get answer.\nPlease check storage access.';[m
+[32m+[m[32m    Alert.alert(errorTitle, errorMessage);[m
+   }[m
+ };[m
+\ No newline at end of file[m

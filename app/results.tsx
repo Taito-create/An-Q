@@ -10,6 +10,7 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { loadStats, UserStats } from './missions';
+import { safeParse, safeParseArray } from './utils/storageUtils';
 
 // Type definitions
 interface QuizResult {
@@ -75,7 +76,7 @@ export default function ResultsScreen() {
       total,
       percentage,
     };
-    const existing: HistoryEntry[] = existingHistoryRaw ? JSON.parse(existingHistoryRaw) : [];
+    const existing: HistoryEntry[] = safeParseArray(existingHistoryRaw, []);
     existing.push(entry);
     await AsyncStorage.setItem('quizHistory', JSON.stringify(existing));
     setHistory(existing);
@@ -101,18 +102,16 @@ export default function ResultsScreen() {
       ]);
 
       if (resultsRaw) {
-        const parsed = JSON.parse(resultsRaw);
+        const parsed = safeParse<any>(resultsRaw, []);
         // Support both old format (array) and new format ({ results, total, score })
-        const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed.results || []);
+        const loadedResults: QuizResult[] = Array.isArray(parsed) ? parsed : (parsed?.results ?? []);
         setResults(loadedResults);
         if (loadedResults.length > 0) {
           await appendHistory(loadedResults, historyRaw);
         }
       }
 
-      if (historyRaw) {
-        setHistory(JSON.parse(historyRaw));
-      }
+      setHistory(safeParseArray(historyRaw, []));
     } catch (e) {
       console.error('ResultsScreen loadData error:', e);
     }

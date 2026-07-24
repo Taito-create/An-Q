@@ -18,6 +18,7 @@ import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationM
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
+import { safeParse, safeParseArray } from './utils/storageUtils';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -227,7 +228,7 @@ const HomeScreen = () => {
       
       if (cachedLevel) setUserLevel(parseInt(cachedLevel, 10));
       if (cachedCoins) setUserCoins(parseInt(cachedCoins, 10));
-      if (cachedProfile) setProfile(JSON.parse(cachedProfile));
+      if (cachedProfile) setProfile(safeParse(cachedProfile, null));
 
       // 2. その後、裏で Firestore から最新データを取得し、差分があればアップデート！
       if (user?.uid) {
@@ -255,7 +256,7 @@ const HomeScreen = () => {
     try {
       const stored = await AsyncStorage.getItem('quiz_questions');
       if (stored) {
-        const allQuestions = JSON.parse(stored);
+        const allQuestions = safeParseArray(stored, []);
         const weakQuestions = allQuestions.filter((q: any) => q.mistakeCount > 0);
         const shuffled = [...weakQuestions].sort(() => Math.random() - 0.5).slice(0, 3);
         setQuickReviewQuestions(shuffled);
@@ -270,7 +271,7 @@ const HomeScreen = () => {
       const examDatesRaw = await AsyncStorage.getItem('EXAM_DATES');
       if (!examDatesRaw) return;
       
-      const examDates: Array<{ date: string; name: string }> = JSON.parse(examDatesRaw);
+      const examDates = safeParseArray<{ date: string; name: string }>(examDatesRaw, []);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -304,7 +305,7 @@ const HomeScreen = () => {
     try {
       const saved = await AsyncStorage.getItem('EXAM_DATES');
       if (saved) {
-        setExamDates(JSON.parse(saved));
+        setExamDates(safeParseArray(saved, []));
       }
     } catch (error) {
       console.error('Error loading exam dates:', error);
@@ -410,7 +411,7 @@ const HomeScreen = () => {
       if (!user) {
         const savedQuestions = await AsyncStorage.getItem('quiz_questions');
         if (savedQuestions) {
-          const questions = JSON.parse(savedQuestions);
+          const questions = safeParseArray(savedQuestions, []);
           setTotalQuestions(questions.length);
           if (questions.length > 0) {
             const today = new Date();

@@ -16,6 +16,7 @@ import { useAuth } from '../auth/AuthContext';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { Question, Folder } from '../types/question';
 import { Alert } from 'react-native';
+import { safeParseArray } from '../utils/storageUtils';
 
 // Contextの型定義
 interface QuestionsContextType {
@@ -254,20 +255,13 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // 未ログイン時はローカルのみ
     if (!user) {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
-      if (data) {
-        const allQuestions: Question[] = JSON.parse(data);
-        const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
-        setQuestions(filteredQuestions);
-      } else {
-        setQuestions([]);
-      }
+      const allQuestions: Question[] = safeParseArray(data, []);
+      const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
+      setQuestions(filteredQuestions);
       
       const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
-      if (folderData) {
-        setFolders(JSON.parse(folderData));
-      } else {
-        setFolders([]);
-      }
+      const folders: Folder[] = safeParseArray(folderData, []);
+      setFolders(folders);
       
       return;
     }
@@ -282,7 +276,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
       
       if (localQuestionsData) {
-        const localQuestions: Question[] = JSON.parse(localQuestionsData);
+        const localQuestions: Question[] = safeParseArray(localQuestionsData, []);
         const filteredLocal = localQuestions.filter((q: any) => q.answerType);
         
         if (filteredLocal.length > 0 && firestoreQuestions.length === 0) {
@@ -311,7 +305,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       // フォルダの移行処理
       if (localFoldersData) {
-        const localFolders: Folder[] = JSON.parse(localFoldersData);
+        const localFolders: Folder[] = safeParseArray(localFoldersData, []);
         
         if (localFolders.length > 0 && firestoreFolders.length === 0) {
           const migrated = await migrateLocalFoldersToFirestore(localFolders);

@@ -13,6 +13,7 @@ import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
 import ImageCropper from '../src/components/ImageCropper';
 import { equipTitle, getTitleDisplay, normalizeUserProfileDocument, resolveTitleDefinition, TITLE_LIBRARY } from '../src/utils/userProgress';
+import { safeParse, safeParseArray } from './utils/storageUtils';
 
 interface UserProfile {
   username: string;
@@ -76,10 +77,43 @@ export default function ProfileScreen() {
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProfile();
+    let isMounted = true;
+
+    const loadProfileAsync = async () => {
+      await loadProfile();
+    };
+
+    loadProfileAsync();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const loadProfile = async () => {
+    // フォールバック用の最小限のプロフィールデータを事前に準備
+    const fallbackProfile: UserProfile = {
+      username: 'An-Q Learner',
+      bio: '',
+      profileImage: null,
+      currentTitle: 'apprentice',
+      unlockedTitles: ['apprentice', 'memory-monk'],
+      level: 1,
+      currentXP: 0,
+      nextLevelXP: 100,
+      totalCoins: 0,
+      totalBooks: 0,
+      totalQuestionsCreated: 0,
+      totalQuizzesPlayed: 0,
+      totalCorrectAnswers: 0,
+      totalQuestionsAnswered: 0,
+      correctRate: 0,
+      streakDays: 0,
+      joinDate: Date.now(),
+      lastLoginDate: Date.now(),
+      achievements: [],
+    };
+
     try {
       const storedUsername = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
       const storedBio = await AsyncStorage.getItem('user_bio') || '';
@@ -109,13 +143,19 @@ export default function ProfileScreen() {
       let totalQuestionsAnswered = 0;
       let correctRate = 0;
 
+      // quiz_questionsのJSONパースを安全に行う
+      let questions: any[] = [];
       const questionsRaw = await AsyncStorage.getItem('quiz_questions') || '[]';
-      const questions = JSON.parse(questionsRaw);
+      questions = safeParseArray(questionsRaw, []);
+
       const stats = await loadStats();
-      const resultsRaw = await AsyncStorage.getItem('quizResults') || '[]';
-      let results = [];
-      try { results = JSON.parse(resultsRaw); } catch(e) {}
-      const resultsArr = Array.isArray(results) ? results : results.results || [];
+      const resultsRaw = await AsyncStorage.getItem('quizResults');
+      const parsedResults = safeParse<any>(resultsRaw, []);
+      const results = Array.isArray(parsedResults)
+        ? parsedResults
+        : (parsedResults?.results ?? []);
+
+      const resultsArr = results;
       const localCorrectCount = resultsArr.filter((r: any) => r.isCorrect).length;
       const localAnsweredCount = resultsArr.length;
       totalCorrectAnswers = localCorrectCount;
@@ -208,14 +248,27 @@ export default function ProfileScreen() {
         streakDays: streakCount,
         joinDate,
         lastLoginDate,
-        achievements: JSON.parse(await AsyncStorage.getItem('achievements') || '[]'),
+        achievements: safeParseArray(await AsyncStorage.getItem('achievements'), []),
       });
 
       setEditUsername(username);
       setEditBio(bio);
       setEditProfileImage(profileImage);
     } catch (error) {
+      // エラーが発生した場合でも、フォールバックプロフィールを表示
       console.error('Failed to load profile:', error);
+      setProfile(fallbackProfile);
+      setEditUsername(fallbackProfile.username);
+      setEditBio(fallbackProfile.bio);
+      setEditProfileImage(fallbackProfile.profileImage);
+
+      // ユーザーに通知（オプション）
+      Alert.alert(
+        locale === 'ja' ? 'プロフィール読み込みエラー' : 'Profile Load Error',
+        locale === 'ja'
+          ? 'プロフィールの読み込みに失敗しました。\n初期状態で表示しています。'
+          : 'Failed to load profile.\nShowing default profile.'
+      );
     }
   };
 

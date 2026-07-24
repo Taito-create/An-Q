@@ -6,6 +6,7 @@ import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
+import { safeParseArray } from './utils/storageUtils';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -73,12 +74,11 @@ export default function CalendarScreen() {
   const loadEvents = async () => {
     try {
       const saved = await AsyncStorage.getItem('calendar_events');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setEvents(parsed);
-      }
+      const parsed = safeParseArray(saved, []);
+      setEvents(parsed);
     } catch (e) {
       console.error('Load failed:', e);
+      setEvents([]);
     }
   };
 
@@ -248,7 +248,7 @@ export default function CalendarScreen() {
           onPress: async () => {
             try {
               const saved = await AsyncStorage.getItem('calendar_events');
-              const currentEvents = saved ? JSON.parse(saved) : [];
+              const currentEvents = safeParseArray(saved, []);
               const newEvents = currentEvents.filter((e: ScheduledEvent) => String(e.id) !== String(eventId));
               
               if (newEvents.length === currentEvents.length) {

@@ -6,6 +6,7 @@ import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
+import { safeParseArray } from './utils/storageUtils';
 
 interface CustomTimer {
   id: string;
@@ -33,9 +34,8 @@ export default function ManageScreen() {
   const loadCustomTimers = async () => {
     try {
       const saved = await AsyncStorage.getItem('CUSTOM_TIMERS');
-      if (saved) {
-        setCustomTimers(JSON.parse(saved));
-      }
+      const timers = safeParseArray(saved, []);
+      setCustomTimers(timers);
     } catch (error) {
       console.error('Error loading custom timers:', error);
     }

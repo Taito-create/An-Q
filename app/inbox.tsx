@@ -7,6 +7,7 @@ import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import { safeParseArray } from './utils/storageUtils';
 
 interface ReceivedItem {
   id: string;
@@ -24,6 +25,7 @@ export default function InboxScreen() {
 
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   // 削除確認モーダル用 state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -36,7 +38,7 @@ export default function InboxScreen() {
   const loadReceivedItems = async () => {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS);
-      const items = raw ? JSON.parse(raw) : [];
+      const items = safeParseArray(raw, []);
       setReceivedItems(items);
     } catch (error) {
       console.error('Failed to load inbox:', error);
@@ -66,116 +68,168 @@ export default function InboxScreen() {
       return;
     }
 
+    if (isTransferring) {
+      return; // 二重実行防止
+    }
+
     try {
+      setIsTransferring(true);
+
+      // ─────────────────────────────────────────
+      // フェーズ1: 全ての既存データを読み込む
+      // ─────────────────────────────────────────
+      const [existingQuestionsRaw, existingFoldersRaw, inboxItemsRaw] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS),
+        AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS),
+        AsyncStorage.getItem(STORAGE_KEYS.INBOX_ITEMS),
+      ]);
+
+      const existingQuestions: any[] = safeParseArray(existingQuestionsRaw, []);
+      const existingFolders: any[] = safeParseArray(existingFoldersRaw, []);
+      const inboxItems: ReceivedItem[] = safeParseArray(inboxItemsRaw, []);
+
+      // 重複チェック用のIDセットを作成
+      const existingQuestionIds = new Set(existingQuestions.map(q => q.id));
+      const existingFolderIds = new Set(existingFolders.map(f => f.id));
+
+      // ─────────────────────────────────────────
+      // フェーズ2: メモリ上でデータをマージ
+      // ─────────────────────────────────────────
       const itemsToTransfer = receivedItems.filter(item => selectedItems.includes(item.id));
       let totalAdded = 0;
+      const newQuestions: any[] = [];
+      const newFolders: any[] = [];
 
-      // 1. 問題（question）を転送
-      const questionsToAdd = itemsToTransfer
-        .filter(item => item.type === 'question')
-        .map(item => ({
+      // 問題（question）を処理
+      const questionItems = itemsToTransfer.filter(item => item.type === 'question');
+      questionItems.forEach(item => {
+        // 重複IDの場合はスキップ（冪等性確保）
+        const newQuestion = {
           ...item.data,
           id: Date.now() + Math.random(),
           isShared: true,
           sharedMark: '🔗',
           originalInboxId: item.id,
-        }));
+        };
 
-      if (questionsToAdd.length > 0) {
-        const existingQuestions = JSON.parse(
-          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'
+        // 内容の重複もチェック（質問テキスト + 送信者コード）
+        const isDuplicateContent = existingQuestions.some(
+          q => q.question === item.data.question && q.senderCode === item.senderCode
         );
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.QUIZ_QUESTIONS,
-          JSON.stringify([...existingQuestions, ...questionsToAdd])
-        );
-        totalAdded += questionsToAdd.length;
-      }
 
-      // 2. 問題集（folder）を転送
+        if (!isDuplicateContent) {
+          newQuestions.push(newQuestion);
+          totalAdded++;
+        }
+      });
+
+      // 問題集（folder）を処理
       const folderItems = itemsToTransfer.filter(item => item.type === 'folder');
       const createId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
       const folderIdMap = new Map<string, string>();
 
       folderItems.forEach(item => {
         const originalFolderId = String(item.data?.id ?? item.id);
-        folderIdMap.set(originalFolderId, createId());
+        const newFolderId = createId();
+        folderIdMap.set(originalFolderId, newFolderId);
       });
 
-      const foldersToAdd = folderItems.map(item => {
+      folderItems.forEach(item => {
         const folderData = item.data;
         const originalFolderId = String(folderData.id ?? item.id);
         const newFolderId = folderIdMap.get(originalFolderId) || createId();
 
         const newQuestionIds: number[] = [];
-        const newQuestions: any[] = [];
+        const folderQuestions: any[] = [];
 
+        // フォルダ内の問題を処理
         (folderData.questions || []).forEach((q: any) => {
           const newQuestionId = Date.now() + Math.random();
-          newQuestions.push({
+          const newQuestion = {
             ...q,
             id: newQuestionId,
             isShared: true,
             sharedMark: '🔗',
             originalFolderId: newFolderId,
-          });
-          newQuestionIds.push(newQuestionId);
+          };
+
+          // 問題の重複チェック
+          const isDuplicateQuestion = existingQuestions.some(
+            eq => eq.question === q.question && eq.senderCode === item.senderCode
+          );
+
+          if (!isDuplicateQuestion) {
+            folderQuestions.push(newQuestion);
+            newQuestionIds.push(newQuestionId);
+          }
         });
 
-        const parentId = folderData.parentId ? folderIdMap.get(String(folderData.parentId)) : undefined;
+        // フォルダ自体の重複チェック
+        const isDuplicateFolder = existingFolders.some(
+          f => f.name === folderData.name && f.senderCode === item.senderCode
+        );
 
-        return {
-          name: folderData.name,
-          description: folderData.description || '',
-          id: newFolderId,
-          questionIds: newQuestionIds,
-          questions: newQuestions,
-          isShared: true,
-          originalInboxId: item.id,
-          parentId,
-        };
+        if (!isDuplicateFolder && folderQuestions.length > 0) {
+          const parentId = folderData.parentId ? folderIdMap.get(String(folderData.parentId)) : undefined;
+
+          newFolders.push({
+            name: folderData.name,
+            description: folderData.description || '',
+            id: newFolderId,
+            questionIds: newQuestionIds,
+            isShared: true,
+            originalInboxId: item.id,
+            parentId,
+          });
+          totalAdded++;
+
+          // フォルダ内の問題も全体リストに追加
+          newQuestions.push(...folderQuestions);
+        }
       });
 
-      if (foldersToAdd.length > 0) {
-        const allNewQuestions = foldersToAdd.flatMap(f => f.questions || []);
-
-        const existingQuestions = JSON.parse(
-          await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS) || '[]'
+      // 追加するものがない場合は早期終了
+      if (totalAdded === 0) {
+        Alert.alert(
+          locale === 'ja' ? '重複エラー' : 'Duplicate Error',
+          locale === 'ja'
+            ? '選択したアイテムは既に登録されています。'
+            : 'Selected items are already registered.'
         );
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.QUIZ_QUESTIONS,
-          JSON.stringify([...existingQuestions, ...allNewQuestions])
-        );
-
-        const foldersToSave = foldersToAdd.map(({ questions, ...folder }) => folder);
-
-        const existingFolders = JSON.parse(
-          await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS) || '[]'
-        );
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.QUESTION_FOLDERS,
-          JSON.stringify([...existingFolders, ...foldersToSave])
-        );
-        totalAdded += foldersToAdd.length;
+        return;
       }
 
-      // 3. 転送済みアイテムを受信ボックスから削除
-      const remaining = receivedItems.filter(item => !selectedItems.includes(item.id));
-      await AsyncStorage.setItem(STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(remaining));
+      // ─────────────────────────────────────────
+      // フェーズ3: 全てをまとめて保存
+      // ─────────────────────────────────────────
+      await AsyncStorage.multiSet([
+        [STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify([...existingQuestions, ...newQuestions])],
+        [STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify([...existingFolders, ...newFolders])],
+        [STORAGE_KEYS.INBOX_ITEMS, JSON.stringify(inboxItems.filter(item => !selectedItems.includes(item.id)))],
+      ]);
 
+      // ─────────────────────────────────────────
+      // フェーズ4: 状態を更新
+      // ─────────────────────────────────────────
+      const remaining = receivedItems.filter(item => !selectedItems.includes(item.id));
       setReceivedItems(remaining);
       setSelectedItems([]);
 
       SoundManager.play('complete');
       Alert.alert(
         locale === 'ja' ? '転送完了' : 'Transfer Complete',
-        locale === 'ja' 
+        locale === 'ja'
           ? `${totalAdded}個のアイテムを転送しました`
           : `Transferred ${totalAdded} items`
       );
     } catch (error) {
       console.error('Failed to transfer:', error);
-      Alert.alert(locale === 'ja' ? 'エラー' : 'Error', locale === 'ja' ? '転送に失敗しました' : 'Transfer failed');
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? '転送に失敗しました。\nもう一度お試しください。' : 'Transfer failed.\nPlease try again.'
+      );
+    } finally {
+      setIsTransferring(false);
     }
   };
 

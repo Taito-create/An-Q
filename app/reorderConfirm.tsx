@@ -5,6 +5,7 @@ import { Ionicons } from '../src/icons';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeParseArray } from './utils/storageUtils';
 
 export default function ReorderConfirmScreen() {
   const navigate = useNavigate();
@@ -13,8 +14,8 @@ export default function ReorderConfirmScreen() {
 
   const locale = searchParams.get('locale') || 'ja';
   const ja = locale !== 'en';
-  const before: string[] = JSON.parse(searchParams.get('before') || '[]');
-  const after: string[] = JSON.parse(searchParams.get('after') || '[]');
+  const before = safeParseArray<string>(searchParams.get('before'), []);
+  const after = safeParseArray<string>(searchParams.get('after'), []);
   const mode = searchParams.get('mode') || 'compact';
 
   // ラベル定義
