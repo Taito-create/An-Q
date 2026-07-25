@@ -66,16 +66,19 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
   // デフォルト（matchMode: 'any' または未指定）
   // 安全な判定のため、正解が3文字以上の場合は部分一致を許可
   // 1〜2文字の場合は完全一致のみ（誤判定防止）
-  let correctAnswerStr = typeof question.descriptiveAnswer === 'string'
-    ? question.descriptiveAnswer
-    : (question.descriptiveAnswer as string[])[0] || '';
-
-  // 正解文字列から「・」や余分な空白を除去
-  // 複数正解が「・ことば\n・論理\n・理性」のような形式の場合、各候補をクリーニング
-  const correctAnswers = correctAnswerStr
-    .split('\n')
-    .map(ans => ans.replace(/^[・]\s*/, '').trim())
-    .filter(ans => ans.length > 0);
+  let correctAnswers: string[];
+  if (Array.isArray(question.descriptiveAnswer)) {
+    // 配列の場合は各要素をそのまま正解候補として使う
+    // （既にクリーンな文字列のはずなので改行や「・」の除去は不要）
+    correctAnswers = question.descriptiveAnswer.filter(ans => ans.length > 0);
+  } else {
+    // 文字列（旧形式）の場合は split('\n') して「・」除去
+    // 複数正解が「・ことば\n・論理\n・理性」のような形式の場合、各候補をクリーニング
+    correctAnswers = (question.descriptiveAnswer as string)
+      .split('\n')
+      .map(ans => ans.replace(/^[・]\s*/, '').trim())
+      .filter(ans => ans.length > 0);
+  }
 
   // 正規化された正解候補
   const normalizedCorrectAnswers = correctAnswers.map(ans => normalizeForCompare(ans));

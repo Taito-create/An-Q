@@ -68,9 +68,8 @@ export default function CreateQuestionScreen() {
   const toggleMatchMode = () => {
     SoundManager.play('decide');
     if (matchMode === 'all') {
-      // OFFにする: 配列を正解1のみ（要素数1）に縮小
+      // OFFにする: モードだけ変更し、入力済みの回答は消さない
       setMatchMode('any');
-      setDescriptiveAnswers([descriptiveAnswers[0]]);
     } else {
       // ONにする: 2つ未満なら2つに増やす
       setMatchMode('all');
@@ -916,8 +915,9 @@ export default function CreateQuestionScreen() {
                   <TouchableOpacity
                     style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
                     onPress={() => {
-                      setDescriptiveAnswers([descriptiveAnswers[0]]);
-                      if (matchMode === 'all') {
+                      const newAnswers = descriptiveAnswers.filter((_, i) => i !== index);
+                      setDescriptiveAnswers(newAnswers);
+                      if (matchMode === 'all' && newAnswers.length < 2) {
                         setMatchMode('any');
                       }
                     }}

@@ -588,7 +588,19 @@ const HomeScreen = () => {
         <Animated.View style={shakeAnim}>
           <TouchableOpacity
             style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
-            onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+            onPress={() => {
+              SoundManager.play('decide');
+              if (questionsFromHook.length === 0) {
+                Alert.alert(
+                  locale === 'ja' ? '問題がありません' : 'No Questions',
+                  locale === 'ja'
+                    ? 'まだ、問題がありません。問題を作成しましょう。'
+                    : 'You have no questions yet. Let\'s create one!'
+                );
+                return;
+              }
+              navigate('/quiz');
+            }}
           >
             <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
             <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
@@ -597,7 +609,19 @@ const HomeScreen = () => {
       ) : (
         <TouchableOpacity
           style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+          onPress={() => {
+            SoundManager.play('decide');
+            if (questionsFromHook.length === 0) {
+              Alert.alert(
+                locale === 'ja' ? '問題がありません' : 'No Questions',
+                locale === 'ja'
+                  ? 'まだ、問題がありません。問題を作成しましょう。'
+                  : 'You have no questions yet. Let\'s create one!'
+              );
+              return;
+            }
+            navigate('/quiz');
+          }}
         >
           <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
           <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>

@@ -143,7 +143,7 @@ export default function QuizScreen() {
 
   // プレ設定用 state
   const [showPreSettings, setShowPreSettings] = useState(true);
-  const [preQuestionCount, setPreQuestionCount] = useState<number>(10);
+  const [preQuestionCount, setPreQuestionCount] = useState<number>(0);
   const [isReverseMode, setIsReverseMode] = useState(false);
 
   // ゲーム機能用 state
@@ -414,6 +414,13 @@ export default function QuizScreen() {
     return filtered;
   };
 
+  // タグ・フォルダ絞り込みで問題数が減った場合、preQuestionCount を自動補正
+  useEffect(() => {
+    const filtered = getFilteredQuestions();
+    if (preQuestionCount > filtered.length) {
+      setPreQuestionCount(filtered.length > 0 ? filtered.length : 1);
+    }
+  }, [selectedTags, selectedFolderIds]);
 
   // ──────────────────────────────────────────────
   // カウントダウンタイマー

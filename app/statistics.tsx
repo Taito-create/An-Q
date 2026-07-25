@@ -33,8 +33,8 @@ export default function StatisticsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadAllData();
-    const interval = setInterval(loadAllData, 5000);
+    loadAllData(true);
+    const interval = setInterval(() => loadAllData(false), 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -52,15 +52,15 @@ export default function StatisticsScreen() {
     return days;
   };
 
-  const loadAllData = async () => {
-    setIsLoading(true);
+  const loadAllData = async (showLoading: boolean = true) => {
+    if (showLoading) setIsLoading(true);
     await Promise.all([
       loadWeeklyStats(),
       loadWeeklyScreenTimeHistory(),
       loadWeeklyQuestionsHistory(),
       loadWeeklyQuizHistory(),
     ]);
-    setIsLoading(false);
+    if (showLoading) setIsLoading(false);
   };
 
   const loadWeeklyStats = async () => {
