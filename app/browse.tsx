@@ -8,8 +8,9 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
-import { getAnswerText, showAnswerAlert } from './utils/answerUtils';
+import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
+import { loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from './utils/storageUtils';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -24,6 +25,7 @@ export default function BrowseQuestionsScreen() {
     deleteQuestion, 
     updateQuestion, 
     addTagToQuestions,
+    removeTagFromAllQuestions,
     createFolder,
     deleteFolder,
     addQuestionsToFolder,
@@ -33,8 +35,9 @@ export default function BrowseQuestionsScreen() {
 
   // タグ編集用 state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [editTagInput, setEditTagInput] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [tagMasterList, setTagMasterList] = useState<string[]>([]);
 
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
@@ -51,7 +54,7 @@ export default function BrowseQuestionsScreen() {
   // 一括タグ編集関連 state
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
   const [showBatchTagModal, setShowBatchTagModal] = useState(false);
-  const [batchTagInput, setBatchTagInput] = useState('');
+  const [batchSelectedTags, setBatchSelectedTags] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isCompactMode, setIsCompactMode] = useState(false);
 
@@ -88,12 +91,13 @@ export default function BrowseQuestionsScreen() {
   const [selectedFolderForAdd, setSelectedFolderForAdd] = useState<Folder | null>(null);
   const [availableQuestionsForAdd, setAvailableQuestionsForAdd] = useState<Question[]>([]);
   const [selectedQuestionIdsForAdd, setSelectedQuestionIdsForAdd] = useState<number[]>([]);
+  const [addByTagSelectedTags, setAddByTagSelectedTags] = useState<string[]>([]);
 
   // 問題編集用 state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuestionFull, setEditingQuestionFull] = useState<Question | null>(null);
   const [editQuestionText, setEditQuestionText] = useState('');
-  const [editAnswerText, setEditAnswerText] = useState('');
+  const [editAnswerGroups, setEditAnswerGroups] = useState<string[][]>([['']]);
   const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
   const [editMultipleOptions, setEditMultipleOptions] = useState<string[]>(['', '', '', '']);
   const [editMultipleCorrect, setEditMultipleCorrect] = useState(0);
@@ -104,6 +108,11 @@ export default function BrowseQuestionsScreen() {
     questions.forEach(q => q.tags?.forEach(t => tags.add(t)));
     setAvailableTags(Array.from(tags).sort());
   }, [questions]);
+
+  // タグのマスターリストを読み込む
+  useEffect(() => {
+    loadTagMasterList().then(setTagMasterList);
+  }, []);
 
   // フォルダが更新されたら、選択中のフォルダとフォルダ質問を更新
   useEffect(() => {
@@ -161,15 +170,13 @@ export default function BrowseQuestionsScreen() {
   };
 
   const batchAddTags = async () => {
-    const newTags = batchTagInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
-    if (newTags.length === 0) {
-      Alert.alert('エラー', locale === 'ja' ? 'タグを入力してください' : 'Please enter tags');
+    if (batchSelectedTags.length === 0) {
+      Alert.alert('エラー', locale === 'ja' ? 'タグを選択してください' : 'Please select tags');
       return;
     }
-
-    await addTagToQuestions(selectedQuestionIds, newTags);
+    await addTagToQuestions(selectedQuestionIds, batchSelectedTags);
     setShowBatchTagModal(false);
-    setBatchTagInput('');
+    setBatchSelectedTags([]);
     setSelectedQuestionIds([]);
     setIsSelectionMode(false);
     SoundManager.play('complete');
@@ -279,28 +286,20 @@ export default function BrowseQuestionsScreen() {
 
   const startEditTags = (question: Question) => {
     setEditingQuestion(question);
-    setEditTagInput(question.tags ? question.tags.join(', ') : '');
+    setEditTags(question.tags || []);
+    loadTagMasterList().then(setTagMasterList);
     setShowTagModal(true);
   };
 
   const saveEditedTags = async () => {
     if (!editingQuestion) return;
-
-    const newTags = editTagInput
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-
-    const updatedQuestion = { ...editingQuestion, tags: newTags };
+    const updatedQuestion = { ...editingQuestion, tags: editTags };
     await updateQuestion(updatedQuestion);
-
     setShowTagModal(false);
     setEditingQuestion(null);
-
-    if (selectedFilterTag && !newTags.includes(selectedFilterTag)) {
+    if (selectedFilterTag && !editTags.includes(selectedFilterTag)) {
       setSelectedFilterTag(null);
     }
-
     SoundManager.play('complete');
     Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました' : 'Tags updated');
   };
@@ -308,11 +307,9 @@ export default function BrowseQuestionsScreen() {
   const startEditQuestion = (question: Question) => {
     setEditingQuestionFull(question);
     setEditQuestionText(question.question);
-    // 配列の回答はカンマ区切りで表示
-    if (question.answerType === 'descriptive' && Array.isArray(question.descriptiveAnswer)) {
-      setEditAnswerText(question.descriptiveAnswer.join('、'));
-    } else {
-      setEditAnswerText(typeof question.descriptiveAnswer === 'string' ? question.descriptiveAnswer : '');
+    if (question.answerType === 'descriptive') {
+      const groups = getAnswerGroups(question);
+      setEditAnswerGroups(groups.length > 0 ? groups : [['']]);
     }
     setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
     setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
@@ -323,20 +320,25 @@ export default function BrowseQuestionsScreen() {
   const saveEditedQuestion = async () => {
     if (!editingQuestionFull || !editQuestionText.trim()) return;
 
+    let updatedDescriptiveAnswerGroups = editingQuestionFull.descriptiveAnswerGroups;
     let updatedDescriptiveAnswer = editingQuestionFull.descriptiveAnswer;
+    let updatedMatchMode = editingQuestionFull.matchMode;
     if (editingQuestionFull.answerType === 'descriptive') {
-      if (Array.isArray(editingQuestionFull.descriptiveAnswer)) {
-        // 元が配列なら、編集後のテキストを配列に戻す
-        updatedDescriptiveAnswer = editAnswerText.split(/[、,]/).map(s => s.trim()).filter(Boolean);
-      } else {
-        updatedDescriptiveAnswer = editAnswerText.trim();
-      }
+      const cleanedGroups = editAnswerGroups
+        .map(group => group.map(a => a.trim()).filter(Boolean))
+        .filter(group => group.length > 0);
+      updatedDescriptiveAnswerGroups = cleanedGroups.length > 0 ? cleanedGroups : undefined;
+      // 互換性のため旧形式も更新しておく
+      updatedDescriptiveAnswer = cleanedGroups.flat();
+      updatedMatchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     }
 
     const updated: Question = {
       ...editingQuestionFull,
       question: editQuestionText.trim(),
+      descriptiveAnswerGroups: updatedDescriptiveAnswerGroups,
       descriptiveAnswer: updatedDescriptiveAnswer,
+      matchMode: updatedMatchMode,
       trueFalseAnswer: editingQuestionFull.answerType === 'truefalse' ? editTrueFalseAnswer : editingQuestionFull.trueFalseAnswer,
       multipleChoice: editingQuestionFull.answerType === 'multiple'
         ? { options: editMultipleOptions, correctAnswer: editMultipleCorrect }
@@ -568,7 +570,7 @@ export default function BrowseQuestionsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12, paddingHorizontal: 4 }}>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
-            onPress={() => setShowBatchTagModal(true)}
+            onPress={() => { loadTagMasterList().then(setTagMasterList); setShowBatchTagModal(true); }}
           >
             <Text style={[styles.batchTagBarText, { color: onPrimary }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
@@ -705,6 +707,8 @@ export default function BrowseQuestionsScreen() {
                         setSelectedFolderForAdd(selectedFolder);
                         setAvailableQuestionsForAdd(questions);
                         setSelectedQuestionIdsForAdd([]);
+                        setAddByTagSelectedTags([]);
+                        loadTagMasterList().then(setTagMasterList);
                         setShowAddToFolderModal(true);
                       }}
                     >
@@ -884,12 +888,61 @@ export default function BrowseQuestionsScreen() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
             <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
-            {editingQuestionFull?.answerType === 'descriptive' && (
-              <>
-                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
-                <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editAnswerText} onChangeText={setEditAnswerText} placeholder="回答を入力" placeholderTextColor={colors.textSecondary} multiline />
-              </>
+{editingQuestionFull?.answerType === 'descriptive' && (
+  <>
+    <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
+    {editAnswerGroups.map((group, groupIndex) => (
+      <View key={groupIndex} style={{ marginBottom: 10, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }}>
+          {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
+        </Text>
+        {group.map((answer, answerIndex) => (
+          <View key={answerIndex} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <TextInput
+              style={[styles.modalInput, { flex: 1, borderColor: colors.border, color: colors.text, minHeight: 44, textAlignVertical: 'top' }]}
+              value={answer}
+              onChangeText={(text) => {
+                const newGroups = editAnswerGroups.map(g => [...g]);
+                newGroups[groupIndex][answerIndex] = text;
+                setEditAnswerGroups(newGroups);
+              }}
+              placeholder={locale === 'ja' ? '言い換え候補' : 'Alternative answer'}
+              placeholderTextColor={colors.textSecondary}
+              multiline
+            />
+            {(group.length > 1 || editAnswerGroups.length > 1) && (
+              <TouchableOpacity
+                style={{ marginLeft: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => {
+                  const newGroups = editAnswerGroups.map(g => [...g]);
+                  newGroups[groupIndex] = newGroups[groupIndex].filter((_, i) => i !== answerIndex);
+                  const filtered = newGroups.filter(g => g.length > 0);
+                  setEditAnswerGroups(filtered.length > 0 ? filtered : [['']]);
+                }}
+              >
+                <Text style={{ color: '#fff' }}>×</Text>
+              </TouchableOpacity>
             )}
+          </View>
+        ))}
+        <TouchableOpacity onPress={() => {
+          const newGroups = editAnswerGroups.map(g => [...g]);
+          newGroups[groupIndex] = [...newGroups[groupIndex], ''];
+          setEditAnswerGroups(newGroups);
+        }}>
+          <Text style={{ color: colors.primary, fontSize: 13 }}>
+            {locale === 'ja' ? '＋ 言い換えを追加' : '+ Add alternative'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    ))}
+    <TouchableOpacity onPress={() => setEditAnswerGroups([...editAnswerGroups, ['']])}>
+      <Text style={{ color: colors.primary, fontSize: 14, fontWeight: 'bold' }}>
+        {locale === 'ja' ? '＋ 新しい正解を追加' : '+ Add new answer slot'}
+      </Text>
+    </TouchableOpacity>
+  </>
+)}
             {editingQuestionFull?.answerType === 'truefalse' && (
               <>
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>回答</Text>
@@ -932,7 +985,81 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{t.tagEditTitle}</Text>
-            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={editTagInput} onChangeText={setEditTagInput} placeholder={t.enterTagsComma} placeholderTextColor={colors.textSecondary} />
+            <ScrollView style={{ maxHeight: 300 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 }}>
+                {tagMasterList.map((tag) => {
+                  const isSelected = editTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        styles.tagButton,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.primary + '20',
+                          borderColor: colors.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        setEditTags((prev) =>
+                          isSelected
+                            ? prev.filter((t) => t !== tag)
+                            : [...prev, tag]
+                        );
+                      }}
+                      onLongPress={() => {
+                        Alert.alert(
+                          locale === 'ja' ? 'タグを削除' : 'Delete Tag',
+                          locale === 'ja'
+                            ? `「${tag}」を全ての問題から削除しますか？`
+                            : `Delete "${tag}" from all questions?`,
+                          [
+                            { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                            {
+                              text: locale === 'ja' ? '削除' : 'Delete',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await removeTagFromAllQuestions(tag);
+                                await removeTagFromMasterList(tag);
+                                setTagMasterList((prev) => prev.filter((t) => t !== tag));
+                                setEditTags((prev) => prev.filter((t) => t !== tag));
+                                SoundManager.play('delete');
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                    >
+                      <Text style={[styles.tagButtonText, { color: isSelected ? '#fff' : colors.primary }]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, borderColor: colors.border, color: colors.text }]}
+                placeholder={locale === 'ja' ? '新しいタグを入力' : 'New tag'}
+                placeholderTextColor={colors.textSecondary}
+                onSubmitEditing={(e) => {
+                  const newTag = e.nativeEvent.text.trim();
+                  if (newTag && !tagMasterList.includes(newTag)) {
+                    addTagToMasterList(newTag).then((success) => {
+                      if (success) {
+                        setTagMasterList((prev) => [...prev, newTag]);
+                        setEditTags((prev) => [...prev, newTag]);
+                      } else {
+                        Alert.alert(
+                          locale === 'ja' ? 'エラー' : 'Error',
+                          locale === 'ja' ? 'タグが既に存在します' : 'Tag already exists'
+                        );
+                      }
+                    });
+                  }
+                }}
+              />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowTagModal(false); setEditingQuestion(null); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancelEdit}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={saveEditedTags}><Text style={styles.modalSaveText}>{t.saveTags}</Text></TouchableOpacity>
@@ -978,7 +1105,81 @@ export default function BrowseQuestionsScreen() {
                 </View>
               );
             })()}
-            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={batchTagInput} onChangeText={setBatchTagInput} placeholder={t.enterTagsComma} placeholderTextColor={colors.textSecondary} />
+            <ScrollView style={{ maxHeight: 300 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 }}>
+                {tagMasterList.map((tag) => {
+                  const isSelected = batchSelectedTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        styles.tagButton,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.primary + '20',
+                          borderColor: colors.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        setBatchSelectedTags((prev) =>
+                          isSelected
+                            ? prev.filter((t) => t !== tag)
+                            : [...prev, tag]
+                        );
+                      }}
+                      onLongPress={() => {
+                        Alert.alert(
+                          locale === 'ja' ? 'タグを削除' : 'Delete Tag',
+                          locale === 'ja'
+                            ? `「${tag}」を全ての問題から削除しますか？`
+                            : `Delete "${tag}" from all questions?`,
+                          [
+                            { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                            {
+                              text: locale === 'ja' ? '削除' : 'Delete',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await removeTagFromAllQuestions(tag);
+                                await removeTagFromMasterList(tag);
+                                setTagMasterList((prev) => prev.filter((t) => t !== tag));
+                                setBatchSelectedTags((prev) => prev.filter((t) => t !== tag));
+                                SoundManager.play('delete');
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                    >
+                      <Text style={[styles.tagButtonText, { color: isSelected ? '#fff' : colors.primary }]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, borderColor: colors.border, color: colors.text }]}
+                placeholder={locale === 'ja' ? '新しいタグを入力' : 'New tag'}
+                placeholderTextColor={colors.textSecondary}
+                onSubmitEditing={(e) => {
+                  const newTag = e.nativeEvent.text.trim();
+                  if (newTag && !tagMasterList.includes(newTag)) {
+                    addTagToMasterList(newTag).then((success) => {
+                      if (success) {
+                        setTagMasterList((prev) => [...prev, newTag]);
+                        setBatchSelectedTags((prev) => [...prev, newTag]);
+                      } else {
+                        Alert.alert(
+                          locale === 'ja' ? 'エラー' : 'Error',
+                          locale === 'ja' ? 'タグが既に存在します' : 'Tag already exists'
+                        );
+                      }
+                    });
+                  }
+                }}
+              />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => setShowBatchTagModal(false)}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancel}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={batchAddTags}><Text style={styles.modalSaveText}>{t.saveTags}</Text></TouchableOpacity>
@@ -1092,6 +1293,48 @@ export default function BrowseQuestionsScreen() {
               <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={styles.modalListContent}>
+              <View style={{ marginBottom: 12, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 6 }}>
+                  {locale === 'ja' ? 'タグで選択' : 'Select by tag'}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {tagMasterList.map(tag => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[styles.tagButton, {
+                        backgroundColor: addByTagSelectedTags.includes(tag) ? colors.primary : colors.background,
+                        borderColor: colors.border,
+                      }]}
+                      onPress={() => {
+                        setAddByTagSelectedTags(prev =>
+                          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                        );
+                      }}
+                    >
+                      <Text style={{ color: addByTagSelectedTags.includes(tag) ? onPrimary : colors.text, fontSize: 13 }}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {addByTagSelectedTags.length > 0 && (
+                  <TouchableOpacity
+                    style={{ padding: 8, borderRadius: 6, backgroundColor: colors.primary + '20', alignItems: 'center' }}
+                    onPress={() => {
+                      const matchedIds = availableQuestionsForAdd
+                        .filter(q => q.tags?.some(tag => addByTagSelectedTags.includes(tag)))
+                        .map(q => q.id);
+                      setSelectedQuestionIdsForAdd(prev => [...new Set([...prev, ...matchedIds])]);
+                    }}
+                  >
+                    <Text style={{ color: colors.primary, fontSize: 13, fontWeight: 'bold' }}>
+                      {locale === 'ja'
+                        ? `該当する問題をまとめて選択（${availableQuestionsForAdd.filter(q => q.tags?.some(tag => addByTagSelectedTags.includes(tag))).length}問）`
+                        : `Select all matching (${availableQuestionsForAdd.filter(q => q.tags?.some(tag => addByTagSelectedTags.includes(tag))).length})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               {availableQuestionsForAdd.length === 0 ? (
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>追加できる問題がありません</Text>
               ) : (
@@ -1314,4 +1557,6 @@ const styles = StyleSheet.create({
   compactToggleBtnText: { fontSize: 16, fontWeight: 'bold' },
   closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
   modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
+  tagButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  tagButtonText: { fontSize: 13, fontWeight: 'bold' },
 });

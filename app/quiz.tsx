@@ -16,7 +16,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useQuestions } from './hooks/useQuestions';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { checkDescriptiveAnswer, getAnswerText } from './utils/answerUtils';
+import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
@@ -99,18 +99,19 @@ export default function QuizScreen() {
   // 現在の問題を取得
   const currentQuestion = shuffledQuestions[currentIndex];
   
-  // 両解モードの問題かどうかを判定
-  const isAllMatchMode = currentQuestion?.matchMode === 'all' && currentQuestion.answerType === 'descriptive';
-  
-  // 正解キーワードのリストを取得
+  // グループ構造の正解候補を取得
+  const answerGroups = useMemo(() => {
+    if (!currentQuestion || currentQuestion.answerType !== 'descriptive') return [];
+    return getAnswerGroups(currentQuestion);
+  }, [currentQuestion]);
+
+  const isAllMatchMode = answerGroups.length > 1;
+
+  // correctKeywords は互換性のため、グループ数分の配列として残す
+  // （見た目上「空欄がいくつあるか」を表すのに使われている箇所のため）
   const correctKeywords = useMemo(() => {
-    if (!isAllMatchMode || !currentQuestion?.descriptiveAnswer) return [];
-    const answer = currentQuestion.descriptiveAnswer;
-    if (Array.isArray(answer)) {
-      return answer;
-    }
-    return answer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);
-  }, [isAllMatchMode, currentQuestion]);
+    return answerGroups.map((_, i) => i);
+  }, [answerGroups]);
 
   // Lottieアニメーション表示制御
   const [showSuccessLottie, setShowSuccessLottie] = useState(false);
@@ -327,7 +328,7 @@ export default function QuizScreen() {
     const sortedTags = Array.from(tagSet).sort();
     setAllTags(sortedTags);
     setSelectedTags(sortedTags);
-    setPreQuestionCount(Math.min(enabled.length, 50));
+    setPreQuestionCount(enabled.length);
     setIsLoading(false);
   }, [allQuestionsFromHook]);
 
@@ -414,12 +415,22 @@ export default function QuizScreen() {
     return filtered;
   };
 
-  // タグ・フォルダ絞り込みで問題数が減った場合、preQuestionCount を自動補正
+  const prevFilteredLengthRef = useRef<number | null>(null);
+
   useEffect(() => {
     const filtered = getFilteredQuestions();
+    const prevMax = prevFilteredLengthRef.current;
+
     if (preQuestionCount > filtered.length) {
+      // 絞り込みで問題数が減った場合：選択数を上限まで縮める
       setPreQuestionCount(filtered.length > 0 ? filtered.length : 1);
+    } else if (prevMax !== null && preQuestionCount === prevMax && filtered.length > prevMax) {
+      // それまで「全問選択」状態だった場合のみ、
+      // 絞り込み解除で増えた分にも追従して増やす
+      setPreQuestionCount(filtered.length);
     }
+
+    prevFilteredLengthRef.current = filtered.length;
   }, [selectedTags, selectedFolderIds]);
 
   // ──────────────────────────────────────────────
@@ -1653,9 +1664,11 @@ export default function QuizScreen() {
                         const fullAnswer = userDescriptiveAnswers.join(' ');
                         handleAnswer(fullAnswer);
                       }}
-                      disabled={answered || isPaused || userDescriptiveAnswers.length !== correctKeywords.length}
+                      disabled={answered || isPaused}
                     >
-                      <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>{t.checkAnswer}</Text>
+                      <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>
+                        {userDescriptiveAnswers.some(a => a && a.trim()) ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 ) : (

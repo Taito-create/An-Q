@@ -67,6 +67,9 @@ export const STORAGE_KEYS = {
   WEEKLY_SCREEN_TIME: 'weekly_screen_time_minutes',
   CUSTOM_TIMERS: 'CUSTOM_TIMERS',
 
+  // タグ管理
+  TAG_MASTER_LIST: 'tag_master_list',
+
   // マイグレーション
   DB_VERSION: 'db_version',
 } as const;

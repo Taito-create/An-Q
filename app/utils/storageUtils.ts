@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+
 /**
  * 安全なJSONパースユーティリティ
  * 
@@ -104,4 +107,48 @@ export const safeParseWithError = <T>(
       }
     };
   }
+};
+
+// ──────────────────────────────────────────────
+// タグのマスターリスト
+// ──────────────────────────────────────────────
+
+/**
+ * タグのマスターリストを読み込む
+ */
+export const loadTagMasterList = async (): Promise<string[]> => {
+  const raw = await AsyncStorage.getItem(STORAGE_KEYS.TAG_MASTER_LIST);
+  return safeParseArray<string>(raw, []);
+};
+
+/**
+ * タグのマスターリストを保存する（重複は自動的に除去）
+ */
+export const saveTagMasterList = async (tags: string[]): Promise<void> => {
+  const deduped = Array.from(new Set(tags.map(t => t.trim()).filter(t => t.length > 0)));
+  await AsyncStorage.setItem(STORAGE_KEYS.TAG_MASTER_LIST, JSON.stringify(deduped));
+};
+
+/**
+ * タグをマスターリストに1つ追加する（既に存在する場合は何もしない）
+ * @returns 追加できた場合は true、既に存在していた場合は false
+ */
+export const addTagToMasterList = async (tag: string): Promise<boolean> => {
+  const trimmed = tag.trim();
+  if (!trimmed) return false;
+
+  const current = await loadTagMasterList();
+  if (current.includes(trimmed)) {
+    return false;
+  }
+  await saveTagMasterList([...current, trimmed]);
+  return true;
+};
+
+/**
+ * タグをマスターリストから1つ削除する
+ */
+export const removeTagFromMasterList = async (tag: string): Promise<void> => {
+  const current = await loadTagMasterList();
+  await saveTagMasterList(current.filter(t => t !== tag));
 };

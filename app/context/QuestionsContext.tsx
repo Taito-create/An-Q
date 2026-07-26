@@ -29,6 +29,7 @@ interface QuestionsContextType {
   deleteQuestion: (id: number) => Promise<Question[]>;
   updateQuestion: (question: Question) => Promise<Question[]>;
   addTagToQuestions: (ids: number[], newTags: string[]) => Promise<Question[]>;
+  removeTagFromAllQuestions: (tagToRemove: string) => Promise<void>;
   createFolder: (folder: Folder) => Promise<Folder[]>;
   updateFolder: (folder: Folder) => Promise<Folder[]>;
   deleteFolder: (folderId: string) => Promise<Folder[]>;
@@ -373,6 +374,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (q.matchMode) {
             sanitized.matchMode = q.matchMode;
           }
+          if (q.descriptiveAnswerGroups !== undefined) {
+            sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
+          }
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) {
             sanitized.trueFalseAnswer = q.trueFalseAnswer;
@@ -571,6 +575,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return updated;
   }, [questions, saveQuestions]);
 
+  /**
+   * 指定したタグを、全問題から一括で取り除く。
+   * 1回の saveQuestions 呼び出しで完結させる（ループでの
+   * updateQuestion 呼び出しは行わない）。
+   */
+  const removeTagFromAllQuestions = useCallback(async (tagToRemove: string): Promise<void> => {
+    const updated = questions.map(q => {
+      if (!q.tags || !q.tags.includes(tagToRemove)) return q;
+      return { ...q, tags: q.tags.filter(t => t !== tagToRemove) };
+    });
+    await saveQuestions(updated);
+  }, [questions, saveQuestions]);
+
   // フォルダCRUD操作
   const createFolder = useCallback(async (folder: Folder): Promise<Folder[]> => {
     const updated = [...folders, folder];
@@ -648,6 +665,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     deleteQuestion,
     updateQuestion,
     addTagToQuestions,
+    removeTagFromAllQuestions,
     createFolder,
     updateFolder,
     deleteFolder,

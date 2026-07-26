@@ -24,77 +24,44 @@ export const normalizeForCompare = (text: string): string => {
     .toLowerCase(); // 小文字化
 };
 
-/**
- * 記述問題の回答を判定する
- * @param userAnswer ユーザーの回答
- * @param question 問題オブジェクト
- * @returns 正解かどうか
- */
 export const checkDescriptiveAnswer = (userAnswer: string, question: Question): boolean => {
-  if (!question.descriptiveAnswer) {
+  const groups = getAnswerGroups(question);
+  if (groups.length === 0) {
     return false;
   }
 
-  // 正規化されたユーザー回答を取得
-  const normalizedUserAnswer = normalizeForCompare(userAnswer);
+  // 判定共通ロジック：正解が3文字以上なら部分一致も許可、
+  // 1〜2文字は完全一致のみ（誤判定防止のため、既存仕様と同じ）
+  const matchesAny = (userPart: string, candidates: string[]): boolean => {
+    const normalizedUserPart = normalizeForCompare(userPart);
+    return candidates.some(candidate => {
+      const correct = normalizeForCompare(candidate);
+      if (correct.length >= 3) {
+        return normalizedUserPart === correct || normalizedUserPart.includes(correct);
+      }
+      return normalizedUserPart === correct;
+    });
+  };
 
-  // matchModeが'all'の場合はすべてのキーワードが含まれているかチェック
-  if (question.matchMode === 'all') {
-    // 正解が配列の場合（新形式）
-    const correctAnswers = Array.isArray(question.descriptiveAnswer)
-      ? question.descriptiveAnswer
-      : question.descriptiveAnswer.split(/[,\s]+/).filter((kw: string) => kw.length > 0);
-
-    // 正解キーワードを正規化
-    const normalizedCorrectAnswers = correctAnswers.map(kw => normalizeForCompare(kw));
-
-    // ユーザー回答をスペース/カンマで分割して正規化
-    const userKeywords = normalizedUserAnswer.split(/[,\s]+/).filter(kw => kw.length > 0);
-
-    // キーワード数が一致するかチェック
-    if (userKeywords.length !== normalizedCorrectAnswers.length) {
-      return false;
-    }
-
-    // 両方をソートして比較（順不同対応）
-    const sortedUser = userKeywords.sort();
-    const sortedCorrect = [...normalizedCorrectAnswers].sort();
-
-    return sortedUser.every((kw, i) => kw === sortedCorrect[i]);
+  // 空欄が1つだけ（言い換え候補のみ）の場合：
+  // ユーザーの回答全体を、そのグループ内のどれかと比較する
+  if (groups.length === 1) {
+    return matchesAny(userAnswer, groups[0]);
   }
 
-  // デフォルト（matchMode: 'any' または未指定）
-  // 安全な判定のため、正解が3文字以上の場合は部分一致を許可
-  // 1〜2文字の場合は完全一致のみ（誤判定防止）
-  let correctAnswers: string[];
-  if (Array.isArray(question.descriptiveAnswer)) {
-    // 配列の場合は各要素をそのまま正解候補として使う
-    // （既にクリーンな文字列のはずなので改行や「・」の除去は不要）
-    correctAnswers = question.descriptiveAnswer.filter(ans => ans.length > 0);
-  } else {
-    // 文字列（旧形式）の場合は split('\n') して「・」除去
-    // 複数正解が「・ことば\n・論理\n・理性」のような形式の場合、各候補をクリーニング
-    correctAnswers = (question.descriptiveAnswer as string)
-      .split('\n')
-      .map(ans => ans.replace(/^[・]\s*/, '').trim())
-      .filter(ans => ans.length > 0);
+  // 空欄が複数（両解モード）の場合：
+  // ユーザーの回答をスペース/カンマで分割し、各空欄ごとに
+  // 対応するグループのどれかと一致するか（かつ、全空欄が一致）を見る
+  const userParts = userAnswer
+    .split(/[,\s]+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
+  if (userParts.length !== groups.length) {
+    return false;
   }
 
-  // 正規化された正解候補
-  const normalizedCorrectAnswers = correctAnswers.map(ans => normalizeForCompare(ans));
-
-  // 安全な判定ロジック
-  return normalizedCorrectAnswers.some(correct => {
-    const correctLength = correct.length;
-
-    // 正解が3文字以上の場合：完全一致または部分一致
-    if (correctLength >= 3) {
-      return normalizedUserAnswer === correct || normalizedUserAnswer.includes(correct);
-    }
-
-    // 正解が1〜2文字の場合：完全一致のみ（誤判定防止）
-    return normalizedUserAnswer === correct;
-  });
+  return groups.every((groupCandidates, i) => matchesAny(userParts[i], groupCandidates));
 };
 
 /**
@@ -110,25 +77,27 @@ export const getAnswerText = (question: Question): string => {
       const correctIdx = question.multipleChoice?.correctAnswer ?? 0;
       const correctOption = question.multipleChoice?.options[correctIdx] || '';
       return `${correctIdx + 1}. ${correctOption}`;
-    case 'descriptive':
-      // 配列の場合はフォーマット分けして表示
-      if (Array.isArray(question.descriptiveAnswer)) {
-        const answers = question.descriptiveAnswer.filter(a => a.trim().length > 0);
-        if (answers.length === 0) return '';
+    case 'descriptive': {
+      const groups = getAnswerGroups(question);
+      if (groups.length === 0) return '';
 
-        if (question.matchMode === 'all') {
-          // 両解モード：①回答1\n②回答2\n③回答3... の丸数字形式（改行で結合）
-          const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
-          return answers.map((a, i) => `${circledNumbers[i] || i + 1}${a}`).join('\n');
-        } else if (answers.length > 1) {
-          // 複数正解（matchMode !== 'all'で複数回答）：
-          // ・回答1\n・回答2\n・回答3... の箇条書き形式（改行で縦に並べる）
+      if (groups.length === 1) {
+        // 空欄が1つ（言い換え候補のみ）の場合：今までと同じ表示形式
+        const answers = groups[0];
+        if (answers.length === 0) return '';
+        if (answers.length > 1) {
           return answers.map(a => `・${a}`).join('\n');
         }
-        // 単一回答
         return answers[0];
       }
-      return question.descriptiveAnswer || '';
+
+      // 空欄が複数（両解モード相当）の場合：
+      // ①候補1 / 候補2\n②候補3 / 候補4... の形式で表示
+      const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+      return groups
+        .map((g, i) => `${circledNumbers[i] || i + 1}${g.join(' / ')}`)
+        .join('\n');
+    }
     default:
       return '';
   }
@@ -184,4 +153,46 @@ export const showAnswerAlert = async (questionId: number, locale: 'ja' | 'en'): 
       : 'Failed to get answer.\nPlease check storage access.';
     Alert.alert(errorTitle, errorMessage);
   }
+};
+
+/**
+ * 問題データから「グループ構造」の正解候補を取得する。
+ * descriptiveAnswerGroups が既に存在すればそれをそのまま使い、
+ * 存在しない場合は、旧形式（descriptiveAnswer / matchMode）から
+ * その場で変換する。保存データ自体は書き換えない。
+ */
+export const getAnswerGroups = (question: Question): string[][] => {
+  // 既に新形式で保存済みならそのまま使う
+  if (question.descriptiveAnswerGroups && question.descriptiveAnswerGroups.length > 0) {
+    return question.descriptiveAnswerGroups;
+  }
+
+  if (!question.descriptiveAnswer) {
+    return [];
+  }
+
+  // 配列形式（新形式のフラット配列）
+  if (Array.isArray(question.descriptiveAnswer)) {
+    const cleaned = question.descriptiveAnswer.filter(a => a && a.trim().length > 0);
+    if (cleaned.length === 0) return [];
+
+    if (question.matchMode === 'all') {
+      // all モード：各要素が別々の空欄（グループ）
+      // 例: ["犬","猫"] → [["犬"], ["猫"]]
+      return cleaned.map(a => [a]);
+    }
+    // any モード：全要素が1つの空欄の言い換え候補（1グループにまとめる）
+    // 例: ["犬","わんこ"] → [["犬","わんこ"]]
+    return [cleaned];
+  }
+
+  // 文字列形式（旧形式）："・犬\n・わんこ" のような形
+  const lines = question.descriptiveAnswer
+    .split('\n')
+    .map(ans => ans.replace(/^[・]\s*/, '').trim())
+    .filter(ans => ans.length > 0);
+
+  if (lines.length === 0) return [];
+  // 旧文字列形式は常に「言い換え候補の集合（1グループ）」として扱う
+  return [lines];
 };

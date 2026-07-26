@@ -19,6 +19,7 @@ import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
+import { loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from './utils/storageUtils';
 import Tesseract from 'tesseract.js';
 import './create.css';
 
@@ -27,7 +28,7 @@ export default function CreateQuestionScreen() {
   const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions, saveQuestions } = useQuestionsContext();
+  const { questions, saveQuestions, removeTagFromAllQuestions } = useQuestionsContext();
   const { user } = useAuth();
   const cpR: number | undefined = isCyberpunk ? 0 : undefined;
   const cpB: number | undefined = isCyberpunk ? 2 : undefined;
@@ -38,7 +39,7 @@ export default function CreateQuestionScreen() {
   
   const [question, setQuestion] = useState('');
   const [answerType, setAnswerType] = useState<'descriptive' | 'truefalse' | 'multiple'>('descriptive');
-  const [descriptiveAnswers, setDescriptiveAnswers] = useState<string[]>(['']);
+  const [answerGroups, setAnswerGroups] = useState<string[][]>([['']]);
   const [trueFalseAnswer, setTrueFalseAnswer] = useState(true);
   const [explanation, setExplanation] = useState('');
   const [multipleChoice, setMultipleChoice] = useState({
@@ -48,7 +49,10 @@ export default function CreateQuestionScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
-  const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');  // 両解モード
+  const [tagMasterList, setTagMasterList] = useState<string[]>([]);
+
+  type OcrTarget = { type: 'question' } | { type: 'answer'; groupIndex: number; answerIndex: number };
+  const [ocrTarget, setOcrTarget] = useState<OcrTarget>({ type: 'question' });
 
   // OCR関連のstate
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -64,22 +68,12 @@ export default function CreateQuestionScreen() {
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 両解モード切り替えハンドラ（useEffectではなく、トグル押下時に直接配列操作）
-  const toggleMatchMode = () => {
-    SoundManager.play('decide');
-    if (matchMode === 'all') {
-      // OFFにする: モードだけ変更し、入力済みの回答は消さない
-      setMatchMode('any');
-    } else {
-      // ONにする: 2つ未満なら2つに増やす
-      setMatchMode('all');
-      if (descriptiveAnswers.length < 2) {
-        setDescriptiveAnswers(['', '']);
-      }
-    }
-  };
-
   // 🟢 画像添付UIを削除（OCR機能のみ使用）
+
+  // タグのマスターリストを読み込む
+  useEffect(() => {
+    loadTagMasterList().then(setTagMasterList);
+  }, []);
 
   // クロップ範囲のリセット
   const resetCropArea = () => {
@@ -453,7 +447,8 @@ export default function CreateQuestionScreen() {
   };
 
   // OCR: 画像からテキストを抽出
-  const handleOcrExtract = async () => {
+  const handleOcrExtract = async (target: OcrTarget = { type: 'question' }) => {
+    setOcrTarget(target);
     // クロップUIが表示されていない場合は、ファイル選択を開く
     if (!showCropUI) {
       const input = document.createElement('input');
@@ -575,7 +570,16 @@ export default function CreateQuestionScreen() {
         console.log("OCR Result (cleaned):", cleanedText);
 
         // 🟢 確実にテキストを反映（コールバック形式で最新のstateを参照）
-        setQuestion(prev => prev ? `${prev}\n${cleanedText}` : cleanedText);
+        if (ocrTarget.type === 'question') {
+          setQuestion(prev => prev ? `${prev}\n${cleanedText}` : cleanedText);
+        } else {
+          setAnswerGroups(prev => {
+            const updated = prev.map(g => [...g]);
+            const current = updated[ocrTarget.groupIndex][ocrTarget.answerIndex] || '';
+            updated[ocrTarget.groupIndex][ocrTarget.answerIndex] = current ? `${current}\n${cleanedText}` : cleanedText;
+            return updated;
+          });
+        }
         console.log("Question updated with OCR text");
         
         // 少し遅延させてからUIを閉じる
@@ -660,11 +664,17 @@ export default function CreateQuestionScreen() {
     }
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
-      const answers = descriptiveAnswers.map(a => a.trim()).filter(Boolean);
-      if (answers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
-      
-      dataToSave.descriptiveAnswer = answers;
-      dataToSave.matchMode = matchMode;
+      const cleanedGroups = answerGroups
+        .map(group => group.map(a => a.trim()).filter(Boolean))
+        .filter(group => group.length > 0);
+
+      if (cleanedGroups.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
+
+      dataToSave.descriptiveAnswerGroups = cleanedGroups;
+      // 互換性のため、旧形式のフィールドも一緒に保存しておく
+      // （browse.tsx編集画面・答え表示アラートが対応するまでの暫定措置）
+      dataToSave.descriptiveAnswer = cleanedGroups.flat();
+      dataToSave.matchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;
       dataToSave.explanation = trueFalseAnswer ? '' : explanation.trim();
@@ -678,19 +688,56 @@ export default function CreateQuestionScreen() {
     if (success) {
       SoundManager.play('complete');
       Alert.alert(t.success, t.questionSaved);
-      setQuestion(''); setDescriptiveAnswers(['']); setTags([]); setTagInput(''); setAnswerType('descriptive');
+      setQuestion(''); setAnswerGroups([['']]); setTags([]); setTagInput(''); setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
-      setSelectedImage(null); setShowTagInput(false); setMatchMode('any');
+      setSelectedImage(null); setShowTagInput(false);
     }
   };
 
-  const addTag = () => { 
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) { 
-      setTags([...tags, tagInput.trim()]); 
-      setTagInput(''); 
-    } 
+  const handleTagToggle = async (tag: string) => {
+    SoundManager.play('select');
+    if (tags.includes(tag)) {
+      setTags(prev => prev.filter(t => t !== tag));
+    } else {
+      setTags(prev => [...prev, tag]);
+    }
   };
-  const removeTag = (tagToRemove: string) => setTags(tags.filter(tag => tag !== tagToRemove));
+
+  const handleTagLongPress = (tag: string) => {
+    Alert.alert(
+      locale === 'ja' ? 'タグを削除' : 'Delete Tag',
+      locale === 'ja'
+        ? `「${tag}」を削除しますか？\n削除すると、このタグが付いている全ての問題からも取り除かれます。`
+        : `Delete "${tag}"?\nThis will also remove it from all questions that have this tag.`,
+      [
+        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+        {
+          text: locale === 'ja' ? '削除する' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await removeTagFromAllQuestions(tag);
+            await removeTagFromMasterList(tag);
+            setTagMasterList(prev => prev.filter(t => t !== tag));
+            setTags(prev => prev.filter(t => t !== tag));
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAddNewTag = async () => {
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+    SoundManager.play('decide');
+    const added = await addTagToMasterList(trimmed);
+    if (added) {
+      setTagMasterList(prev => [...prev, trimmed]);
+      setTags(prev => [...prev, trimmed]);
+    } else {
+      Alert.alert(t.error, locale === 'ja' ? '既に存在するタグです' : 'Tag already exists');
+    }
+    setTagInput('');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -721,11 +768,25 @@ export default function CreateQuestionScreen() {
       {showTagInput && (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15, marginBottom: 16 }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.tags}</Text>
-          <View style={styles.tagInputContainer}>
-            <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={t.enterTag} placeholderTextColor={colors.textSecondary} onSubmitEditing={() => { SoundManager.play('decide'); addTag(); }} />
-            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={() => { SoundManager.play('decide'); addTag(); }}><Text style={[styles.addTagText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>+</Text></TouchableOpacity>
+          <View style={styles.tagContainer}>
+            {tagMasterList.map((tag) => {
+              const isSelected = tags.includes(tag);
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  style={[styles.tag, { backgroundColor: isSelected ? colors.primary : colors.primary + '20', borderRadius: cpR ?? 16 }]}
+                  onPress={() => handleTagToggle(tag)}
+                  onLongPress={() => handleTagLongPress(tag)}
+                >
+                  <Text style={[styles.tagText, { color: isSelected ? (isCyberpunk ? '#000000' : '#ffffff') : colors.primary }]}>{tag}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          {tags.length > 0 && (<View style={styles.tagContainer}>{tags.map((tag, index) => (<TouchableOpacity key={index} style={[styles.tag, { backgroundColor: colors.primary + '20', borderRadius: cpR ?? 16 }]} onPress={() => { SoundManager.play('select'); removeTag(tag); }}><Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text><Text style={[styles.removeTagText, { color: colors.primary }]}>×</Text></TouchableOpacity>))}</View>)}
+          <View style={styles.tagInputContainer}>
+            <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={locale === 'ja' ? '新しいタグ名' : 'New tag name'} placeholderTextColor={colors.textSecondary} onSubmitEditing={handleAddNewTag} />
+            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={handleAddNewTag}><Text style={[styles.addTagText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>+</Text></TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -756,7 +817,7 @@ export default function CreateQuestionScreen() {
                 opacity: ocrLoading ? 0.7 : 1,
               }
             ]}
-            onPress={handleOcrExtract}
+            onPress={() => handleOcrExtract({ type: 'question' })}
             disabled={ocrLoading}
           >
             {ocrLoading ? (
@@ -815,7 +876,7 @@ export default function CreateQuestionScreen() {
             <View style={[styles.cropButtons, { marginTop: 12 }]}>
               <TouchableOpacity
                 style={[styles.cropButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 8, marginRight: 8 }]}
-                onPress={handleOcrExtract}
+                onPress={() => handleOcrExtract(ocrTarget)}
                 disabled={ocrLoading || cropArea.width < 10 || cropArea.height < 10}
               >
                 <Text style={[styles.cropButtonText, { color: onPrimary }]}>
@@ -834,106 +895,89 @@ export default function CreateQuestionScreen() {
           </View>
         )}
 
-        {/* 問題入力欄のすぐ下に両解モード・タグ追加ボタンを配置 */}
-        <View style={[styles.inlineButtons, { flexDirection: 'row', gap: 10, marginBottom: 16 }]}>
-          <TouchableOpacity
-            style={[
-              styles.inlineModeButton,
-              { 
-                flex: 1,
-                borderColor: colors.primary,
-                backgroundColor: matchMode === 'all' ? colors.primary : 'transparent'
-              }
-            ]}
-            onPress={toggleMatchMode}
-          >
-            <Text style={[
-              styles.inlineModeButtonText,
-              { 
-                color: matchMode === 'all' 
-                  ? (isCyberpunk ? '#000000' : '#ffffff') 
-                  : colors.primary
-              }
-            ]}>
-              {locale === 'ja' ? '両解モード' : 'Multi-Answer'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.inlineModeButton,
-              { 
-                flex: 1,
-                borderColor: colors.primary,
-                backgroundColor: showTagInput ? colors.primary : 'transparent'
-              }
-            ]}
-            onPress={() => {
-              SoundManager.play('decide');
-              setShowTagInput(!showTagInput);
-            }}
-          >
-            <Text style={[
-              styles.inlineModeButtonText,
-              { 
-                color: showTagInput 
-                  ? (isCyberpunk ? '#000000' : '#ffffff') 
-                  : colors.primary
-              }
-            ]}>
-              🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* タグ追加ボタン */}
+        <TouchableOpacity
+          style={[
+            styles.inlineModeButton,
+            { 
+              alignSelf: 'flex-start',
+              borderColor: colors.primary,
+              backgroundColor: showTagInput ? colors.primary : 'transparent'
+            }
+          ]}
+          onPress={() => {
+            SoundManager.play('decide');
+            setShowTagInput(!showTagInput);
+          }}
+        >
+          <Text style={[
+            styles.inlineModeButtonText,
+            { 
+              color: showTagInput 
+                ? (isCyberpunk ? '#000000' : '#ffffff') 
+                : colors.primary
+            }
+          ]}>
+            🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
+          </Text>
+        </TouchableOpacity>
 
         {answerType === 'descriptive' && (
           <View>
-            {matchMode === 'all' && (
-              <View style={[styles.matchModeInfo, { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: 6, padding: 10, marginBottom: 12 }]}>
-                <Text style={[styles.matchModeInfoText, { color: colors.primary, fontSize: 12 }]}>
-                  {locale === 'ja' 
-                    ? '※ 各入力欄に正解を1つずつ入力してください（順不同）' 
-                    : '※ Enter one correct answer in each field (order doesn\'t matter)'}
+            {answerGroups.map((group, groupIndex) => (
+              <View key={groupIndex} style={{ marginBottom: 12, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }}>
+                  {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
                 </Text>
-              </View>
-            )}
-
-            {descriptiveAnswers.map((answer, index) => (
-              <View key={index} style={styles.descriptiveAnswerRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
-                  value={answer}
-                  onChangeText={(text) => {
-                    const newAnswers = [...descriptiveAnswers];
-                    newAnswers[index] = text;
-                    setDescriptiveAnswers(newAnswers);
-                  }}
-                  placeholder={locale === 'ja' ? `正解 ${index + 1}` : `Answer ${index + 1}`}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                />
-                {index > 0 && (
-                  <TouchableOpacity
-                    style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
-                    onPress={() => {
-                      const newAnswers = descriptiveAnswers.filter((_, i) => i !== index);
-                      setDescriptiveAnswers(newAnswers);
-                      if (matchMode === 'all' && newAnswers.length < 2) {
-                        setMatchMode('any');
-                      }
-                    }}
-                  >
-                    <Text style={[styles.removeAnswerButtonText, { color: '#fff' }]}>×</Text>
-                  </TouchableOpacity>
-                )}
+                {group.map((answer, answerIndex) => (
+                  <View key={answerIndex} style={styles.descriptiveAnswerRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
+                      value={answer}
+                      onChangeText={(text) => {
+                        const newGroups = answerGroups.map(g => [...g]);
+                        newGroups[groupIndex][answerIndex] = text;
+                        setAnswerGroups(newGroups);
+                      }}
+                      placeholder={locale === 'ja' ? '言い換え候補' : 'Alternative answer'}
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                    />
+                    <TouchableOpacity
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}
+                      onPress={() => handleOcrExtract({ type: 'answer', groupIndex, answerIndex })}
+                    >
+                      <Text style={{ color: isCyberpunk ? '#000000' : '#ffffff', fontSize: 16 }}>📷</Text>
+                    </TouchableOpacity>
+                    {(group.length > 1 || answerGroups.length > 1) && (
+                      <TouchableOpacity
+                        style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
+                        onPress={() => {
+                          const newGroups = answerGroups.map(g => [...g]);
+                          newGroups[groupIndex] = newGroups[groupIndex].filter((_, i) => i !== answerIndex);
+                          const filteredGroups = newGroups.filter(g => g.length > 0);
+                          setAnswerGroups(filteredGroups.length > 0 ? filteredGroups : [['']]);
+                        }}
+                      >
+                        <Text style={[styles.removeAnswerButtonText, { color: '#fff' }]}>×</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <TouchableOpacity onPress={() => {
+                  const newGroups = answerGroups.map(g => [...g]);
+                  newGroups[groupIndex] = [...newGroups[groupIndex], ''];
+                  setAnswerGroups(newGroups);
+                }}>
+                  <Text style={{ color: colors.primary, fontSize: 13 }}>
+                    {locale === 'ja' ? '＋ 言い換えを追加' : '+ Add alternative'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))}
-            
-            <TouchableOpacity
-              style={[styles.addAnswerButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10', marginBottom: 16 }]}
-              onPress={() => setDescriptiveAnswers([...descriptiveAnswers, ''])}
-            >
-              <Text style={[styles.addAnswerButtonText, { color: colors.primary }]}>
-                + {locale === 'ja' ? '正解を追加' : 'Add Answer'}
+            <TouchableOpacity onPress={() => setAnswerGroups([...answerGroups, ['']])}>
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: 'bold', marginTop: 4 }}>
+                {locale === 'ja' ? '＋ 新しい正解を追加（複数の空欄がある問題用）' : '+ Add new answer slot'}
               </Text>
             </TouchableOpacity>
           </View>

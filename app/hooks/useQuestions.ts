@@ -355,8 +355,62 @@ export const useQuestions = () => {
       console.log(`Saving ${newQuestions.length} questions to Firestore for user:`, user.uid);
       const docRef = doc(db, 'userQuestions', user.uid);
       
+      // undefinedを排除した安全な問題データに変換
+      const sanitizedQuestions = newQuestions.map(q => {
+        const sanitized: any = {
+          id: q.id,
+          question: q.question || '',
+          answerType: q.answerType,
+          tags: q.tags || [],
+          mistakeCount: q.mistakeCount || 0,
+          createdAt: q.createdAt || Date.now(),
+          enabled: q.enabled !== undefined ? q.enabled : true,
+          isShared: q.isShared || false
+        };
+        
+        // 回答タイプに応じて必要なフィールドを追加
+        if (q.answerType === 'descriptive') {
+          if (q.descriptiveAnswer !== undefined) {
+            sanitized.descriptiveAnswer = q.descriptiveAnswer;
+          }
+          if (q.matchMode) {
+            sanitized.matchMode = q.matchMode;
+          }
+          if (q.descriptiveAnswerGroups !== undefined) {
+            sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
+          }
+        } else if (q.answerType === 'truefalse') {
+          if (q.trueFalseAnswer !== undefined) {
+            sanitized.trueFalseAnswer = q.trueFalseAnswer;
+          }
+          if (q.explanation) {
+            sanitized.explanation = q.explanation;
+          }
+        } else if (q.answerType === 'multiple') {
+          if (q.multipleChoice) {
+            sanitized.multipleChoice = {
+              options: q.multipleChoice.options || ['', '', '', ''],
+              correctAnswer: q.multipleChoice.correctAnswer ?? 0
+            };
+          }
+          if (q.explanation) {
+            sanitized.explanation = q.explanation;
+          }
+        }
+        
+        // 画像データがある場合
+        if (q.image) {
+          sanitized.image = q.image;
+        }
+        if (q.imageAnnotations && q.imageAnnotations.length > 0) {
+          sanitized.imageAnnotations = q.imageAnnotations;
+        }
+        
+        return sanitized;
+      });
+      
       const dataToSave = {
-        questions: newQuestions,
+        questions: sanitizedQuestions,
         updatedAt: serverTimestamp()
       };
       
@@ -502,6 +556,19 @@ export const useQuestions = () => {
     return updated;
   }, [questions, saveQuestions]);
 
+  /**
+   * 指定したタグを、全問題から一括で取り除く。
+   * 1回の saveQuestions 呼び出しで完結させる（ループでの
+   * updateQuestion 呼び出しは行わない）。
+   */
+  const removeTagFromAllQuestions = useCallback(async (tagToRemove: string): Promise<void> => {
+    const updated = questions.map(q => {
+      if (!q.tags || !q.tags.includes(tagToRemove)) return q;
+      return { ...q, tags: q.tags.filter(t => t !== tagToRemove) };
+    });
+    await saveQuestions(updated);
+  }, [questions, saveQuestions]);
+
   const addTagToQuestions = useCallback(async (ids: number[], newTags: string[]): Promise<Question[]> => {
     const updated = questions.map(q => {
       if (ids.includes(q.id)) {
@@ -600,6 +667,7 @@ export const useQuestions = () => {
     deleteQuestion,
     updateQuestion,
     addTagToQuestions,
+    removeTagFromAllQuestions,
     createFolder,
     updateFolder,
     deleteFolder,
