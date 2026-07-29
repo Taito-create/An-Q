@@ -92,11 +92,13 @@ export const getAnswerText = (question: Question): string => {
       }
 
       // 空欄が複数（両解モード相当）の場合：
-      // ①候補1 / 候補2\n②候補3 / 候補4... の形式で表示
-      const circledNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+      // 正解1: 候補1 / 候補2 | 正解2: 候補3 / 候補4 の形式で表示
       return groups
-        .map((g, i) => `${circledNumbers[i] || i + 1}${g.join(' / ')}`)
-        .join('\n');
+        .map((g, i) => {
+          const answers = g.filter(a => a && a.trim()).join(' / ');
+          return `正解${i + 1}: ${answers}`;
+        })
+        .join(' | ');
     }
     default:
       return '';

@@ -65,6 +65,9 @@ export default function CreateQuestionScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
+  // 作成中フラグ（二重送信防止）
+  const [isCreating, setIsCreating] = useState(false);
+
   type OcrTarget = { type: 'question' } | { type: 'answer'; groupIndex: number; answerIndex: number };
   const [ocrTarget, setOcrTarget] = useState<OcrTarget>({ type: 'question' });
 
@@ -671,11 +674,21 @@ export default function CreateQuestionScreen() {
   };
 
   const handleManualCreate = async () => {
+    // Prevent double submission
+    if (isCreating) {
+      console.log('⏳ 既に作成中です');
+      return;
+    }
+
     if (!question.trim()) {
       SoundManager.play('select');
       Alert.alert(t.error, t.enterQuestion);
       return;
     }
+
+    setIsCreating(true);
+
+    try {
     let dataToSave: any = { question: question.trim() || '', answerType: answerType };
     if (answerType === 'descriptive') {
       const cleanedGroups = answerGroups
@@ -709,6 +722,12 @@ export default function CreateQuestionScreen() {
       setQuestion(''); setAnswerGroups([['']]); setTags([]); setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
       setSelectedImage(null);
+    }
+    } catch (error) {
+      console.error('Save error:', error);
+      Alert.alert(t.error, t.failedToSave);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -1183,8 +1202,21 @@ export default function CreateQuestionScreen() {
             />
           </View>
         )}
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 25, borderWidth: cpB, borderColor: isCyberpunk ? colors.primary : undefined, marginTop: 8 }]} onPress={handleManualCreate}>
-          <Text style={[styles.buttonText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#ffffff' }]}>{t.createQuestion}</Text>
+        <TouchableOpacity
+          style={[styles.createButton, {
+            backgroundColor: isCreating ? colors.textSecondary : colors.primary,
+            borderRadius: cpR ?? 25,
+            borderWidth: cpB,
+            borderColor: isCyberpunk ? colors.primary : undefined,
+            marginTop: 8,
+            opacity: isCreating ? 0.6 : 1,
+          }]}
+          onPress={handleManualCreate}
+          disabled={isCreating}
+        >
+          <Text style={[styles.buttonText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#ffffff' }]}>
+            {isCreating ? '⏳ 作成中...' : t.createQuestion}
+          </Text>
         </TouchableOpacity>
       </View>
 

@@ -919,27 +919,63 @@ export default function BrowseQuestionsScreen() {
   <>
     <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
     {editAnswerGroups.map((group, groupIndex) => (
-      <View key={groupIndex} style={{ marginBottom: 10, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }}>
-          {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
-        </Text>
+      <View key={groupIndex} style={{
+        backgroundColor: colors.background,
+        borderColor: colors.border,
+        borderWidth: 2,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 14,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <View style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
+            <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>
+              {locale === 'ja' ? `📝 正解 ${groupIndex + 1}` : `✅ Answer ${groupIndex + 1}`}
+            </Text>
+          </View>
+          {editAnswerGroups.length > 1 && groupIndex > 0 && (
+            <TouchableOpacity
+              style={{ padding: 6, borderRadius: 20, backgroundColor: colors.error + '20' }}
+              onPress={() => {
+                const newGroups = editAnswerGroups.filter((_, i) => i !== groupIndex);
+                setEditAnswerGroups(newGroups.length > 0 ? newGroups : [['']]);
+              }}
+            >
+              <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}>✕ {locale === 'ja' ? '削除' : 'Remove'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
         {group.map((answer, answerIndex) => (
-          <View key={answerIndex} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <View key={answerIndex} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '500', minWidth: 24 }}>
+              {String.fromCharCode(65 + answerIndex)}
+            </Text>
             <TextInput
-              style={[styles.modalInput, { flex: 1, borderColor: colors.border, color: colors.text, minHeight: 44, textAlignVertical: 'top' }]}
+              style={[styles.modalInput, {
+                flex: 1,
+                minHeight: 44,
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                color: colors.text,
+                fontSize: 14,
+              }]}
               value={answer}
               onChangeText={(text) => {
                 const newGroups = editAnswerGroups.map(g => [...g]);
                 newGroups[groupIndex][answerIndex] = text;
                 setEditAnswerGroups(newGroups);
               }}
-              placeholder={locale === 'ja' ? '言い換え候補' : 'Alternative answer'}
+              placeholder={locale === 'ja' ? '言い換え候補を入力' : 'Enter alternative answer'}
               placeholderTextColor={colors.textSecondary}
-              multiline
             />
-            {(group.length > 1 || editAnswerGroups.length > 1) && (
+            {group.length > 1 && answerIndex > 0 && (
               <TouchableOpacity
-                style={{ marginLeft: 6, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center' }}
+                style={{ padding: 6, borderRadius: 16, backgroundColor: colors.error + '20' }}
                 onPress={() => {
                   const newGroups = editAnswerGroups.map(g => [...g]);
                   newGroups[groupIndex] = newGroups[groupIndex].filter((_, i) => i !== answerIndex);
@@ -947,25 +983,44 @@ export default function BrowseQuestionsScreen() {
                   setEditAnswerGroups(filtered.length > 0 ? filtered : [['']]);
                 }}
               >
-                <Text style={{ color: '#fff' }}>×</Text>
+                <Text style={{ color: colors.error, fontSize: 16, fontWeight: 'bold' }}>×</Text>
               </TouchableOpacity>
             )}
           </View>
         ))}
-        <TouchableOpacity onPress={() => {
-          const newGroups = editAnswerGroups.map(g => [...g]);
-          newGroups[groupIndex] = [...newGroups[groupIndex], ''];
-          setEditAnswerGroups(newGroups);
-        }}>
-          <Text style={{ color: colors.primary, fontSize: 13 }}>
-            {locale === 'ja' ? '＋ 言い換えを追加' : '+ Add alternative'}
+        
+        <TouchableOpacity
+          style={{ alignSelf: 'flex-start', marginTop: 6 }}
+          onPress={() => {
+            const newGroups = editAnswerGroups.map(g => [...g]);
+            newGroups[groupIndex] = [...newGroups[groupIndex], ''];
+            setEditAnswerGroups(newGroups);
+          }}
+        >
+          <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+            ＋ {locale === 'ja' ? '言い換えを追加' : 'Add alternative'}
           </Text>
         </TouchableOpacity>
       </View>
     ))}
-    <TouchableOpacity onPress={() => setEditAnswerGroups([...editAnswerGroups, ['']])}>
-      <Text style={{ color: colors.primary, fontSize: 14, fontWeight: 'bold' }}>
-        {locale === 'ja' ? '＋ 新しい正解を追加' : '+ Add new answer slot'}
+    <TouchableOpacity
+      style={{
+        backgroundColor: colors.primary + '15',
+        borderColor: colors.primary,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderRadius: 12,
+        padding: 14,
+        alignItems: 'center',
+        marginTop: 8,
+      }}
+      onPress={() => setEditAnswerGroups([...editAnswerGroups, ['']])}
+    >
+      <Text style={{ color: colors.primary, fontSize: 15, fontWeight: 'bold' }}>
+        ＋ {locale === 'ja' ? '新しい正解を追加（複数空欄用）' : 'Add new answer slot (for multiple blanks)'}
+      </Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+        {locale === 'ja' ? '例：「AとB」のような複数回答が必要な問題に' : 'For questions requiring multiple answers like "A and B"'}
       </Text>
     </TouchableOpacity>
   </>
