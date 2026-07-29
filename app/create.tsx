@@ -8,6 +8,7 @@ import {
   Text,
   View,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -28,7 +29,7 @@ export default function CreateQuestionScreen() {
   const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions, saveQuestions, removeTagFromAllQuestions } = useQuestionsContext();
+  const { questions, saveQuestions, applyQuestionsChange, removeTagFromAllQuestions } = useQuestionsContext();
   const { user } = useAuth();
   const cpR: number | undefined = isCyberpunk ? 0 : undefined;
   const cpB: number | undefined = isCyberpunk ? 2 : undefined;
@@ -47,9 +48,22 @@ export default function CreateQuestionScreen() {
     correctAnswers: [0] as number[]
   });
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
-  const [showTagInput, setShowTagInput] = useState(false);
   const [tagMasterList, setTagMasterList] = useState<string[]>([]);
+
+  // タグ追加モーダル用 state
+  const [showAddTagModal, setShowAddTagModal] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+
+  // タグ削除モード用 state
+  const [isTagDeleteMode, setIsTagDeleteMode] = useState(false);
+
+  // タグ削除確認モーダル用 state
+  const [showTagDeleteModal, setShowTagDeleteModal] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+
+  // Toast notification state
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   type OcrTarget = { type: 'question' } | { type: 'answer'; groupIndex: number; answerIndex: number };
   const [ocrTarget, setOcrTarget] = useState<OcrTarget>({ type: 'question' });
@@ -643,7 +657,7 @@ export default function CreateQuestionScreen() {
         image: selectedImage || newQuestionData.image || null,
         imageAnnotations: [],
       };
-      await saveQuestions([...questions, newQuestion]);
+      await applyQuestionsChange(current => [...current, newQuestion]);
       await incrementStat('questionsCreated', 1);
       if (user?.uid) {
         await awardQuestionCreation(user.uid);
@@ -687,10 +701,14 @@ export default function CreateQuestionScreen() {
     const success = await saveQuestion(dataToSave);
     if (success) {
       SoundManager.play('complete');
-      Alert.alert(t.success, t.questionSaved);
-      setQuestion(''); setAnswerGroups([['']]); setTags([]); setTagInput(''); setAnswerType('descriptive');
+      // Show toast notification instead of Alert
+      setToastMessage('✅ 問題を作成しました！');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000); // Auto dismiss after 3s
+      
+      setQuestion(''); setAnswerGroups([['']]); setTags([]); setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
-      setSelectedImage(null); setShowTagInput(false);
+      setSelectedImage(null);
     }
   };
 
@@ -726,17 +744,26 @@ export default function CreateQuestionScreen() {
   };
 
   const handleAddNewTag = async () => {
-    const trimmed = tagInput.trim();
-    if (!trimmed) return;
+    const trimmed = newTagName.trim();
+    if (!trimmed) {
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? 'タグ名を入力してください' : 'Please enter a tag name'
+      );
+      return;
+    }
     SoundManager.play('decide');
     const added = await addTagToMasterList(trimmed);
     if (added) {
       setTagMasterList(prev => [...prev, trimmed]);
       setTags(prev => [...prev, trimmed]);
+      setNewTagName('');
+      setShowAddTagModal(false);
+      setIsTagDeleteMode(false);
+      SoundManager.play('complete');
     } else {
       Alert.alert(t.error, locale === 'ja' ? '既に存在するタグです' : 'Tag already exists');
     }
-    setTagInput('');
   };
 
   return (
@@ -759,36 +786,125 @@ export default function CreateQuestionScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
-        <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-          <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.addTagHeaderBtn, { 
+              backgroundColor: isTagDeleteMode ? colors.error : colors.primary,
+              borderRadius: 8, 
+              paddingHorizontal: 14, 
+              paddingVertical: 8 
+            }]}
+            onPress={() => {
+              if (isTagDeleteMode) {
+                setIsTagDeleteMode(false);
+              } else {
+                if (tagMasterList.length === 0) {
+                  Alert.alert(
+                    locale === 'ja' ? '削除するタグがありません' : 'No tags to delete',
+                    locale === 'ja' ? 'タグが存在しないため、削除モードを開始できません。' : 'There are no tags to delete.'
+                  );
+                  return;
+                }
+                setIsTagDeleteMode(true);
+              }
+            }}
+          >
+            <Text style={[styles.addTagHeaderBtnText, { 
+              color: isTagDeleteMode ? '#ffffff' : onPrimary, 
+              fontWeight: 'bold', 
+              fontSize: 13 
+            }]}>
+              {isTagDeleteMode ? '✕ キャンセル' : '− タグ'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addTagHeaderBtn, { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }]}
+            onPress={() => setShowAddTagModal(true)}
+          >
+            <Text style={[styles.addTagHeaderBtnText, { color: onPrimary, fontWeight: 'bold', fontSize: 13 }]}>
+              ＋ タグ
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
+            <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* タグ入力エリア（ヘッダー下） */}
-      {showTagInput && (
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15, marginBottom: 16 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.tags}</Text>
-          <View style={styles.tagContainer}>
-            {tagMasterList.map((tag) => {
-              const isSelected = tags.includes(tag);
-              return (
-                <TouchableOpacity
-                  key={tag}
-                  style={[styles.tag, { backgroundColor: isSelected ? colors.primary : colors.primary + '20', borderRadius: cpR ?? 16 }]}
-                  onPress={() => handleTagToggle(tag)}
-                  onLongPress={() => handleTagLongPress(tag)}
-                >
-                  <Text style={[styles.tagText, { color: isSelected ? (isCyberpunk ? '#000000' : '#ffffff') : colors.primary }]}>{tag}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <View style={styles.tagInputContainer}>
-            <TextInput style={[styles.tagInput, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={tagInput} onChangeText={setTagInput} placeholder={locale === 'ja' ? '新しいタグ名' : 'New tag name'} placeholderTextColor={colors.textSecondary} onSubmitEditing={handleAddNewTag} />
-            <TouchableOpacity style={[styles.addTagButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 20 }]} onPress={handleAddNewTag}><Text style={[styles.addTagText, { color: isCyberpunk ? '#ffffff' : '#000000' }]}>+</Text></TouchableOpacity>
-          </View>
+      {/* タグセクション - 横スクロール表示 */}
+      {tagMasterList.length > 0 && (
+        <View style={[styles.tagSection, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+              {tagMasterList.map((tag) => {
+                const isSelected = tags.includes(tag);
+                const isDeleteMode = isTagDeleteMode;
+                
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[
+                      styles.tagChip,
+                      {
+                        backgroundColor: isDeleteMode 
+                          ? colors.error + '20' 
+                          : isSelected ? colors.primary : colors.primary + '20',
+                        borderColor: isDeleteMode 
+                          ? colors.error 
+                          : isSelected ? colors.primary : colors.border,
+                        borderWidth: 2,
+                        borderRadius: 20,
+                        paddingHorizontal: 14,
+                        paddingVertical: 6,
+                        opacity: isDeleteMode ? 0.9 : 1,
+                      }
+                    ]}
+                    onPress={() => {
+                      if (isDeleteMode) {
+                        setTagToDelete(tag);
+                        setShowTagDeleteModal(true);
+                        return;
+                      }
+                      
+                      if (tags.includes(tag)) {
+                        setTags(prev => prev.filter(t => t !== tag));
+                      } else {
+                        setTags(prev => [...prev, tag]);
+                      }
+                    }}
+                    onLongPress={() => {
+                      if (!isDeleteMode) {
+                        setTagToDelete(tag);
+                        setShowTagDeleteModal(true);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.tagChipText,
+                      {
+                        color: isDeleteMode 
+                          ? colors.error 
+                          : isSelected ? onPrimary : colors.primary,
+                        fontWeight: isSelected || isDeleteMode ? 'bold' : '500',
+                        fontSize: 13,
+                      }
+                    ]}>
+                      {isDeleteMode ? '✕ ' : ''}
+                      {isSelected && !isDeleteMode ? '✓ ' : ''}{tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+          {isTagDeleteMode && (
+            <Text style={{ color: colors.error, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+              {locale === 'ja' ? '⚠️ 削除したいタグをタップしてください' : '⚠️ Tap the tag you want to delete'}
+            </Text>
+          )}
         </View>
       )}
+
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{locale === 'ja' ? '回答形式' : 'Answer Type'}</Text>
@@ -802,41 +918,19 @@ export default function CreateQuestionScreen() {
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
+          {!showCropUI && (
+            <TouchableOpacity
+              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, padding: 10 }]}
+              onPress={() => handleOcrExtract({ type: 'question' })}
+              disabled={ocrLoading}
+            >
+              <Text style={{ fontSize: 20, color: onPrimary }}>📷</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
-
-        {/* 📷 OCRボタン：写真や画像から文字を抽出 */}
-        {!showCropUI && (
-          <TouchableOpacity
-            style={[
-              styles.ocrButton,
-              {
-                backgroundColor: ocrLoading ? colors.textSecondary : colors.primary,
-                borderColor: colors.primary,
-                borderRadius: cpR ?? 12,
-                opacity: ocrLoading ? 0.7 : 1,
-              }
-            ]}
-            onPress={() => handleOcrExtract({ type: 'question' })}
-            disabled={ocrLoading}
-          >
-            {ocrLoading ? (
-              <View style={styles.ocrButtonContent}>
-                <ActivityIndicator size="small" color={isCyberpunk ? '#000000' : '#ffffff'} />
-                <Text style={[styles.ocrButtonText, { color: isCyberpunk ? '#000000' : '#ffffff', marginLeft: 8 }]}>
-                  {locale === 'ja' ? `解析中 (${ocrProgress}%)...` : `Processing (${ocrProgress}%)...`}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.ocrButtonContent}>
-                <Text style={[styles.ocrButtonIcon]}>📷</Text>
-                <Text style={[styles.ocrButtonText, { color: isCyberpunk ? '#000000' : '#ffffff' }]}>
-                  {locale === 'ja' ? '写真や画像から文字を抽出' : 'Extract text from image'}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
 
         {/* クロップUI */}
         {showCropUI && selectedImage && (
@@ -895,89 +989,126 @@ export default function CreateQuestionScreen() {
           </View>
         )}
 
-        {/* タグ追加ボタン */}
-        <TouchableOpacity
-          style={[
-            styles.inlineModeButton,
-            { 
-              alignSelf: 'flex-start',
-              borderColor: colors.primary,
-              backgroundColor: showTagInput ? colors.primary : 'transparent'
-            }
-          ]}
-          onPress={() => {
-            SoundManager.play('decide');
-            setShowTagInput(!showTagInput);
-          }}
-        >
-          <Text style={[
-            styles.inlineModeButtonText,
-            { 
-              color: showTagInput 
-                ? (isCyberpunk ? '#000000' : '#ffffff') 
-                : colors.primary
-            }
-          ]}>
-            🏷️ {locale === 'ja' ? 'タグを追加' : 'Add Tags'}
-          </Text>
-        </TouchableOpacity>
-
         {answerType === 'descriptive' && (
           <View>
             {answerGroups.map((group, groupIndex) => (
-              <View key={groupIndex} style={{ marginBottom: 12, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }}>
-                  {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
-                </Text>
+              <View key={groupIndex} style={[
+                styles.answerGroupCard,
+                { 
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 2,
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 14,
+                }
+              ]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={[styles.answerGroupHeader, { backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }]}>
+                      <Text style={[styles.answerGroupHeaderText, { color: colors.primary, fontWeight: 'bold', fontSize: 13 }]}>
+                        {locale === 'ja' ? `📝 正解 ${groupIndex + 1}` : `✅ Answer ${groupIndex + 1}`}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8 }]}
+                      onPress={() => handleOcrExtract({ type: 'answer', groupIndex, answerIndex: 0 })}
+                      disabled={ocrLoading}
+                    >
+                      <Text style={{ fontSize: 16, color: onPrimary }}>📷</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {answerGroups.length > 1 && groupIndex > 0 && (
+                    <TouchableOpacity
+                      style={{ padding: 6, borderRadius: 20, backgroundColor: colors.error + '20' }}
+                      onPress={() => {
+                        const newGroups = answerGroups.filter((_, i) => i !== groupIndex);
+                        setAnswerGroups(newGroups.length > 0 ? newGroups : [['']]);
+                      }}
+                    >
+                      <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}>✕ {locale === 'ja' ? '削除' : 'Remove'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
                 {group.map((answer, answerIndex) => (
-                  <View key={answerIndex} style={styles.descriptiveAnswerRow}>
+                  <View key={answerIndex} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '500', minWidth: 24 }}>
+                      {String.fromCharCode(65 + answerIndex)}
+                    </Text>
                     <TextInput
-                      style={[styles.input, { flex: 1, minHeight: 60, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
+                      style={[styles.input, { 
+                        flex: 1, 
+                        minHeight: 44, 
+                        textAlignVertical: 'center',
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        color: colors.text,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        fontSize: 14,
+                      }]}
                       value={answer}
                       onChangeText={(text) => {
                         const newGroups = answerGroups.map(g => [...g]);
                         newGroups[groupIndex][answerIndex] = text;
                         setAnswerGroups(newGroups);
                       }}
-                      placeholder={locale === 'ja' ? '言い換え候補' : 'Alternative answer'}
+                      placeholder={locale === 'ja' ? '言い換え候補を入力' : 'Enter alternative answer'}
                       placeholderTextColor={colors.textSecondary}
-                      multiline
                     />
-                    <TouchableOpacity
-                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}
-                      onPress={() => handleOcrExtract({ type: 'answer', groupIndex, answerIndex })}
-                    >
-                      <Text style={{ color: isCyberpunk ? '#000000' : '#ffffff', fontSize: 16 }}>📷</Text>
-                    </TouchableOpacity>
-                    {(group.length > 1 || answerGroups.length > 1) && (
+                    {group.length > 1 && answerIndex > 0 && (
                       <TouchableOpacity
-                        style={[styles.removeAnswerButton, { backgroundColor: colors.error }]}
+                        style={{ padding: 6, borderRadius: 16, backgroundColor: colors.error + '20' }}
                         onPress={() => {
                           const newGroups = answerGroups.map(g => [...g]);
                           newGroups[groupIndex] = newGroups[groupIndex].filter((_, i) => i !== answerIndex);
-                          const filteredGroups = newGroups.filter(g => g.length > 0);
-                          setAnswerGroups(filteredGroups.length > 0 ? filteredGroups : [['']]);
+                          const filtered = newGroups.filter(g => g.length > 0);
+                          setAnswerGroups(filtered.length > 0 ? filtered : [['']]);
                         }}
                       >
-                        <Text style={[styles.removeAnswerButtonText, { color: '#fff' }]}>×</Text>
+                        <Text style={{ color: colors.error, fontSize: 16, fontWeight: 'bold' }}>×</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 ))}
-                <TouchableOpacity onPress={() => {
-                  const newGroups = answerGroups.map(g => [...g]);
-                  newGroups[groupIndex] = [...newGroups[groupIndex], ''];
-                  setAnswerGroups(newGroups);
-                }}>
-                  <Text style={{ color: colors.primary, fontSize: 13 }}>
-                    {locale === 'ja' ? '＋ 言い換えを追加' : '+ Add alternative'}
+                
+                <TouchableOpacity
+                  style={{ alignSelf: 'flex-start', marginTop: 6 }}
+                  onPress={() => {
+                    const newGroups = answerGroups.map(g => [...g]);
+                    newGroups[groupIndex] = [...newGroups[groupIndex], ''];
+                    setAnswerGroups(newGroups);
+                  }}
+                >
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                    ＋ {locale === 'ja' ? '言い換えを追加' : 'Add alternative'}
                   </Text>
                 </TouchableOpacity>
               </View>
             ))}
-            <TouchableOpacity onPress={() => setAnswerGroups([...answerGroups, ['']])}>
-              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: 'bold', marginTop: 4 }}>
-                {locale === 'ja' ? '＋ 新しい正解を追加（複数の空欄がある問題用）' : '+ Add new answer slot'}
+            <TouchableOpacity
+              style={[
+                styles.addAnswerSlotBtn,
+                {
+                  backgroundColor: colors.primary + '15',
+                  borderColor: colors.primary,
+                  borderWidth: 2,
+                  borderStyle: 'dashed',
+                  borderRadius: 12,
+                  padding: 14,
+                  alignItems: 'center',
+                  marginTop: 8,
+                }
+              ]}
+              onPress={() => setAnswerGroups([...answerGroups, ['']])}
+            >
+              <Text style={[styles.addAnswerSlotBtnText, { color: colors.primary, fontSize: 15, fontWeight: 'bold' }]}>
+                ＋ {locale === 'ja' ? '新しい正解を追加（複数空欄用）' : 'Add new answer slot (for multiple blanks)'}
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                {locale === 'ja' ? '例：「AとB」のような複数回答が必要な問題に' : 'For questions requiring multiple answers like "A and B"'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1058,6 +1189,114 @@ export default function CreateQuestionScreen() {
       </View>
 
       {/* 🟢 画像添付UIを削除（OCR機能のみ使用） */}
+
+      {/* タグ追加モーダル（問題集作成と同様のスタイル） */}
+      <Modal visible={showAddTagModal} transparent animationType="fade" statusBarTranslucent={true}>
+        <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {locale === 'ja' ? '🏷️ 新しいタグを追加' : '🏷️ Add New Tag'}
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+              value={newTagName}
+              onChangeText={setNewTagName}
+              placeholder={locale === 'ja' ? 'タグ名を入力' : 'Enter tag name'}
+              placeholderTextColor={colors.textSecondary}
+              maxLength={20}
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowAddTagModal(false);
+                  setNewTagName('');
+                }}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleAddNewTag}
+              >
+                <Text style={[styles.modalSaveText, { color: onPrimary }]}>
+                  {locale === 'ja' ? '追加' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* タグ削除確認モーダル */}
+      <Modal visible={showTagDeleteModal} transparent animationType="fade" statusBarTranslucent={true}>
+        <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? 'タグを削除' : 'Delete Tag'}
+            </Text>
+            <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 14, lineHeight: 22 }]}>
+              {locale === 'ja'
+                ? `「${tagToDelete}」を全ての問題から削除しますか？\nこの操作は取り消せません。`
+                : `Delete "${tagToDelete}" from all questions?\nThis action cannot be undone.`}
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowTagDeleteModal(false);
+                  setTagToDelete(null);
+                }}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.error }]}
+                onPress={async () => {
+                  if (tagToDelete) {
+                    await removeTagFromAllQuestions(tagToDelete);
+                    await removeTagFromMasterList(tagToDelete);
+                    setTagMasterList(prev => prev.filter(t => t !== tagToDelete));
+                    setTags(prev => prev.filter(t => t !== tagToDelete));
+                    SoundManager.play('delete');
+                    
+                    if (tagMasterList.length <= 1) {
+                      setIsTagDeleteMode(false);
+                    }
+                    
+                    setShowTagDeleteModal(false);
+                    setTagToDelete(null);
+                  }
+                }}
+              >
+                <Text style={[styles.modalSaveText, { color: '#ffffff' }]}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <View style={styles.toastContainer}>
+          <TouchableOpacity 
+            style={[styles.toast, { backgroundColor: colors.success }]}
+            onPress={() => setShowToast(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.toastText, { color: '#fff' }]}>
+              {toastMessage}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
     </View>
   );
@@ -1079,6 +1318,14 @@ const styles = StyleSheet.create({
   ocrButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   ocrButtonIcon: { fontSize: 20, marginRight: 8 },
   ocrButtonText: { fontSize: 15, fontWeight: '700' },
+  ocrIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+  },
   createButton: { padding: 15, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 5 },
   button: { padding: 12, alignItems: 'center' },
   buttonText: { fontWeight: 'bold', fontSize: 16 },
@@ -1098,14 +1345,67 @@ const styles = StyleSheet.create({
   removeAnswerButtonText: { fontSize: 20, fontWeight: 'bold' },
   addAnswerButton: { padding: 12, borderRadius: 8, borderWidth: 1, alignItems: 'center', marginTop: 8 },
   addAnswerButtonText: { fontSize: 14, fontWeight: '600' },
-  tagInputContainer: { flexDirection: 'row', gap: 10, marginBottom: 15 },
-  tagInput: { flex: 1, borderWidth: 1, padding: 10 },
-  addTagButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  addTagText: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, gap: 6 },
-  tagText: { fontSize: 14, fontWeight: '500' },
-  removeTagText: { fontSize: 16, fontWeight: 'bold' },
+  answerGroupCard: {
+    padding: 14,
+    borderWidth: 2,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  answerGroupHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  answerGroupHeaderText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  addAnswerSlotBtn: {
+    padding: 14,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addAnswerSlotBtnText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  tagSection: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  addTagHeaderBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addTagHeaderBtnText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  tagChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 2,
+    marginRight: 8,
+  },
+  tagChipText: {
+    fontSize: 13,
+  },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalContainer: { width: '85%', maxWidth: 400, padding: 24, borderRadius: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 20 },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  modalCancelBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  modalCancelText: { fontWeight: 'bold' },
+  modalSaveBtn: { flex: 1, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center' },
+  modalSaveText: { color: '#000000', fontWeight: 'bold', fontSize: 15 },
   imageUploadBtn: { padding: 24, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   imageUploadText: { fontSize: 15, fontWeight: '600' },
   imagePreview: { position: 'relative', overflow: 'hidden', marginBottom: 12 },
@@ -1126,4 +1426,26 @@ const styles = StyleSheet.create({
   ocrLoadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999999 },
   ocrLoadingContent: { padding: 30, borderRadius: 20, alignItems: 'center', minWidth: 200 },
   ocrLoadingText: { fontSize: 16, fontWeight: 'bold', marginTop: 15 },
+  // Toast notification styles
+  toastContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: '50%',
+    transform: [{ translateX: '-50%' }],
+    zIndex: 999,
+  },
+  toast: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  toastText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

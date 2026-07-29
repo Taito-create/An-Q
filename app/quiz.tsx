@@ -184,7 +184,7 @@ export default function QuizScreen() {
       toValue,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -670,7 +670,7 @@ export default function QuizScreen() {
     if (correct) setScore(s => s + 1);
 
     fadeAnim.setValue(0);
-    Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }).start();
 
     // Lottieアニメーションを再生（正解・不正解時）
     if (correct) {

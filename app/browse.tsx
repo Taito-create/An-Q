@@ -32,6 +32,21 @@ export default function BrowseQuestionsScreen() {
     removeQuestionsFromFolder,
     cleanupOrphanFolders
   } = useQuestionsContext();
+  
+  // Debug: Log questions when component renders
+  console.log('📋 Browse render - questions:', questions.length, 'items');
+  console.log('📋 First question (if any):', questions.length > 0 ? questions[0] : 'none');
+
+  // Determine checkbox text color based on theme luminance
+  const getCheckboxTextColor = (): string => {
+    // Simple luminance calculation for primary color
+    const hex = colors.primary.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+    return luminance > 150 ? '#1A1A1A' : '#FFFFFF';
+  };
 
   // タグ編集用 state
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -85,6 +100,10 @@ export default function BrowseQuestionsScreen() {
   // 問題削除確認モーダル用 state（Web では Alert が動作しないため独自モーダルを使用）
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [showQuestionDeleteModal, setShowQuestionDeleteModal] = useState(false);
+
+  // 一括削除確認モーダル用 state
+  const [showBatchDeleteModal, setShowBatchDeleteModal] = useState(false);
+  const [batchDeleteCount, setBatchDeleteCount] = useState(0);
 
   // 問題追加用モーダルの state
   const [showAddToFolderModal, setShowAddToFolderModal] = useState(false);
@@ -189,57 +208,43 @@ export default function BrowseQuestionsScreen() {
   };
 
   const batchDeleteQuestions = async () => {
+    console.log('🗑️ batchDeleteQuestions called, selected:', selectedQuestionIds);
+    
     if (selectedQuestionIds.length === 0) {
-      Alert.alert('エラー', locale === 'ja' ? '削除する問題を選択してください' : 'Please select questions to delete');
+      window.alert(locale === 'ja' ? 'エラー\n削除する問題を選択してください' : 'Error\nPlease select questions to delete');
       return;
     }
 
-    const confirmMessage = locale === 'ja'
-      ? `選択した${selectedQuestionIds.length}問の問題を削除しますか？\nこの操作は取り消せません。`
-      : `Are you sure you want to delete ${selectedQuestionIds.length} selected questions?\nThis action cannot be undone.`;
+    // Show custom modal instead of window.confirm
+    setBatchDeleteCount(selectedQuestionIds.length);
+    setShowBatchDeleteModal(true);
+  };
 
-    Alert.alert(
-      locale === 'ja' ? '一括削除の確認' : 'Confirm Batch Delete',
-      confirmMessage,
-      [
-        { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-        {
-          text: locale === 'ja' ? '削除する' : 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // 選択した問題を削除
-              let updatedQuestions = questions;
-              for (const id of selectedQuestionIds) {
-                updatedQuestions = await deleteQuestion(id);
-              }
+  const confirmBatchDelete = async () => {
+    console.log('🗑️ confirmBatchDelete called');
+    setShowBatchDeleteModal(false);
+    
+    try {
+      console.log('🗑️ Starting batch delete for:', selectedQuestionIds);
+      
+      // Delete each question
+      let currentQuestions = questions;
+      for (const id of selectedQuestionIds) {
+        console.log(`🗑️ Deleting question ${id}`);
+        currentQuestions = await deleteQuestion(id);
+        console.log(`🗑️ After delete, ${currentQuestions.length} questions remaining`);
+      }
 
-              // フォルダからも削除
-              const updatedFolders = folders.map(folder => ({
-                ...folder,
-                questionIds: folder.questionIds.filter(qid => !selectedQuestionIds.includes(qid))
-              }));
-              await addQuestionsToFolder('', []); // ダミー呼び出し（folders stateは自動更新）
-              
-              // 選択状態をクリア
-              setSelectedQuestionIds([]);
-              setIsSelectionMode(false);
+      // Clear selection
+      setSelectedQuestionIds([]);
+      setIsSelectionMode(false);
 
-              SoundManager.play('complete');
-              Alert.alert(
-                locale === 'ja' ? '削除完了' : 'Deleted',
-                locale === 'ja'
-                  ? `${selectedQuestionIds.length}問の問題を削除しました`
-                  : `Deleted ${selectedQuestionIds.length} questions`
-              );
-            } catch (e) {
-              console.error('一括削除エラー:', e);
-              Alert.alert('エラー', locale === 'ja' ? '削除に失敗しました' : 'Failed to delete questions');
-            }
-          }
-        }
-      ]
-    );
+      SoundManager.play('complete');
+      // ✅ No success alert - just close modal and refresh list
+    } catch (e) {
+      console.error('❌ Batch delete error:', e);
+      window.alert(locale === 'ja' ? 'エラー\n削除に失敗しました' : 'Error\nFailed to delete questions');
+    }
   };
 
   const requestDeleteQuestion = (id: number) => {
@@ -576,7 +581,10 @@ export default function BrowseQuestionsScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
-            onPress={batchDeleteQuestions}
+            onPress={() => {
+              console.log('🗑️ Delete button pressed, selected:', selectedQuestionIds.length);
+              batchDeleteQuestions();
+            }}
           >
             <Text style={[styles.batchTagBarText, { color: '#ffffff' }]}>🗑️ {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
           </TouchableOpacity>
@@ -599,17 +607,36 @@ export default function BrowseQuestionsScreen() {
                 ]}
               >
                 {isSelectionMode && (
-                  <TouchableOpacity onPress={() => { if (selectedQuestionIds.includes(item.id)) { setSelectedQuestionIds(prev => prev.filter(id => id !== item.id)); } else { setSelectedQuestionIds(prev => [...prev, item.id]); } }} style={styles.checkbox}>
-                    <Text style={[
-                      styles.checkboxText, 
-                      { 
-                        color: onPrimary,
-                        backgroundColor: isCyberpunk ? 'transparent' : colors.card,
-                        borderRadius: 4,
-                        paddingHorizontal: 4,
-                        paddingVertical: 2,
+                  <TouchableOpacity 
+                    onPress={() => {
+                      if (selectedQuestionIds.includes(item.id)) {
+                        setSelectedQuestionIds(prev => prev.filter(id => id !== item.id));
+                      } else {
+                        setSelectedQuestionIds(prev => [...prev, item.id]);
                       }
-                    ]}>{selectedQuestionIds.includes(item.id) ? '☑' : '☐'}</Text>
+                    }} 
+                    style={styles.checkbox}
+                  >
+                    <View style={[
+                      styles.checkboxBox,
+                      {
+                        borderColor: selectedQuestionIds.includes(item.id) ? colors.primary : colors.border,
+                        backgroundColor: selectedQuestionIds.includes(item.id) ? colors.primary + '30' : 'transparent',
+                      }
+                    ]}>
+                      {selectedQuestionIds.includes(item.id) && (
+                        <Text style={[
+                          styles.checkboxText,
+                          { 
+                            color: getCheckboxTextColor(),
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                          }
+                        ]}>
+                          ✓
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 )}
                 <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
@@ -1265,6 +1292,43 @@ export default function BrowseQuestionsScreen() {
         </View>
       </Modal>
 
+      {/* 一括削除確認モーダル */}
+      <Modal visible={showBatchDeleteModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              🗑️ {locale === 'ja' ? '一括削除の確認' : 'Batch Delete Confirmation'}
+            </Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              {locale === 'ja'
+                ? `選択した${batchDeleteCount}問の問題を削除しますか？\nこの操作は取り消せません。`
+                : `Are you sure you want to delete ${batchDeleteCount} selected questions?\nThis action cannot be undone.`}
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowBatchDeleteModal(false);
+                  setBatchDeleteCount(0);
+                }}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={confirmBatchDelete}
+              >
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* タグ絞り込みモーダル */}
       <Modal visible={showTagFilterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -1495,7 +1559,18 @@ const styles = StyleSheet.create({
   headerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1 },
   headerBtnText: { fontSize: 12, fontWeight: 'bold', color: '#ffffff' },
   checkbox: { marginRight: 12, padding: 6 },
-  checkboxText: { fontSize: 20 },
+  checkboxBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxBoxSelected: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  checkboxText: { fontSize: 18, fontWeight: 'bold' },
   batchTagBar: { marginVertical: 12, padding: 14, borderRadius: 14, alignItems: 'center' },
   batchTagBarText: { color: '#000000', fontWeight: 'bold' },
   folderGridView: { flex: 1 },

@@ -9,7 +9,8 @@ import {
   collection,
   query,
   where,
-  deleteDoc
+  deleteDoc,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../auth/AuthContext';
@@ -36,6 +37,8 @@ interface QuestionsContextType {
   addQuestionsToFolder: (folderId: string, questionIds: number[]) => Promise<Folder[]>;
   removeQuestionsFromFolder: (folderId: string, questionIds: number[]) => Promise<Folder[]>;
   cleanupOrphanFolders: () => Promise<number>;
+  applyQuestionsChange: (mutate: (current: Question[]) => Question[]) => Promise<Question[]>;
+  applyFoldersChange: (mutate: (current: Folder[]) => Folder[]) => Promise<Folder[]>;
 }
 
 // Contextの作成
@@ -63,7 +66,20 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const questions = data.questions || [];
+        let questions = data.questions || [];
+        
+        // Deserialize descriptiveAnswerGroups from JSON string to string[][]
+        questions = questions.map((q: any) => {
+          if (q.descriptiveAnswerGroups && typeof q.descriptiveAnswerGroups === 'string') {
+            try {
+              q.descriptiveAnswerGroups = JSON.parse(q.descriptiveAnswerGroups);
+            } catch (e) {
+              console.error('Failed to parse descriptiveAnswerGroups:', e);
+            }
+          }
+          return q;
+        });
+        
         console.log(`Loaded ${questions.length} questions from Firestore`);
         return questions;
       }
@@ -253,11 +269,15 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // 問題を読み込み（マイグレーション付き）
   // Firestoreのオフラインキャッシュが有効なので、瞬時にデータを読み込める
   const loadQuestions = useCallback(async () => {
+    console.log('📋 loadQuestions called, user:', user?.uid);
+    
     // 未ログイン時はローカルのみ
     if (!user) {
+      console.log('👤 No user, loading from AsyncStorage only');
       const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
       const allQuestions: Question[] = safeParseArray(data, []);
       const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
+      console.log('📦 Loaded from AsyncStorage:', filteredQuestions.length, 'questions');
       setQuestions(filteredQuestions);
       
       const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
@@ -269,25 +289,35 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // ログイン時はFirestoreから読み込み（オフラインキャッシュ優先）
     try {
+      console.log('🔍 Loading from Firestore...');
       const firestoreQuestions = await loadQuestionsFromFirestore();
       const firestoreFolders = await loadFoldersFromFirestore();
+      console.log('✅ Firestore questions:', firestoreQuestions.length);
+      console.log('✅ Firestore folders:', firestoreFolders.length);
       
       // ローカルにデータがある場合は移行を試みる
       const localQuestionsData = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
       const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
       
+      console.log('💾 Local questions data exists:', !!localQuestionsData);
+      console.log('💾 Local folders data exists:', !!localFoldersData);
+      
       if (localQuestionsData) {
         const localQuestions: Question[] = safeParseArray(localQuestionsData, []);
         const filteredLocal = localQuestions.filter((q: any) => q.answerType);
+        console.log('📦 Local questions (filtered):', filteredLocal.length);
         
         if (filteredLocal.length > 0 && firestoreQuestions.length === 0) {
           // Firestoreにデータがない場合、ローカルから移行
+          console.log('🔄 Migrating local questions to Firestore...');
           const migrated = await migrateLocalQuestionsToFirestore(filteredLocal);
           
           if (migrated) {
+            console.log('✅ Migration successful, using local data');
             setQuestions(filteredLocal);
             await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
           } else {
+            console.log('⚠️ Migration failed, using local data anyway');
             setQuestions(filteredLocal);
             Alert.alert(
               '同期エラー',
@@ -295,26 +325,35 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreQuestions.length > 0) {
+          console.log('✅ Using Firestore questions (has data)');
           setQuestions(firestoreQuestions);
           await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
         } else {
+          console.log('⚠️ No questions anywhere, setting empty');
           setQuestions([]);
         }
       } else {
+        console.log('✅ No local data, using Firestore questions');
+        console.log('📝 Setting questions to Firestore data:', firestoreQuestions.length);
         setQuestions(firestoreQuestions);
+        console.log('✅ setQuestions called with', firestoreQuestions.length, 'questions');
       }
 
       // フォルダの移行処理
       if (localFoldersData) {
         const localFolders: Folder[] = safeParseArray(localFoldersData, []);
+        console.log('📦 Local folders:', localFolders.length);
         
         if (localFolders.length > 0 && firestoreFolders.length === 0) {
+          console.log('🔄 Migrating local folders to Firestore...');
           const migrated = await migrateLocalFoldersToFirestore(localFolders);
           
           if (migrated) {
+            console.log('✅ Folder migration successful');
             setFolders(localFolders);
             await AsyncStorage.removeItem(STORAGE_KEYS.QUESTION_FOLDERS);
           } else {
+            console.log('⚠️ Folder migration failed');
             setFolders(localFolders);
             Alert.alert(
               '同期エラー',
@@ -322,16 +361,25 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreFolders.length > 0) {
+          console.log('✅ Using Firestore folders');
+          console.log('📝 Setting folders to Firestore data:', firestoreFolders.length);
           setFolders(firestoreFolders);
           await AsyncStorage.removeItem(STORAGE_KEYS.QUESTION_FOLDERS);
         } else {
+          console.log('⚠️ No folders anywhere, setting empty');
           setFolders([]);
         }
       } else {
+        console.log('✅ No local folders, using Firestore folders');
+        console.log('📝 Setting folders to Firestore data:', firestoreFolders.length);
         setFolders(firestoreFolders);
       }
+      
+      // Note: questions and folders state will update asynchronously
+      // The UI should reflect the new values after re-render
+      console.log('✅ loadQuestions complete - state updates queued');
     } catch (e) {
-      console.error('Failed to load questions:', e);
+      console.error('❌ Failed to load questions:', e);
       Alert.alert('エラー', 'データの読み込みに失敗しました。');
     }
   }, [user, loadQuestionsFromFirestore, loadFoldersFromFirestore, migrateLocalQuestionsToFirestore, migrateLocalFoldersToFirestore]);
@@ -375,7 +423,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             sanitized.matchMode = q.matchMode;
           }
           if (q.descriptiveAnswerGroups !== undefined) {
-            sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
+            // Firestore doesn't support nested arrays, so serialize to JSON string
+            sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
           }
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) {
@@ -451,6 +500,86 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return false;
     }
   }, [user]);
+
+  /**
+   * Safely apply a change to the questions array using a Firestore
+   * transaction. `mutate` receives the CURRENT question list read
+   * fresh from Firestore at save time (not the possibly-stale local
+   * state), and must return the new full list. This prevents
+   * overwriting changes made by other tabs/devices/sessions.
+   */
+  const applyQuestionsChange = useCallback(async (
+    mutate: (current: Question[]) => Question[]
+  ): Promise<Question[]> => {
+    if (!user?.uid) {
+      // Not logged in: no concurrent-session risk from other
+      // devices, fall back to the existing local-only path.
+      const current = questions;
+      const updated = mutate(current);
+      await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(updated));
+      setQuestions(updated);
+      return updated;
+    }
+
+    const docRef = doc(db, 'userQuestions', user.uid);
+    let updated: Question[] = [];
+
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      const freshQuestions: Question[] = docSnap.exists() ? (docSnap.data().questions || []) : [];
+      updated = mutate(freshQuestions);
+
+      // Reuse the exact same sanitization logic as
+      // saveQuestionsToFirestore, applied to `updated`.
+      const sanitizedQuestions = updated.map(q => {
+        const sanitized: any = {
+          id: q.id,
+          question: q.question || '',
+          answerType: q.answerType,
+          tags: q.tags || [],
+          mistakeCount: q.mistakeCount || 0,
+          createdAt: q.createdAt || Date.now(),
+          enabled: q.enabled !== undefined ? q.enabled : true,
+          isShared: q.isShared || false
+        };
+        if (q.answerType === 'descriptive') {
+          if (q.descriptiveAnswer !== undefined) sanitized.descriptiveAnswer = q.descriptiveAnswer;
+          if (q.matchMode) sanitized.matchMode = q.matchMode;
+          if (q.descriptiveAnswerGroups !== undefined) {
+            // Firestore doesn't support nested arrays, so serialize to JSON string
+            sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+          }
+        } else if (q.answerType === 'truefalse') {
+          if (q.trueFalseAnswer !== undefined) sanitized.trueFalseAnswer = q.trueFalseAnswer;
+          if (q.explanation) sanitized.explanation = q.explanation;
+        } else if (q.answerType === 'multiple') {
+          if (q.multipleChoice) {
+            sanitized.multipleChoice = {
+              options: q.multipleChoice.options || ['', '', '', ''],
+              correctAnswer: q.multipleChoice.correctAnswer ?? 0
+            };
+          }
+          if (q.explanation) sanitized.explanation = q.explanation;
+        }
+        if (q.image) sanitized.image = q.image;
+        if (q.imageAnnotations && q.imageAnnotations.length > 0) sanitized.imageAnnotations = q.imageAnnotations;
+        return sanitized;
+      });
+
+      transaction.set(docRef, { questions: sanitizedQuestions, updatedAt: serverTimestamp() }, { merge: true });
+    });
+
+    // Update local state and local backup to match what was actually
+    // written (the fresh-read result, not the stale pre-transaction state)
+    setQuestions(updated);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.QUIZ_QUESTIONS, JSON.stringify(updated));
+    } catch (localError) {
+      console.error('Failed to save local backup:', localError);
+    }
+
+    return updated;
+  }, [user, questions]);
 
   // Firestoreにフォルダを保存
   const saveFoldersToFirestore = useCallback(async (newFolders: Folder[]): Promise<boolean> => {
@@ -550,30 +679,79 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [saveFoldersToFirestore]);
 
-  const deleteQuestion = useCallback(async (id: number): Promise<Question[]> => {
-    const updated = questions.filter(q => q.id !== id);
-    await saveQuestions(updated);
+  /**
+   * Safely apply a change to the folders array using a Firestore
+   * transaction. `mutate` receives the CURRENT folder list read
+   * fresh from Firestore at save time (not the possibly-stale local
+   * state), and must return the new full list. This prevents
+   * overwriting changes made by other tabs/devices/sessions.
+   */
+  const applyFoldersChange = useCallback(async (
+    mutate: (current: Folder[]) => Folder[]
+  ): Promise<Folder[]> => {
+    if (!user?.uid) {
+      // Not logged in: no concurrent-session risk from other
+      // devices, fall back to the existing local-only path.
+      const current = folders;
+      const updated = mutate(current);
+      await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updated));
+      setFolders(updated);
+      return updated;
+    }
+
+    const docRef = doc(db, 'userQuestions', user.uid);
+    let updated: Folder[] = [];
+
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      const freshFolders: Folder[] = docSnap.exists() ? (docSnap.data().folders || []) : [];
+      updated = mutate(freshFolders);
+
+      // Reuse the exact same sanitization logic as
+      // saveFoldersToFirestore, applied to `updated`.
+      const sanitizedFolders = updated.map(f => ({
+        id: f.id,
+        name: f.name,
+        questionIds: f.questionIds || [],
+        parentId: f.parentId === undefined ? null : f.parentId
+      }));
+
+      transaction.set(docRef, { folders: sanitizedFolders, updatedAt: serverTimestamp() }, { merge: true });
+    });
+
+    // Update local state and local backup to match what was actually
+    // written (the fresh-read result, not the stale pre-transaction state)
+    setFolders(updated);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.QUESTION_FOLDERS, JSON.stringify(updated));
+    } catch (localError) {
+      console.error('Failed to save local backup:', localError);
+    }
+
     return updated;
-  }, [questions, saveQuestions]);
+  }, [user, folders]);
+
+  const deleteQuestion = useCallback(async (id: number): Promise<Question[]> => {
+    console.log('🗑️ deleteQuestion called with id:', id);
+    const result = await applyQuestionsChange(current => current.filter(q => q.id !== id));
+    console.log('🗑️ deleteQuestion result:', result.length, 'questions remaining');
+    return result;
+  }, [applyQuestionsChange]);
 
   const updateQuestion = useCallback(async (updatedQuestion: Question): Promise<Question[]> => {
-    const updated = questions.map(q => q.id === updatedQuestion.id ? updatedQuestion : q);
-    await saveQuestions(updated);
-    return updated;
-  }, [questions, saveQuestions]);
+    return await applyQuestionsChange(current => current.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
+  }, [applyQuestionsChange]);
 
   const addTagToQuestions = useCallback(async (ids: number[], newTags: string[]): Promise<Question[]> => {
-    const updated = questions.map(q => {
+    return await applyQuestionsChange(current => current.map(q => {
       if (ids.includes(q.id)) {
         const currentTags = q.tags || [];
         const mergedTags = [...new Set([...currentTags, ...newTags])];
         return { ...q, tags: mergedTags };
       }
       return q;
-    });
-    await saveQuestions(updated);
-    return updated;
-  }, [questions, saveQuestions]);
+    }));
+  }, [applyQuestionsChange]);
 
   /**
    * 指定したタグを、全問題から一括で取り除く。
@@ -581,55 +759,42 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
    * updateQuestion 呼び出しは行わない）。
    */
   const removeTagFromAllQuestions = useCallback(async (tagToRemove: string): Promise<void> => {
-    const updated = questions.map(q => {
+    await applyQuestionsChange(current => current.map(q => {
       if (!q.tags || !q.tags.includes(tagToRemove)) return q;
       return { ...q, tags: q.tags.filter(t => t !== tagToRemove) };
-    });
-    await saveQuestions(updated);
-  }, [questions, saveQuestions]);
+    }));
+  }, [applyQuestionsChange]);
 
   // フォルダCRUD操作
   const createFolder = useCallback(async (folder: Folder): Promise<Folder[]> => {
-    const updated = [...folders, folder];
-    await saveFolders(updated);
-    return updated;
-  }, [folders, saveFolders]);
+    return await applyFoldersChange(current => [...current, folder]);
+  }, [applyFoldersChange]);
 
   const updateFolder = useCallback(async (updatedFolder: Folder): Promise<Folder[]> => {
-    const updated = folders.map(f => f.id === updatedFolder.id ? updatedFolder : f);
-    await saveFolders(updated);
-    return updated;
-  }, [folders, saveFolders]);
+    return await applyFoldersChange(current => current.map(f => f.id === updatedFolder.id ? updatedFolder : f));
+  }, [applyFoldersChange]);
 
   const deleteFolder = useCallback(async (folderId: string): Promise<Folder[]> => {
-    const updated = folders.filter(f => f.id !== folderId);
-    await saveFolders(updated);
-    return updated;
-  }, [folders, saveFolders]);
+    return await applyFoldersChange(current => current.filter(f => f.id !== folderId));
+  }, [applyFoldersChange]);
 
   const addQuestionsToFolder = useCallback(async (folderId: string, questionIds: number[]): Promise<Folder[]> => {
-    const updated = folders.map(f => {
+    return await applyFoldersChange(current => current.map(f => {
       if (f.id === folderId) {
-        const newQuestionIds = [...new Set([...f.questionIds, ...questionIds])];
-        return { ...f, questionIds: newQuestionIds };
+        return { ...f, questionIds: [...new Set([...f.questionIds, ...questionIds])] };
       }
       return f;
-    });
-    await saveFolders(updated);
-    return updated;
-  }, [folders, saveFolders]);
+    }));
+  }, [applyFoldersChange]);
 
   const removeQuestionsFromFolder = useCallback(async (folderId: string, questionIds: number[]): Promise<Folder[]> => {
-    const updated = folders.map(f => {
+    return await applyFoldersChange(current => current.map(f => {
       if (f.id === folderId) {
-        const newQuestionIds = f.questionIds.filter(id => !questionIds.includes(id));
-        return { ...f, questionIds: newQuestionIds };
+        return { ...f, questionIds: f.questionIds.filter(id => !questionIds.includes(id)) };
       }
       return f;
-    });
-    await saveFolders(updated);
-    return updated;
-  }, [folders, saveFolders]);
+    }));
+  }, [applyFoldersChange]);
 
   // ゴーストフォルダ（実体のないフォルダ）のクリーンアップ
   const cleanupOrphanFolders = useCallback(async (): Promise<number> => {
@@ -643,16 +808,21 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const removedCount = folders.length - validFolders.length;
     
     if (removedCount > 0) {
-      await saveFolders(validFolders);
+      await applyFoldersChange(() => validFolders);
     }
     
     return removedCount;
-  }, [folders, questions, saveFolders]);
+  }, [folders, questions, applyFoldersChange]);
 
   // 初回読み込み
   useEffect(() => {
     loadQuestions();
   }, [loadQuestions]);
+
+  // Debug: Log actual state values after updates
+  useEffect(() => {
+    console.log('🔄 State updated - questions:', questions.length, 'folders:', folders.length);
+  }, [questions, folders]);
 
   // ContextValueの作成
   const value: QuestionsContextType = {
@@ -661,6 +831,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     isMigrating,
     loadQuestions,
     saveQuestions,
+    applyQuestionsChange,
+    applyFoldersChange,
     saveFolders,
     deleteQuestion,
     updateQuestion,
