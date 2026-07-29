@@ -184,8 +184,18 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       });
       
+      // 🟢 サニタイズ: descriptiveAnswerGroups を JSON 文字列に変換
+      //    （Firestore はネストされた配列をサポートしていないため）
+      const sanitizedQuestions = mergedQuestions.map(q => {
+        const sanitized: any = { ...q };
+        if (q.descriptiveAnswerGroups !== undefined && Array.isArray(q.descriptiveAnswerGroups)) {
+          sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+        }
+        return sanitized;
+      });
+      
       const dataToSave = {
-        questions: mergedQuestions,
+        questions: sanitizedQuestions,
         updatedAt: serverTimestamp(),
         migratedAt: serverTimestamp()
       };
