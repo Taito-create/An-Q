@@ -637,12 +637,13 @@ export default function CreateQuestionScreen() {
 
   const saveQuestion = async (newQuestionData: Partial<Question>): Promise<boolean> => {
     try {
-      const stats = await loadStats();
-      const limit = stats.questionSlots ?? 20;
-      if (questions.length >= limit) {
-        Alert.alert(t.limitReached, `${t.limitReachedMsg} (${limit})`);
-        return false;
-      }
+      // 🟢 問題数の制限を一時的に無効化（学習用途のため）
+      // const stats = await loadStats();
+      // const limit = stats.questionSlots ?? 20;
+      // if (questions.length >= limit) {
+      //   Alert.alert(t.limitReached, `${t.limitReachedMsg} (${limit})`);
+      //   return false;
+      // }
       if (selectedImage && !selectedImage.startsWith('data:image')) {
         Alert.alert('エラー', locale === 'ja' ? '画像データが正しくありません' : 'Invalid image data');
         return false;
