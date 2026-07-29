@@ -191,37 +191,34 @@ export const showAnswerAlert = async (questionId: number, locale: 'ja' | 'en'): 
  * その場で変換する。保存データ自体は書き換えない。
  */
 export const getAnswerGroups = (question: Question): string[][] => {
-  // 既に新形式で保存済みならそのまま使う
-  if (question.descriptiveAnswerGroups && question.descriptiveAnswerGroups.length > 0) {
-    return question.descriptiveAnswerGroups;
-  }
-
-  if (!question.descriptiveAnswer) {
-    return [];
-  }
-
-  // 配列形式（新形式のフラット配列）
-  if (Array.isArray(question.descriptiveAnswer)) {
-    const cleaned = question.descriptiveAnswer.filter(a => a && a.trim().length > 0);
-    if (cleaned.length === 0) return [];
-
-    if (question.matchMode === 'all') {
-      // all モード：各要素が別々の空欄（グループ）
-      // 例: ["犬","猫"] → [["犬"], ["猫"]]
-      return cleaned.map(a => [a]);
+  if (!question) return [['']];
+  
+  try {
+    // Priority 1: descriptiveAnswerGroups (new format)
+    if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
+      // Ensure all elements are arrays
+      const groups = question.descriptiveAnswerGroups.map(group => 
+        Array.isArray(group) ? group : [String(group)]
+      );
+      // Filter out empty groups
+      const filtered = groups.filter(group => group.some(a => a && a.trim()));
+      return filtered.length > 0 ? filtered : [['']];
     }
-    // any モード：全要素が1つの空欄の言い換え候補（1グループにまとめる）
-    // 例: ["犬","わんこ"] → [["犬","わんこ"]]
-    return [cleaned];
+    
+    // Priority 2: descriptiveAnswer (old format)
+    if (question.descriptiveAnswer !== undefined && question.descriptiveAnswer !== null) {
+      if (Array.isArray(question.descriptiveAnswer)) {
+        const answers = question.descriptiveAnswer.filter(a => a && a.trim());
+        return answers.length > 0 ? [answers] : [['']];
+      }
+      if (typeof question.descriptiveAnswer === 'string') {
+        return [[question.descriptiveAnswer]];
+      }
+    }
+    
+    return [['']];
+  } catch (e) {
+    console.error('getAnswerGroups error:', e);
+    return [['']];
   }
-
-  // 文字列形式（旧形式）："・犬\n・わんこ" のような形
-  const lines = question.descriptiveAnswer
-    .split('\n')
-    .map(ans => ans.replace(/^[・]\s*/, '').trim())
-    .filter(ans => ans.length > 0);
-
-  if (lines.length === 0) return [];
-  // 旧文字列形式は常に「言い換え候補の集合（1グループ）」として扱う
-  return [lines];
 };

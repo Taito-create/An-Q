@@ -310,12 +310,46 @@ export default function BrowseQuestionsScreen() {
   };
 
   const startEditQuestion = (question: Question) => {
+    console.log('✏️ startEditQuestion called:', question);
+    
     setEditingQuestionFull(question);
-    setEditQuestionText(question.question);
+    setEditQuestionText(question.question || '');
+    
     if (question.answerType === 'descriptive') {
-      const groups = getAnswerGroups(question);
-      setEditAnswerGroups(groups.length > 0 ? groups : [['']]);
+      // Safely get answer groups
+      let groups: string[][] = [['']];
+      
+      try {
+        // Priority 1: Check descriptiveAnswerGroups (new format)
+        if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
+          groups = question.descriptiveAnswerGroups;
+          // Make sure each group is an array
+          groups = groups.map(group => Array.isArray(group) ? group : [String(group)]);
+          if (groups.length === 0 || groups.every(g => g.length === 0 || g.every(a => !a || !a.trim()))) {
+            groups = [['']];
+          }
+        }
+        // Priority 2: Check descriptiveAnswer (old format)
+        else if (question.descriptiveAnswer !== undefined && question.descriptiveAnswer !== null) {
+          if (Array.isArray(question.descriptiveAnswer)) {
+            groups = [question.descriptiveAnswer.filter(a => a && a.trim())];
+            if (groups[0].length === 0) groups = [['']];
+          } else if (typeof question.descriptiveAnswer === 'string') {
+            groups = [[question.descriptiveAnswer]];
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing answer groups:', e);
+        groups = [['']];
+      }
+      
+      console.log('✏️ Set editAnswerGroups:', groups);
+      setEditAnswerGroups(groups);
+    } else {
+      // Reset for non-descriptive questions
+      setEditAnswerGroups([['']]);
     }
+    
     setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
     setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
     setEditMultipleCorrect(question.multipleChoice?.correctAnswer ?? 0);
