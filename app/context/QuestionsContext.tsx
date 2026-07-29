@@ -17,12 +17,13 @@ import { useAuth } from '../auth/AuthContext';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { Question, Folder } from '../types/question';
 import { Alert } from 'react-native';
-import { safeParseArray } from '../utils/storageUtils';
+import { safeParseArray, loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from '../utils/storageUtils';
 
 // Contextの型定義
 interface QuestionsContextType {
   questions: Question[];
   folders: Folder[];
+  tagMasterList: string[];
   isMigrating: boolean;
   loadQuestions: () => Promise<void>;
   saveQuestions: (questions: Question[]) => Promise<void>;
@@ -39,6 +40,8 @@ interface QuestionsContextType {
   cleanupOrphanFolders: () => Promise<number>;
   applyQuestionsChange: (mutate: (current: Question[]) => Question[]) => Promise<Question[]>;
   applyFoldersChange: (mutate: (current: Folder[]) => Folder[]) => Promise<Folder[]>;
+  addTag: (tag: string) => Promise<void>;
+  removeTag: (tag: string) => Promise<void>;
 }
 
 // Contextの作成
@@ -48,6 +51,7 @@ const QuestionsContext = createContext<QuestionsContextType | undefined>(undefin
 export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [tagMasterList, setTagMasterList] = useState<string[]>([]);
   const [isMigrating, setIsMigrating] = useState(false);
   const { user } = useAuth();
 
@@ -79,6 +83,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
           return q;
         });
+        
+        // Load tags from Firestore and sync to local
+        const firestoreTags = data.tags || [];
+        if (Array.isArray(firestoreTags) && firestoreTags.length > 0) {
+          console.log(`Loaded ${firestoreTags.length} tags from Firestore`);
+          // Update state and local storage
+          setTagMasterList(firestoreTags);
+          try {
+            await AsyncStorage.setItem(STORAGE_KEYS.TAG_MASTER_LIST, JSON.stringify(firestoreTags));
+          } catch (e) {
+            console.error('Failed to save tags to local storage:', e);
+          }
+        }
         
         console.log(`Loaded ${questions.length} questions from Firestore`);
         return questions;
@@ -796,6 +813,44 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }));
   }, [applyFoldersChange]);
 
+  // タグをFirestoreに保存
+  const saveTagsToFirestore = useCallback(async (tags: string[]): Promise<void> => {
+    if (!user?.uid) {
+      // 未ログイン時はローカルのみ（addTagToMasterList/removeTagFromMasterListで既に保存済み）
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'userQuestions', user.uid);
+      await setDoc(docRef, { tags, updatedAt: serverTimestamp() }, { merge: true });
+      console.log('✅ Tags saved to Firestore:', tags.length);
+    } catch (error: any) {
+      console.error('Failed to save tags to Firestore:', error);
+      // エラー時はローカルのみ（既に保存済み）
+    }
+  }, [user]);
+
+  // タグを追加（Firestore + AsyncStorage + state）
+  const addTag = useCallback(async (tag: string): Promise<void> => {
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+
+    const added = await addTagToMasterList(trimmed);
+    if (added) {
+      const updated = [...tagMasterList, trimmed];
+      setTagMasterList(updated);
+      await saveTagsToFirestore(updated);
+    }
+  }, [tagMasterList, saveTagsToFirestore]);
+
+  // タグを削除（Firestore + AsyncStorage + state）
+  const removeTag = useCallback(async (tag: string): Promise<void> => {
+    await removeTagFromMasterList(tag);
+    const updated = tagMasterList.filter(t => t !== tag);
+    setTagMasterList(updated);
+    await saveTagsToFirestore(updated);
+  }, [tagMasterList, saveTagsToFirestore]);
+
   // ゴーストフォルダ（実体のないフォルダ）のクリーンアップ
   const cleanupOrphanFolders = useCallback(async (): Promise<number> => {
     // フォルダに紐づく問題が存在するかチェック
@@ -817,6 +872,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // 初回読み込み
   useEffect(() => {
     loadQuestions();
+    // タグマスターリストをローカルから読み込み
+    loadTagMasterList().then(setTagMasterList);
   }, [loadQuestions]);
 
   // Debug: Log actual state values after updates
@@ -828,6 +885,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value: QuestionsContextType = {
     questions,
     folders,
+    tagMasterList,
     isMigrating,
     loadQuestions,
     saveQuestions,
@@ -844,6 +902,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     addQuestionsToFolder,
     removeQuestionsFromFolder,
     cleanupOrphanFolders,
+    addTag,
+    removeTag,
   };
 
   return (

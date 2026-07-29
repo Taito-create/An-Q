@@ -70,38 +70,65 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
  * @returns 回答テキスト（○/✕、正解選択肢、記述回答など）
  */
 export const getAnswerText = (question: Question): string => {
-  switch (question.answerType) {
-    case 'truefalse':
-      return question.trueFalseAnswer ? '○' : '✕';
-    case 'multiple':
-      const correctIdx = question.multipleChoice?.correctAnswer ?? 0;
-      const correctOption = question.multipleChoice?.options[correctIdx] || '';
-      return `${correctIdx + 1}. ${correctOption}`;
-    case 'descriptive': {
-      const groups = getAnswerGroups(question);
-      if (groups.length === 0) return '';
-
-      if (groups.length === 1) {
-        // 空欄が1つ（言い換え候補のみ）の場合：今までと同じ表示形式
-        const answers = groups[0];
-        if (answers.length === 0) return '';
-        if (answers.length > 1) {
-          return answers.map(a => `・${a}`).join('\n');
+  if (!question) return '問題データがありません';
+  
+  try {
+    if (question.answerType === 'descriptive') {
+      // Priority 1: Check descriptiveAnswerGroups (new format - string[][])
+      if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
+        if (question.descriptiveAnswerGroups.length === 0) {
+          return '回答なし';
         }
-        return answers[0];
+        // Map each group safely
+        const groupTexts = question.descriptiveAnswerGroups
+          .map((group, index) => {
+            if (!Array.isArray(group)) {
+              return `正解${index + 1}: ${String(group)}`;
+            }
+            const answers = group.filter(a => a && String(a).trim()).map(a => String(a).trim());
+            return answers.length > 0 ? `正解${index + 1}: ${answers.join(' / ')}` : `正解${index + 1}: (空欄)`;
+          })
+          .filter(text => text && text.length > 0);
+        
+        return groupTexts.length > 0 ? groupTexts.join(' | ') : '回答なし';
       }
-
-      // 空欄が複数（両解モード相当）の場合：
-      // 正解1: 候補1 / 候補2 | 正解2: 候補3 / 候補4 の形式で表示
-      return groups
-        .map((g, i) => {
-          const answers = g.filter(a => a && a.trim()).join(' / ');
-          return `正解${i + 1}: ${answers}`;
-        })
-        .join(' | ');
+      
+      // Priority 2: Check descriptiveAnswer (old format - string | string[])
+      if (question.descriptiveAnswer !== undefined && question.descriptiveAnswer !== null) {
+        if (Array.isArray(question.descriptiveAnswer)) {
+          const answers = question.descriptiveAnswer
+            .filter(a => a && String(a).trim())
+            .map(a => String(a).trim());
+          return answers.length > 0 ? answers.join(' / ') : '回答なし';
+        }
+        if (typeof question.descriptiveAnswer === 'string') {
+          return question.descriptiveAnswer.trim() || '回答なし';
+        }
+      }
+      
+      return '回答なし';
     }
-    default:
-      return '';
+    
+    if (question.answerType === 'truefalse') {
+      return question.trueFalseAnswer ? '○ (正しい)' : '× (間違い)';
+    }
+    
+    if (question.answerType === 'multiple') {
+      if (question.multipleChoice?.options) {
+        const options = question.multipleChoice.options;
+        const correct = question.multipleChoice.correctAnswer;
+        if (options && Array.isArray(options) && correct !== undefined) {
+          const answer = options[correct] || '選択肢がありません';
+          return `正解: ${answer}`;
+        }
+      }
+      return '正解が設定されていません';
+    }
+    
+    return '回答形式が不明です';
+  } catch (e) {
+    console.error('getAnswerText error:', e, question);
+    return '回答の表示中にエラーが発生しました';
   }
 };
 
