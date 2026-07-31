@@ -367,8 +367,8 @@ export default function BrowseQuestionsScreen() {
         .map(group => group.map(a => a.trim()).filter(Boolean))
         .filter(group => group.length > 0);
       updatedDescriptiveAnswerGroups = cleanedGroups.length > 0 ? cleanedGroups : undefined;
-      // 互換性のため旧形式も更新しておく
-      updatedDescriptiveAnswer = cleanedGroups.flat();
+      // ❌ descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
+      //    （Firestore でフィールド型の競合エラーを避けるため）
       updatedMatchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     }
 

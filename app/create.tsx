@@ -699,9 +699,8 @@ export default function CreateQuestionScreen() {
       if (cleanedGroups.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
 
       dataToSave.descriptiveAnswerGroups = cleanedGroups;
-      // 互換性のため、旧形式のフィールドも一緒に保存しておく
-      // （browse.tsx編集画面・答え表示アラートが対応するまでの暫定措置）
-      dataToSave.descriptiveAnswer = cleanedGroups.flat();
+      // ❌ descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
+      //    （Firestore でフィールド型の競合エラーを避けるため）
       dataToSave.matchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     } else if (answerType === 'truefalse') {
       dataToSave.trueFalseAnswer = trueFalseAnswer;

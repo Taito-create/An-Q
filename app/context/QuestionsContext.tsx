@@ -188,6 +188,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       //    （Firestore はネストされた配列をサポートしていないため）
       const sanitizedQuestions = mergedQuestions.map(q => {
         const sanitized: any = { ...q };
+        // ❌ descriptiveAnswer を削除（descriptiveAnswerGroups と重複するため）
+        delete sanitized.descriptiveAnswer;
         if (q.descriptiveAnswerGroups !== undefined && Array.isArray(q.descriptiveAnswerGroups)) {
           sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
         }
@@ -434,7 +436,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: q.id,
           question: q.question || '',
           answerType: q.answerType,
-          tags: q.tags || [],
+          tags: (q.tags || []).map((t: any) => String(t)), // ✅ Flat array of strings
           mistakeCount: q.mistakeCount || 0,
           createdAt: q.createdAt || Date.now(),
           enabled: q.enabled !== undefined ? q.enabled : true,
@@ -443,16 +445,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         // 回答タイプに応じて必要なフィールドを追加
         if (q.answerType === 'descriptive') {
-          if (q.descriptiveAnswer !== undefined) {
-            sanitized.descriptiveAnswer = q.descriptiveAnswer;
-          }
           if (q.matchMode) {
             sanitized.matchMode = q.matchMode;
           }
+          // ✅ descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
           if (q.descriptiveAnswerGroups !== undefined) {
-            // Firestore doesn't support nested arrays, so serialize to JSON string
-            sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+            if (Array.isArray(q.descriptiveAnswerGroups)) {
+              sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+            } else if (typeof q.descriptiveAnswerGroups === 'string') {
+              // 既に文字列の場合はそのまま
+              sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
+            }
           }
+          // ❌ descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) {
             sanitized.trueFalseAnswer = q.trueFalseAnswer;
@@ -462,8 +467,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
+            // ✅ options を平坦な文字列配列に強制
+            const rawOptions = q.multipleChoice.options || ['', '', '', ''];
             sanitized.multipleChoice = {
-              options: q.multipleChoice.options || ['', '', '', ''],
+              options: Array.isArray(rawOptions) 
+                ? rawOptions.map((opt: any) => String(opt || ''))
+                : ['', '', '', ''],
               correctAnswer: q.multipleChoice.correctAnswer ?? 0
             };
           }
@@ -477,11 +486,23 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           sanitized.image = q.image;
         }
         if (q.imageAnnotations && q.imageAnnotations.length > 0) {
-          sanitized.imageAnnotations = q.imageAnnotations;
+          // ✅ imageAnnotations を安全なオブジェクト配列に強制
+          sanitized.imageAnnotations = q.imageAnnotations.map(ann => ({
+            id: String(ann.id || ''),
+            x: Number(ann.x || 0),
+            y: Number(ann.y || 0),
+            width: Number(ann.width || 0),
+            height: Number(ann.height || 0),
+            color: String(ann.color || '#ffffff'),
+            opacity: Number(ann.opacity || 1)
+          }));
         }
         
         return sanitized;
       });
+      
+      // 🐛 デバッグログ: Firestoreに送信するデータを確認
+      console.log('📤 Sending to Firestore (saveQuestionsToFirestore):', JSON.stringify(sanitizedQuestions, null, 2));
       
       const dataToSave = {
         questions: sanitizedQuestions,
@@ -563,35 +584,58 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: q.id,
           question: q.question || '',
           answerType: q.answerType,
-          tags: q.tags || [],
+          tags: (q.tags || []).map((t: any) => String(t)), // ✅ Flat array of strings
           mistakeCount: q.mistakeCount || 0,
           createdAt: q.createdAt || Date.now(),
           enabled: q.enabled !== undefined ? q.enabled : true,
           isShared: q.isShared || false
         };
         if (q.answerType === 'descriptive') {
-          if (q.descriptiveAnswer !== undefined) sanitized.descriptiveAnswer = q.descriptiveAnswer;
           if (q.matchMode) sanitized.matchMode = q.matchMode;
+          // ✅ descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
           if (q.descriptiveAnswerGroups !== undefined) {
-            // Firestore doesn't support nested arrays, so serialize to JSON string
-            sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+            if (Array.isArray(q.descriptiveAnswerGroups)) {
+              sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
+            } else if (typeof q.descriptiveAnswerGroups === 'string') {
+              // 既に文字列の場合はそのまま（Firestoreから読み込んだデータ等）
+              sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
+            }
           }
+          // ❌ descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) sanitized.trueFalseAnswer = q.trueFalseAnswer;
           if (q.explanation) sanitized.explanation = q.explanation;
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
+            // ✅ options を平坦な文字列配列に強制
+            const rawOptions = q.multipleChoice.options || ['', '', '', ''];
             sanitized.multipleChoice = {
-              options: q.multipleChoice.options || ['', '', '', ''],
+              options: Array.isArray(rawOptions)
+                ? rawOptions.map((opt: any) => String(opt || ''))
+                : ['', '', '', ''],
               correctAnswer: q.multipleChoice.correctAnswer ?? 0
             };
           }
           if (q.explanation) sanitized.explanation = q.explanation;
         }
         if (q.image) sanitized.image = q.image;
-        if (q.imageAnnotations && q.imageAnnotations.length > 0) sanitized.imageAnnotations = q.imageAnnotations;
+        if (q.imageAnnotations && q.imageAnnotations.length > 0) {
+          // ✅ imageAnnotations を安全なオブジェクト配列に強制
+          sanitized.imageAnnotations = q.imageAnnotations.map(ann => ({
+            id: String(ann.id || ''),
+            x: Number(ann.x || 0),
+            y: Number(ann.y || 0),
+            width: Number(ann.width || 0),
+            height: Number(ann.height || 0),
+            color: String(ann.color || '#ffffff'),
+            opacity: Number(ann.opacity || 1)
+          }));
+        }
         return sanitized;
       });
+
+      // 🐛 デバッグログ: Firestoreに送信するデータを確認
+      console.log('📤 Sending to Firestore (applyQuestionsChange):', JSON.stringify(sanitizedQuestions, null, 2));
 
       transaction.set(docRef, { questions: sanitizedQuestions, updatedAt: serverTimestamp() }, { merge: true });
     });
