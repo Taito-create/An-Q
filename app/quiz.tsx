@@ -22,6 +22,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuizCompletion } from '../src/utils/userProgress';
+import { speakText, stopSpeech } from './utils/speechUtils';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -119,6 +120,7 @@ export default function QuizScreen() {
 
   // 自動再生モード
   const [autoPlayMode, setAutoPlayMode] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(true);
   const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
@@ -268,6 +270,11 @@ export default function QuizScreen() {
           setAutoPlayPhase('answer');
           autoPlayRemainingRef.current = autoPlayInterval;
           setAutoPlayCountdown(autoPlayRemainingRef.current);
+          // 🔊 音声読み上げ: 答えを読み上げ
+          if (speechEnabled && shuffledQuestions[currentIndexRef.current]) {
+            const answerText = getAnswerText(shuffledQuestions[currentIndexRef.current]);
+            speakText(answerText);
+          }
         } else {
           // 回答表示終了 → 次の問題へ
           const nextIdx = currentIndexRef.current + 1;
@@ -298,6 +305,11 @@ export default function QuizScreen() {
             setAutoPlayPhase('question');
             autoPlayRemainingRef.current = autoPlayInterval;
             setAutoPlayCountdown(autoPlayRemainingRef.current);
+            // 🔊 音声読み上げ: 問題を読み上げ
+            if (speechEnabled && shuffledQuestions[nextIdx]) {
+              const textToSpeak = shuffledQuestions[nextIdx].reading || shuffledQuestions[nextIdx].question;
+              speakText(textToSpeak);
+            }
             console.log('[AutoPlay] Moved to question', nextIdx, 'resetting timer');
           }
         }
@@ -1175,6 +1187,18 @@ export default function QuizScreen() {
                       </Text>
                     </TouchableOpacity>
                   ))}
+                </View>
+                {/* 🔊 音声読み上げトグル */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                  <Text style={[{ fontSize: 13, color: colors.text }]}>
+                    🔊 {locale === 'ja' ? '音声読み上げ' : 'Voice Reading'}
+                  </Text>
+                  <Switch
+                    value={speechEnabled}
+                    onValueChange={setSpeechEnabled}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor="#FFF"
+                  />
                 </View>
               </View>
             )}

@@ -68,6 +68,12 @@ export default function CreateQuestionScreen() {
   // 作成中フラグ（二重送信防止）
   const [isCreating, setIsCreating] = useState(false);
 
+  // タグ固定モード（2回押しで有効、3回目で解除）
+  const [tagLockMode, setTagLockMode] = useState<Record<string, boolean>>({});
+
+  // 読み仮名（音声読み上げ用）
+  const [reading, setReading] = useState('');
+
   type OcrTarget = { type: 'question' } | { type: 'answer'; groupIndex: number; answerIndex: number };
   const [ocrTarget, setOcrTarget] = useState<OcrTarget>({ type: 'question' });
 
@@ -660,6 +666,7 @@ export default function CreateQuestionScreen() {
         question: newQuestionData.question || '',
         image: selectedImage || newQuestionData.image || null,
         imageAnnotations: [],
+        reading: reading.trim() || undefined,
       };
       await applyQuestionsChange(current => [...current, newQuestion]);
       await incrementStat('questionsCreated', 1);
@@ -719,9 +726,14 @@ export default function CreateQuestionScreen() {
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000); // Auto dismiss after 3s
       
-      setQuestion(''); setAnswerGroups([['']]); setTags([]); setAnswerType('descriptive');
+      setQuestion(''); setAnswerGroups([['']]);
+      // ロックされたタグのみ維持、それ以外はリセット
+      const lockedTags = Object.keys(tagLockMode).filter(key => tagLockMode[key]);
+      setTags(lockedTags);
+      setAnswerType('descriptive');
       setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
       setSelectedImage(null);
+      setReading('');
     }
     } catch (error) {
       console.error('Save error:', error);
@@ -733,11 +745,24 @@ export default function CreateQuestionScreen() {
 
   const handleTagToggle = async (tag: string) => {
     SoundManager.play('select');
-    if (tags.includes(tag)) {
+    const isSelected = tags.includes(tag);
+    const isLocked = tagLockMode[tag] || false;
+
+    if (isLocked) {
+      // 3回目: ロック解除 + 選択解除
+      setTagLockMode(prev => ({ ...prev, [tag]: false }));
       setTags(prev => prev.filter(t => t !== tag));
-    } else {
-      setTags(prev => [...prev, tag]);
+      return;
     }
+
+    if (isSelected) {
+      // 2回目: ロック（作成後も選択を維持）
+      setTagLockMode(prev => ({ ...prev, [tag]: true }));
+      return;
+    }
+
+    // 1回目: 選択（一時的、作成後にリセット）
+    setTags(prev => [...prev, tag]);
   };
 
   const handleTagLongPress = (tag: string) => {
@@ -884,12 +909,7 @@ export default function CreateQuestionScreen() {
                         setShowTagDeleteModal(true);
                         return;
                       }
-                      
-                      if (tags.includes(tag)) {
-                        setTags(prev => prev.filter(t => t !== tag));
-                      } else {
-                        setTags(prev => [...prev, tag]);
-                      }
+                      handleTagToggle(tag);
                     }}
                     onLongPress={() => {
                       if (!isDeleteMode) {
@@ -909,7 +929,8 @@ export default function CreateQuestionScreen() {
                       }
                     ]}>
                       {isDeleteMode ? '✕ ' : ''}
-                      {isSelected && !isDeleteMode ? '✓ ' : ''}{tag}
+                      {!isDeleteMode && tagLockMode[tag] ? '🔒 ' : ''}
+                      {isSelected && !isDeleteMode && !tagLockMode[tag] ? '✓ ' : ''}{tag}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -950,6 +971,29 @@ export default function CreateQuestionScreen() {
           )}
         </View>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+
+        {/* 読み仮名入力（任意） */}
+        <View style={{ marginTop: 8, marginBottom: 12 }}>
+          <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>
+            📖 {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}
+          </Text>
+          <TextInput
+            style={[styles.input, {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+              color: colors.text,
+              borderRadius: 8,
+              minHeight: 44,
+            }]}
+            value={reading}
+            onChangeText={setReading}
+            placeholder={locale === 'ja' ? '例: もり おうがい' : 'e.g., mori ougai'}
+            placeholderTextColor={colors.textSecondary}
+          />
+          <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
+            {locale === 'ja' ? '※ 音声読み上げ時に使用されます（任意）' : '※ Used for text-to-speech (optional)'}
+          </Text>
+        </View>
 
         {/* クロップUI */}
         {showCropUI && selectedImage && (

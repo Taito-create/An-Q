@@ -37,6 +37,7 @@ export interface Question {
   // 例: [["アポリア", "行き詰まり"], ["思い込み", "ドクサ"]]
   // 外側の配列＝空欄の数（AND条件）、内側の配列＝その空欄で
   // 許容する言い換え（OR条件）
+  reading?: string;  // 読み仮名（任意）例: "もり おうがい"
 }
 
 export interface Folder {

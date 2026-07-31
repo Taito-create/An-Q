@@ -11,6 +11,7 @@ import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from './utils/storageUtils';
+import { speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -120,6 +121,7 @@ export default function BrowseQuestionsScreen() {
   const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
   const [editMultipleOptions, setEditMultipleOptions] = useState<string[]>(['', '', '', '']);
   const [editMultipleCorrect, setEditMultipleCorrect] = useState(0);
+  const [editReading, setEditReading] = useState('');
 
   // タグ一覧更新（questions 変更時に実行）
   useEffect(() => {
@@ -353,6 +355,7 @@ export default function BrowseQuestionsScreen() {
     setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
     setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
     setEditMultipleCorrect(question.multipleChoice?.correctAnswer ?? 0);
+    setEditReading(question.reading || '');
     setShowEditModal(true);
   };
 
@@ -382,6 +385,7 @@ export default function BrowseQuestionsScreen() {
       multipleChoice: editingQuestionFull.answerType === 'multiple'
         ? { options: editMultipleOptions, correctAnswer: editMultipleCorrect }
         : editingQuestionFull.multipleChoice,
+      reading: editReading.trim() || undefined,
     };
 
     await updateQuestion(updated);
@@ -638,6 +642,7 @@ export default function BrowseQuestionsScreen() {
                   styles.card,
                   { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.primary },
                   isCompactMode && styles.cardCompact,
+                  isSelectionMode && styles.batchCompactCard,
                 ]}
               >
                 {isSelectionMode && (
@@ -673,7 +678,7 @@ export default function BrowseQuestionsScreen() {
                     </View>
                   </TouchableOpacity>
                 )}
-                <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact]}>
+                <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact, isSelectionMode && { paddingVertical: 4, paddingHorizontal: 0 }]}>
                   <TouchableOpacity
                     style={styles.cardHeaderLeft}
                     onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}
@@ -729,6 +734,14 @@ export default function BrowseQuestionsScreen() {
                       </View>
                     )}
                     <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const textToSpeak = item.reading || item.question;
+                          speakText(textToSpeak);
+                        }}
+                      >
+                        <Text style={[styles.speakBtnText, { color: colors.primary }]}>🔊 読み上げ</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => startEditQuestion(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text></TouchableOpacity>
                       <TouchableOpacity onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
                         <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
@@ -949,6 +962,8 @@ export default function BrowseQuestionsScreen() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
             <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
+            <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6, marginTop: 12 }]}>📖 {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}</Text>
+            <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={editReading} onChangeText={setEditReading} placeholder={locale === 'ja' ? '例: もり おうがい' : 'e.g., mori ougai'} placeholderTextColor={colors.textSecondary} />
 {editingQuestionFull?.answerType === 'descriptive' && (
   <>
     <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
@@ -1100,9 +1115,14 @@ export default function BrowseQuestionsScreen() {
       <Modal visible={showTagModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>{t.tagEditTitle}</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 }}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              🏷️ {locale === 'ja' ? 'タグを選択' : 'Select Tags'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
+              {locale === 'ja' ? 'タグをタップして選択/解除' : 'Tap to select/deselect tags'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4, paddingHorizontal: 4 }}>
                 {tagMasterList.map((tag) => {
                   const isSelected = editTags.includes(tag);
                   return (
@@ -1112,7 +1132,11 @@ export default function BrowseQuestionsScreen() {
                         styles.tagButton,
                         {
                           backgroundColor: isSelected ? colors.primary : colors.primary + '20',
-                          borderColor: colors.primary,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          borderWidth: 2,
+                          borderRadius: 20,
+                          paddingHorizontal: 14,
+                          paddingVertical: 8,
                         },
                       ]}
                       onPress={() => {
@@ -1145,41 +1169,35 @@ export default function BrowseQuestionsScreen() {
                         );
                       }}
                     >
-                      <Text style={[styles.tagButtonText, { color: isSelected ? '#fff' : colors.primary }]}>
-                        {tag}
+                      <Text style={[
+                        styles.tagButtonText,
+                        {
+                          color: isSelected ? onPrimary : colors.primary,
+                          fontWeight: isSelected ? 'bold' : '500',
+                          fontSize: 13,
+                        }
+                      ]}>
+                        {isSelected ? '✓ ' : ''}{tag}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, borderColor: colors.border, color: colors.text }]}
-                placeholder={locale === 'ja' ? '新しいタグを入力' : 'New tag'}
-                placeholderTextColor={colors.textSecondary}
-                onSubmitEditing={(e) => {
-                  const newTag = e.nativeEvent.text.trim();
-                  if (newTag && !tagMasterList.includes(newTag)) {
-                    addTagToMasterList(newTag).then((success) => {
-                      if (success) {
-                        setTagMasterList((prev) => [...prev, newTag]);
-                        setEditTags((prev) => [...prev, newTag]);
-                      } else {
-                        Alert.alert(
-                          locale === 'ja' ? 'エラー' : 'Error',
-                          locale === 'ja' ? 'タグが既に存在します' : 'Tag already exists'
-                        );
-                      }
-                    });
-                  }
-                }}
-              />
-            </View>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowTagModal(false); setEditingQuestion(null); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t.cancelEdit}</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={saveEditedTags}><Text style={styles.modalSaveText}>{t.saveTags}</Text></TouchableOpacity>
-            </View>
+            
+            {/* 空の場合のメッセージ */}
+            {tagMasterList.length === 0 && (
+              <Text style={{ color: colors.textSecondary, textAlign: 'center', paddingVertical: 20 }}>
+                {locale === 'ja' ? 'タグがありません。問題作成画面で作成してください。' : 'No tags. Create them in the create screen.'}
+              </Text>
+            )}
+            
+            <TouchableOpacity
+              style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+              onPress={saveEditedTags}
+            >
+              <Text style={styles.modalSaveText}>{t.saveTags}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1723,4 +1741,19 @@ const styles = StyleSheet.create({
   modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
   tagButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   tagButtonText: { fontSize: 13, fontWeight: 'bold' },
+  speakBtnText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  batchCompactCard: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+    borderRadius: 10,
+  },
+  batchCompactQuestionText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+  },
 });
