@@ -280,7 +280,7 @@ export default function QuizScreen() {
     // モードA: 音声完了待ちモード（speechEnabled=true）
     // ============================================================
     if (speechEnabled) {
-      const PAUSE_AFTER_SPEECH = 2000; // 音声終了後の待機時間（ms）
+      const PAUSE_AFTER_SPEECH = 500; // 音声終了後の待機時間（ms）
 
       // キャンセル可能な待機ヘルパー
       const wait = (ms: number): Promise<boolean> => {

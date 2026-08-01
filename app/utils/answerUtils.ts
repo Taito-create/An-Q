@@ -71,42 +71,34 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
  */
 export const getAnswerText = (question: Question): string => {
   if (!question) return '問題データがありません';
-  
+
   try {
     if (question.answerType === 'descriptive') {
-      // Priority 1: Check descriptiveAnswerGroups (new format - string[][])
+      // Priority 1: descriptiveAnswerGroups (new format)
       if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
-        if (question.descriptiveAnswerGroups.length === 0) {
-          return '回答なし';
+        const groups = question.descriptiveAnswerGroups
+          .filter(group => group && group.length > 0)
+          .map(group => group.filter(a => a && a.trim()).join(' / '))
+          .filter(text => text.length > 0);
+
+        if (groups.length > 0) {
+          return groups.join(' | ');
         }
-        // Map each group safely
-        const groupTexts = question.descriptiveAnswerGroups
-          .map((group, index) => {
-            if (!Array.isArray(group)) {
-              return `正解${index + 1}: ${String(group)}`;
-            }
-            const answers = group.filter(a => a && String(a).trim()).map(a => String(a).trim());
-            return answers.length > 0 ? `正解${index + 1}: ${answers.join(' / ')}` : `正解${index + 1}: (空欄)`;
-          })
-          .filter(text => text && text.length > 0);
-        
-        return groupTexts.length > 0 ? groupTexts.join(' | ') : '回答なし';
       }
-      
-      // Priority 2: Check descriptiveAnswer (old format - string | string[])
-      if (question.descriptiveAnswer !== undefined && question.descriptiveAnswer !== null) {
+
+      // Priority 2: descriptiveAnswer (old format)
+      if (question.descriptiveAnswer) {
         if (Array.isArray(question.descriptiveAnswer)) {
-          const answers = question.descriptiveAnswer
-            .filter(a => a && String(a).trim())
-            .map(a => String(a).trim());
-          return answers.length > 0 ? answers.join(' / ') : '回答なし';
-        }
-        if (typeof question.descriptiveAnswer === 'string') {
-          return question.descriptiveAnswer.trim() || '回答なし';
+          const answers = question.descriptiveAnswer.filter(a => a && a.trim());
+          if (answers.length > 0) {
+            return answers.join(' / ');
+          }
+        } else if (typeof question.descriptiveAnswer === 'string') {
+          return question.descriptiveAnswer;
         }
       }
-      
-      return '回答なし';
+
+      return '回答が設定されていません';
     }
     
     if (question.answerType === 'truefalse') {
