@@ -220,6 +220,78 @@ export const speakTextWithStoredPreset = async (
   return speakText(text, lang, preset);
 };
 
+// ============================================================
+// サーバー経由での音声生成・再生（VOICEVOX Engine）
+// ============================================================
+const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'http://localhost:3001/speak';
+
+/**
+ * サーバー経由で音声を生成・再生する
+ * サーバーに到達できない場合は Web Speech API にフォールバックする
+ * @param text 読み上げるテキスト
+ * @returns Promise<void>
+ */
+export const speakWithServer = async (text: string): Promise<void> => {
+  try {
+    const response = await fetch(VOICE_SERVER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+
+    // 再生終了後にURLを解放
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    await audio.play();
+
+    console.log(`✅ サーバー音声再生: ${text}`);
+  } catch (error) {
+    console.error('⚠️ サーバー音声に失敗、Web Speech APIにフォールバック:', error);
+    // フォールバック: 既存の Web Speech API を使用（保存済みプリセットを尊重）
+    await speakTextWithStoredPreset(text);
+  }
+};
+
+// ============================================================
+// 設定に基づく音声再生の統合エントリポイント
+// ============================================================
+/**
+ * ユーザー設定（USE_SERVER_VOICE）に基づいて音声を再生する
+ * - サーバー音声が有効: speakWithServer を使用（失敗時は自動フォールバック）
+ * - サーバー音声が無効: Web Speech API（保存済みプリセット）を使用
+ * @param text 読み上げるテキスト
+ * @returns Promise<void>
+ */
+export const speak = async (text: string): Promise<void> => {
+  try {
+    const useServer = await AsyncStorage.getItem(STORAGE_KEYS.USE_SERVER_VOICE);
+    console.log('🎤 speak() called, useServer:', useServer);
+    // デフォルトはサーバー音声を有効とする（未設定時は true 扱い）
+    if (useServer !== 'false') {
+      console.log('🎤 Using server voice (VOICEVOX Engine)');
+      await speakWithServer(text);
+    } else {
+      console.log('🎤 Using Web Speech API');
+      await speakTextWithStoredPreset(text);
+    }
+  } catch (error) {
+    console.error('音声設定読み込みエラー、Web Speech APIにフォールバック:', error);
+    await speakTextWithStoredPreset(text);
+  }
+};
+
 export const stopSpeech = (): void => {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
