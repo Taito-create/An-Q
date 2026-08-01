@@ -10,8 +10,23 @@ const VOICEVOX_URL = process.env.VOICEVOX_URL || 'https://voicevox-engine.onrend
 // ずんだもんのスピーカーID
 const SPEAKER_ID = 1;
 
-// CORS を最初に設定
-app.use(cors());
+// CORS 設定
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://localhost:3005',
+    'http://localhost:3006',
+    'https://an-q.vercel.app',
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ルートルート（テスト用）
