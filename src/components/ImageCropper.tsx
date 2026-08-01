@@ -100,13 +100,21 @@ export default function ImageCropper({
 
         <View
           style={styles.cropPreview}
-          onMouseDown={(event) => handleStart(event.clientX, event.clientY)}
-          onMouseMove={(event) => handleMove(event.clientX, event.clientY)}
-          onMouseUp={handleEnd}
-          onMouseLeave={handleEnd}
-          onTouchStart={(event) => handleStart(event.touches[0].clientX, event.touches[0].clientY)}
-          onTouchMove={(event) => handleMove(event.touches[0].clientX, event.touches[0].clientY)}
-          onTouchEnd={handleEnd}
+          {...({
+            onMouseDown: (event: any) => handleStart(event.clientX, event.clientY),
+            onMouseMove: (event: any) => handleMove(event.clientX, event.clientY),
+            onMouseUp: handleEnd,
+            onMouseLeave: handleEnd,
+            onTouchStart: (event: any) => {
+              const touch = event.touches?.[0] || event.nativeEvent?.touches?.[0];
+              if (touch) handleStart(touch.clientX, touch.clientY);
+            },
+            onTouchMove: (event: any) => {
+              const touch = event.touches?.[0] || event.nativeEvent?.touches?.[0];
+              if (touch) handleMove(touch.clientX, touch.clientY);
+            },
+            onTouchEnd: handleEnd,
+          } as any)}
         >
           <Image
             source={{ uri: imageUri }}

@@ -8,8 +8,20 @@ import { useBGM } from './bgmContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import {
+  VoicePreset,
+  voicePresetLabels,
+  voicePresetDescriptions,
+  getStoredVoicePreset,
+  setStoredVoicePreset,
+  speakText,
+  logAvailableVoices,
+  initSpeechVoices,
+} from './utils/speechUtils';
 
 const APP_VERSION = '1.0.0';
+
+const VOICE_PRESET_ORDER: VoicePreset[] = ['standard', 'yukkuri', 'slow', 'energetic', 'calm', 'deep'];
 
 export default function AppSettingsScreen() {
   const navigate = useNavigate();
@@ -21,10 +33,16 @@ export default function AppSettingsScreen() {
 
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [seEnabled, setSeEnabled] = useState(true);
+  const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEYS.DEV_MODE_ENABLED).then(v => setDevModeEnabled(v === 'true'));
     AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED).then(v => setSeEnabled(v !== 'false'));
+    getStoredVoicePreset().then(p => setVoicePreset(p));
+
+    // 音声エンジンを初期化し、デバッグ用にボイス一覧を出力
+    initSpeechVoices();
+    logAvailableVoices();
   }, []);
 
   const handleLanguage = async (lang: 'ja' | 'en') => {
@@ -42,6 +60,17 @@ export default function AppSettingsScreen() {
     setSeEnabled(val);
     await AsyncStorage.setItem(STORAGE_KEYS.SE_ENABLED, val ? 'true' : 'false');
     SoundManager.play('decide');
+  };
+
+  const handleVoicePreset = async (preset: VoicePreset) => {
+    setVoicePreset(preset);
+    await setStoredVoicePreset(preset);
+    SoundManager.play('decide');
+  };
+
+  const handleVoicePreview = (preset: VoicePreset) => {
+    SoundManager.play('decide');
+    speakText(t.voicePreviewText, 'ja-JP', preset);
   };
 
   const Row = ({ label, right }: { label: string; right: React.ReactNode }) => (
@@ -141,6 +170,57 @@ export default function AppSettingsScreen() {
               </TouchableOpacity>
             }
           />
+        </View>
+
+        {/* ボイスプリセット */}
+        <SectionHeader title={t.voicePreset} />
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <View style={[styles.row, { borderBottomColor: colors.border, flexDirection: 'column', alignItems: 'stretch' }]}>
+            <Text style={[styles.rowLabel, { color: colors.text, fontSize: fs(15), marginBottom: 8 }]}>
+              {t.voicePresetDesc}
+            </Text>
+            <View style={styles.voicePresetList}>
+              {VOICE_PRESET_ORDER.map((preset) => (
+                <View key={preset} style={styles.voicePresetItem}>
+                  <TouchableOpacity
+                    style={[
+                      styles.voicePresetBtn,
+                      {
+                        backgroundColor: voicePreset === preset ? colors.primary : colors.background,
+                        borderColor: voicePreset === preset ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => handleVoicePreset(preset)}
+                  >
+                    <Text
+                      style={[
+                        styles.voicePresetBtnText,
+                        { color: voicePreset === preset ? onPrimary : colors.text },
+                      ]}
+                    >
+                      {voicePresetLabels[preset]}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.voicePresetDescText,
+                        { color: voicePreset === preset ? onPrimary : colors.textSecondary },
+                      ]}
+                    >
+                      {voicePresetDescriptions[preset]}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.previewBtn, { borderColor: colors.primary }]}
+                    onPress={() => handleVoicePreview(preset)}
+                  >
+                    <Text style={[styles.previewBtnText, { color: colors.primary }]}>
+                      🔊 {t.voicePreview}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* 外観 */}
@@ -247,4 +327,11 @@ const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   segBtnText: { fontWeight: '600' },
+  voicePresetList: { flexDirection: 'column', gap: 8 },
+  voicePresetItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  voicePresetBtn: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1.5 },
+  voicePresetBtnText: { fontWeight: '700', fontSize: 14 },
+  voicePresetDescText: { fontSize: 11, marginTop: 2 },
+  previewBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5 },
+  previewBtnText: { fontWeight: '600', fontSize: 12 },
 });

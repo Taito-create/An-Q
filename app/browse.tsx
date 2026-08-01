@@ -10,8 +10,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from './utils/storageUtils';
-import { speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
+import { speakTextWithStoredPreset as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -31,7 +30,10 @@ export default function BrowseQuestionsScreen() {
     deleteFolder,
     addQuestionsToFolder,
     removeQuestionsFromFolder,
-    cleanupOrphanFolders
+    cleanupOrphanFolders,
+    tagMasterList,
+    addTag,
+    removeTag
   } = useQuestionsContext();
   
   // Debug: Log questions when component renders
@@ -53,7 +55,7 @@ export default function BrowseQuestionsScreen() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editTags, setEditTags] = useState<string[]>([]);
   const [showTagModal, setShowTagModal] = useState(false);
-  const [tagMasterList, setTagMasterList] = useState<string[]>([]);
+  // tagMasterList は Context から取得（デバイス間同期対応）
 
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
@@ -130,10 +132,7 @@ export default function BrowseQuestionsScreen() {
     setAvailableTags(Array.from(tags).sort());
   }, [questions]);
 
-  // タグのマスターリストを読み込む
-  useEffect(() => {
-    loadTagMasterList().then(setTagMasterList);
-  }, []);
+  // tagMasterList は Context から取得するため、ローカルでのロードは不要
 
   // フォルダが更新されたら、選択中のフォルダとフォルダ質問を更新
   useEffect(() => {
@@ -294,7 +293,7 @@ export default function BrowseQuestionsScreen() {
   const startEditTags = (question: Question) => {
     setEditingQuestion(question);
     setEditTags(question.tags || []);
-    loadTagMasterList().then(setTagMasterList);
+    // tagMasterList は Context から取得済み（ロード不要）
     setShowTagModal(true);
   };
 
@@ -613,7 +612,7 @@ export default function BrowseQuestionsScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12, paddingHorizontal: 4 }}>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
-            onPress={() => { loadTagMasterList().then(setTagMasterList); setShowBatchTagModal(true); }}
+            onPress={() => { setShowBatchTagModal(true); }}
           >
             <Text style={[styles.batchTagBarText, { color: onPrimary }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
@@ -782,7 +781,6 @@ export default function BrowseQuestionsScreen() {
                         setAvailableQuestionsForAdd(questions);
                         setSelectedQuestionIdsForAdd([]);
                         setAddByTagSelectedTags([]);
-                        loadTagMasterList().then(setTagMasterList);
                         setShowAddToFolderModal(true);
                       }}
                     >
@@ -1159,8 +1157,7 @@ export default function BrowseQuestionsScreen() {
                               style: 'destructive',
                               onPress: async () => {
                                 await removeTagFromAllQuestions(tag);
-                                await removeTagFromMasterList(tag);
-                                setTagMasterList((prev) => prev.filter((t) => t !== tag));
+                                await removeTag(tag);
                                 setEditTags((prev) => prev.filter((t) => t !== tag));
                                 SoundManager.play('delete');
                               },
@@ -1273,8 +1270,7 @@ export default function BrowseQuestionsScreen() {
                               style: 'destructive',
                               onPress: async () => {
                                 await removeTagFromAllQuestions(tag);
-                                await removeTagFromMasterList(tag);
-                                setTagMasterList((prev) => prev.filter((t) => t !== tag));
+                                await removeTag(tag);
                                 setBatchSelectedTags((prev) => prev.filter((t) => t !== tag));
                                 SoundManager.play('delete');
                               },
@@ -1299,16 +1295,8 @@ export default function BrowseQuestionsScreen() {
                 onSubmitEditing={(e) => {
                   const newTag = e.nativeEvent.text.trim();
                   if (newTag && !tagMasterList.includes(newTag)) {
-                    addTagToMasterList(newTag).then((success) => {
-                      if (success) {
-                        setTagMasterList((prev) => [...prev, newTag]);
-                        setBatchSelectedTags((prev) => [...prev, newTag]);
-                      } else {
-                        Alert.alert(
-                          locale === 'ja' ? 'エラー' : 'Error',
-                          locale === 'ja' ? 'タグが既に存在します' : 'Tag already exists'
-                        );
-                      }
+                    addTag(newTag).then(() => {
+                      setBatchSelectedTags((prev) => [...prev, newTag]);
                     });
                   }
                 }}

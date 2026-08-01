@@ -131,8 +131,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     elements.forEach(element => {
       if (element.id !== targetId && !element.closest('#tutorial-overlay')) {
         element.setAttribute('data-tutorial-disabled', 'true');
-        element.style.pointerEvents = 'none';
-        element.style.opacity = '0.5';
+        (element as HTMLElement).style.pointerEvents = 'none';
+        (element as HTMLElement).style.opacity = '0.5';
         disabledElementsRef.current.add(element.id || '');
       }
     });
@@ -145,8 +145,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     const elements = document.querySelectorAll('[data-tutorial-disabled="true"]');
     elements.forEach(element => {
       element.removeAttribute('data-tutorial-disabled');
-      element.style.pointerEvents = '';
-      element.style.opacity = '';
+      (element as HTMLElement).style.pointerEvents = '';
+      (element as HTMLElement).style.opacity = '';
     });
     disabledElementsRef.current.clear();
   }, []);
@@ -345,7 +345,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       if (task.targetElement) {
         setTimeout(() => {
           showSpotlight(
-            task.targetElement, 
+            task.targetElement as string, 
             task.disableOtherElements && !task.highlightOnly
           );
         }, 300);

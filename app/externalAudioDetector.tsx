@@ -16,7 +16,7 @@ export function useExternalAudioDetector() {
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const detectionIntervalRef = useRef<number | null>(null);
+  const detectionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 外部音楽アプリの検出
   useEffect(() => {

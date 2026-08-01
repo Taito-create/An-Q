@@ -340,4 +340,13 @@ const styles = StyleSheet.create({
   customBGMCard: { borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 2 },
   backButton: { margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
   backButtonText: { fontWeight: 'bold' },
+  exchangeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
 });

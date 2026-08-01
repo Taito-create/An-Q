@@ -6,6 +6,10 @@ export const translations = {
     bgm: 'BGM',
     soundEffects: '効果音',
     musicSettings: '音楽設定',
+    voicePreset: 'ボイスプリセット',
+    voicePresetDesc: '読み上げの声の種類を選択',
+    voicePreview: '試聴',
+    voicePreviewText: 'これは読み上げのテストです',
     appearance: '外観',
     themeSetting: 'テーマ設定',
     details: '詳細',
@@ -187,6 +191,47 @@ export const translations = {
     unlockBgmMsg: 'BGMをアンロックしました',
     library: 'ライブラリ',
     addMusic: '音楽を追加',
+    
+    // Music screen
+    selectAction: 'アクションを選択',
+    soundEffectsTitle: '効果音',
+    currentSet: '現在のセット',
+    addAudioFiles: '音声ファイルを追加',
+    addToPlaylist: 'プレイリストに追加',
+    newPlaylist: '新しいプレイリスト',
+    playlistName: 'プレイリスト名',
+    createPlaylistPrompt: 'プレイリストを作成',
+    tracks: 'トラック',
+    
+    // Shop
+    purchased: '購入済み',
+    notEnoughBooks: '本が不足しています',
+    alreadyPurchased: '既に購入済みです',
+    shopTitle: 'ショップ',
+    currentStatus: '現在のステータス',
+    questionLimit: '問題数上限',
+    unlocked: 'アンロック済み',
+    locked: 'ロック中',
+    purchase: '購入',
+    insufficientBooks: '本が不足しています',
+    exchangeRow: '交換',
+    
+    // Title
+    titlesTitle: '称号',
+    unlockedLabel: 'アンロック済み',
+    yourStats: 'あなたの統計',
+    quizzes: 'クイズ',
+    correctAnswers: '正解数',
+    questionsCreated: '作成した問題数',
+    loginDays: 'ログイン日数',
+    maxStreak: '最大ストリーク',
+    books: '本',
+    equipped: '装備中',
+    
+    // Tutorial
+    skipTutorial: 'スキップ',
+    previous: '前へ',
+    next: '次へ',
   },
 
   en: {
@@ -196,6 +241,10 @@ export const translations = {
     bgm: 'BGM',
     soundEffects: 'Sound Effects',
     musicSettings: 'Music Settings',
+    voicePreset: 'Voice Preset',
+    voicePresetDesc: 'Select the type of reading voice',
+    voicePreview: 'Preview',
+    voicePreviewText: 'This is a reading test',
     appearance: 'Appearance',
     themeSetting: 'Theme Settings',
     details: 'Details',
@@ -377,5 +426,46 @@ export const translations = {
     unlockBgmMsg: 'BGM unlocked',
     library: 'Library',
     addMusic: 'Add Music',
+    
+    // Music screen
+    selectAction: 'Select Action',
+    soundEffectsTitle: 'Sound Effects',
+    currentSet: 'Current Set',
+    addAudioFiles: 'Add Audio Files',
+    addToPlaylist: 'Add to Playlist',
+    newPlaylist: 'New Playlist',
+    playlistName: 'Playlist Name',
+    createPlaylistPrompt: 'Create Playlist',
+    tracks: 'Tracks',
+    
+    // Shop
+    purchased: 'Purchased',
+    notEnoughBooks: 'Not enough books',
+    alreadyPurchased: 'Already purchased',
+    shopTitle: 'Shop',
+    currentStatus: 'Current Status',
+    questionLimit: 'Question Limit',
+    unlocked: 'Unlocked',
+    locked: 'Locked',
+    purchase: 'Purchase',
+    insufficientBooks: 'Not enough books',
+    exchangeRow: 'Exchange',
+    
+    // Title
+    titlesTitle: 'Titles',
+    unlockedLabel: 'Unlocked',
+    yourStats: 'Your Stats',
+    quizzes: 'Quizzes',
+    correctAnswers: 'Correct Answers',
+    questionsCreated: 'Questions Created',
+    loginDays: 'Login Days',
+    maxStreak: 'Max Streak',
+    books: 'Books',
+    equipped: 'Equipped',
+    
+    // Tutorial
+    skipTutorial: 'Skip',
+    previous: 'Previous',
+    next: 'Next',
   }
 };

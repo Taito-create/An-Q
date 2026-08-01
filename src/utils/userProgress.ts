@@ -17,6 +17,7 @@ export interface UserProgressDocument {
   bio: string;
   profileImage: string | null;
   currentTitle: string;
+  equippedTitle?: string;
   unlockedTitles: string[];
   level: number;
   currentXP: number;

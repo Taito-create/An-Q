@@ -20,7 +20,7 @@ import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
-import { loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from './utils/storageUtils';
+// Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
 import './create.css';
 
@@ -29,7 +29,7 @@ export default function CreateQuestionScreen() {
   const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions, saveQuestions, applyQuestionsChange, removeTagFromAllQuestions } = useQuestionsContext();
+  const { questions, saveQuestions, applyQuestionsChange, removeTagFromAllQuestions, tagMasterList, addTag, removeTag } = useQuestionsContext();
   const { user } = useAuth();
   const cpR: number | undefined = isCyberpunk ? 0 : undefined;
   const cpB: number | undefined = isCyberpunk ? 2 : undefined;
@@ -48,7 +48,7 @@ export default function CreateQuestionScreen() {
     correctAnswers: [0] as number[]
   });
   const [tags, setTags] = useState<string[]>([]);
-  const [tagMasterList, setTagMasterList] = useState<string[]>([]);
+  // tagMasterList は Context から取得（デバイス間同期対応）
 
   // タグ追加モーダル用 state
   const [showAddTagModal, setShowAddTagModal] = useState(false);
@@ -93,10 +93,7 @@ export default function CreateQuestionScreen() {
 
   // 🟢 画像添付UIを削除（OCR機能のみ使用）
 
-  // タグのマスターリストを読み込む
-  useEffect(() => {
-    loadTagMasterList().then(setTagMasterList);
-  }, []);
+  // tagMasterList は Context から取得するため、ローカルでのロードは不要
 
   // クロップ範囲のリセット
   const resetCropArea = () => {
@@ -778,8 +775,7 @@ export default function CreateQuestionScreen() {
           style: 'destructive',
           onPress: async () => {
             await removeTagFromAllQuestions(tag);
-            await removeTagFromMasterList(tag);
-            setTagMasterList(prev => prev.filter(t => t !== tag));
+            await removeTag(tag);
             setTags(prev => prev.filter(t => t !== tag));
           }
         }
@@ -797,17 +793,12 @@ export default function CreateQuestionScreen() {
       return;
     }
     SoundManager.play('decide');
-    const added = await addTagToMasterList(trimmed);
-    if (added) {
-      setTagMasterList(prev => [...prev, trimmed]);
-      setTags(prev => [...prev, trimmed]);
-      setNewTagName('');
-      setShowAddTagModal(false);
-      setIsTagDeleteMode(false);
-      SoundManager.play('complete');
-    } else {
-      Alert.alert(t.error, locale === 'ja' ? '既に存在するタグです' : 'Tag already exists');
-    }
+    await addTag(trimmed);
+    setTags(prev => [...prev, trimmed]);
+    setNewTagName('');
+    setShowAddTagModal(false);
+    setIsTagDeleteMode(false);
+    SoundManager.play('complete');
   };
 
   return (
@@ -1336,8 +1327,7 @@ export default function CreateQuestionScreen() {
                 onPress={async () => {
                   if (tagToDelete) {
                     await removeTagFromAllQuestions(tagToDelete);
-                    await removeTagFromMasterList(tagToDelete);
-                    setTagMasterList(prev => prev.filter(t => t !== tagToDelete));
+                    await removeTag(tagToDelete);
                     setTags(prev => prev.filter(t => t !== tagToDelete));
                     SoundManager.play('delete');
                     

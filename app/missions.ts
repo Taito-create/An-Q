@@ -56,6 +56,7 @@ export interface UserStats {
   maxStreak: number;
   totalBooks: number;
   currentTitle: string;
+  equippedTitle?: string;
   firstLoginDate: string;
   lastLoginDate: string;
   unlockedTitles: string[];
@@ -194,6 +195,7 @@ export async function loadStatsFromFirestore(userId: string): Promise<UserStats 
       maxStreak: data.streakDays || 0,
       totalBooks: data.totalBooks || 0,
       currentTitle: data.currentTitle || 'apprentice',
+      equippedTitle: data.equippedTitle,
       firstLoginDate: new Date(data.joinDate || Date.now()).toISOString().split('T')[0],
       lastLoginDate: new Date(data.lastLoginDate || Date.now()).toISOString().split('T')[0],
       unlockedTitles: data.unlockedTitles || [],

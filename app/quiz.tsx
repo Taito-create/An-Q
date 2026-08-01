@@ -22,7 +22,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuizCompletion } from '../src/utils/userProgress';
-import { speakText, stopSpeech } from './utils/speechUtils';
+import { speakTextWithStoredPreset as speakText, stopSpeech, getStoredVoicePreset, setStoredVoicePreset, VoicePreset, voicePresetLabels, speakText as speakTextWithPreset } from './utils/speechUtils';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -121,6 +121,7 @@ export default function QuizScreen() {
   // 自動再生モード
   const [autoPlayMode, setAutoPlayMode] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
   const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
@@ -130,15 +131,16 @@ export default function QuizScreen() {
   const autoPlaySessionRef = useRef(0);
   const currentIndexRef = useRef(0);
 
+  // 🔇 無操作検知用（スリープ学習モード）
+  const [lastInteraction, setLastInteraction] = useState(Date.now());
+  const inactivityTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // currentIndex が変わったら ref も更新
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
-  // タグフィルター用 state
-  const [allTags, setAllTags] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [preSelectedTags, setPreSelectedTags] = useState<string[]>([]);
+  // タグフィルターは削除（フォルダフィルターのみ使用）
 
   // 長押し用 ref
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -214,10 +216,19 @@ export default function QuizScreen() {
     loadTimerSetting();
     loadTimerPresets();
     SoundManager.initialize();
+    getStoredVoicePreset().then(p => setVoicePreset(p));
   }, []);
 
+  const handleVoicePresetChange = async (preset: VoicePreset) => {
+    setVoicePreset(preset);
+    await setStoredVoicePreset(preset);
+    SoundManager.play('decide');
+    // テスト再生
+    speakTextWithPreset(locale === 'ja' ? 'こんにちは！テストです。' : 'Hello! This is a test.', 'ja-JP', preset);
+  };
+
   // ──────────────────────────────────────────────
-  // 自動再生タイマー（修正版 3 - useRef 使用）
+  // 自動再生タイマー（スリープ学習モード対応版）
   // ──────────────────────────────────────────────
   useEffect(() => {
     console.log('[AutoPlay] useEffect triggered:', { 
@@ -229,11 +240,11 @@ export default function QuizScreen() {
 
     if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
       if (autoPlayTimerRef.current) {
-        console.log('[AutoPlay] Clearing timer (exit condition)');
         clearTimeout(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
       autoPlaySessionRef.current += 1;
+      stopSpeech();
       return;
     }
 
@@ -282,18 +293,25 @@ export default function QuizScreen() {
           
           if (nextIdx >= shuffledQuestions.length) {
             console.log('[AutoPlay] All questions completed');
-                      autoPlaySessionRef.current += 1;
-                      if (autoPlayTimerRef.current) {
-                        clearTimeout(autoPlayTimerRef.current);
-                        autoPlayTimerRef.current = null;
-                      }
-            navigate('/results', { 
-              state: { 
-                total: shuffledQuestions.length, 
-                score: 0, 
-                results: [] 
-              } 
-            });
+            if (autoPlayMode) {
+              // 自動再生モード: 常にループ（結果画面なし）
+              console.log('[AutoPlay] Looping back to start (auto-play mode)');
+              currentIndexRef.current = 0;
+              setCurrentIndex(0);
+              autoPlayPhaseRef.current = 'question';
+              setAutoPlayPhase('question');
+              autoPlayRemainingRef.current = autoPlayInterval;
+              setAutoPlayCountdown(autoPlayRemainingRef.current);
+            } else {
+              autoPlaySessionRef.current += 1;
+              if (autoPlayTimerRef.current) {
+                clearTimeout(autoPlayTimerRef.current);
+                autoPlayTimerRef.current = null;
+              }
+              navigate('/results', { 
+                state: { total: shuffledQuestions.length, score: 0, results: [] } 
+              });
+            }
           } else {
             // 次の問題に遷移
             currentIndexRef.current = nextIdx;
@@ -326,7 +344,53 @@ export default function QuizScreen() {
         autoPlayTimerRef.current = null;
       }
     };
-  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length]);
+  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length, speechEnabled]);
+
+  // ──────────────────────────────────────────────
+  // 無操作検知（スリープ学習モード用）
+  // 10秒間操作がない場合、現在の問題を繰り返す
+  // ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!autoPlayMode || !quizStarted || !speechEnabled) {
+      if (inactivityTimerRef.current) {
+        clearInterval(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      return;
+    }
+
+    const checkInactivity = () => {
+      const now = Date.now();
+      const elapsed = (now - lastInteraction) / 1000;
+      
+      if (elapsed >= 10) {
+        // 10秒無操作 → 現在の問題を繰り返す
+        console.log('⏰ No interaction for 10s, repeating question');
+        autoPlaySessionRef.current += 1;
+        setLastInteraction(Date.now());
+        
+        // 新しいセッションで現在の問題を再読み上げ
+        setTimeout(() => {
+          const currentQ = shuffledQuestions[currentIndexRef.current];
+          if (currentQ && autoPlayMode && speechEnabled) {
+            autoPlayPhaseRef.current = 'question';
+            setAutoPlayPhase('question');
+            const textToSpeak = currentQ.reading || currentQ.question;
+            speakText(textToSpeak);
+          }
+        }, 100);
+      }
+    };
+
+    inactivityTimerRef.current = setInterval(checkInactivity, 1000);
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearInterval(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+    };
+  }, [autoPlayMode, quizStarted, speechEnabled, lastInteraction]);
 
   // useQuestions フックのデータをローカル state に反映
   useEffect(() => {
@@ -335,11 +399,6 @@ export default function QuizScreen() {
     setAllQuestions(enabled);
     setEnabledQuestions(enabled);
 
-    const tagSet = new Set<string>();
-    enabled.forEach(q => (q.tags || []).forEach(tag => tagSet.add(tag)));
-    const sortedTags = Array.from(tagSet).sort();
-    setAllTags(sortedTags);
-    setSelectedTags(sortedTags);
     setPreQuestionCount(enabled.length);
     setIsLoading(false);
   }, [allQuestionsFromHook]);
@@ -404,15 +463,9 @@ export default function QuizScreen() {
 
   // 選択したタグとフォルダでフィルタリングされた問題
   const getFilteredQuestions = () => {
-    // まずタグでフィルタリング
+    // フォルダフィルタリングのみ（タグフィルターは削除）
     let filtered = allQuestions;
-    if (selectedTags.length < allTags.length) {
-      filtered = allQuestions.filter(q => {
-        if (!q.tags || q.tags.length === 0) return selectedTags.length === allTags.length;
-        return q.tags.some(tag => selectedTags.includes(tag));
-      });
-    }
-    // 次にフォルダでフィルタリング（フォルダが1つ以上選択されている場合）
+    // フォルダでフィルタリング（フォルダが1つ以上選択されている場合）
     if (selectedFolderIds.length > 0) {
       // 選択されたフォルダに含まれる全問題IDを収集
       const selectedQuestionIds = new Set<number>();
@@ -443,7 +496,7 @@ export default function QuizScreen() {
     }
 
     prevFilteredLengthRef.current = filtered.length;
-  }, [selectedTags, selectedFolderIds]);
+  }, [selectedFolderIds]);
 
   // ──────────────────────────────────────────────
   // カウントダウンタイマー
@@ -996,10 +1049,7 @@ export default function QuizScreen() {
             </View>
             {/* タグ選択情報も併記 */}
             <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-              {selectedTags.length === 0
-                ? `すべての問題（全${allQuestions.length}問）`
-                : `「${selectedTags.join(', ')}」から ${filtered.length}問`
-              }
+              {`すべての問題（全${allQuestions.length}問）`}
             </Text>
           </View>
 
@@ -1052,61 +1102,6 @@ export default function QuizScreen() {
                     : `${selectedFolderIds.length} folder(s) selected`}
                 </Text>
               )}
-            </View>
-          )}
-
-          {/* 🏷️ タグで絞り込み（リバースモードの上に移動） */}
-          {allTags.length > 0 && (
-            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🏷️ {locale === 'ja' ? 'タグで絞り込み' : 'Filter by Tag'}
-                </Text>
-              </View>
-              
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
-                  {selectedTags.length === 0
-                    ? `選択なし = すべての問題（全${allQuestions.length}問）`
-                    : `${selectedTags.length}個タグ選択中（最大${filtered.length}問）`
-                  }
-                </Text>
-              </View>
-              
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {allTags.map(tag => {
-                  const count = allQuestions.filter(q => (q.tags || []).includes(tag)).length;
-                  const isSelected = selectedTags.includes(tag);
-                  return (
-                    <TouchableOpacity
-                      key={tag}
-                      style={[{
-                        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-                        borderWidth: 1.5,
-                        borderColor: colors.primary,
-                        backgroundColor: isSelected ? colors.primary : 'transparent',
-                      }]}
-                      onPress={() => {
-                        SoundManager.play('select');
-                        setSelectedTags(prev =>
-                          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                        );
-                      }}
-                    >
-                      <Text style={[{
-                        color: isSelected ? '#fff' : colors.primary,
-                        fontWeight: '600',
-                        fontSize: 13,
-                      }]}>
-                        {tag}
-                        <Text style={[{ fontSize: 11, opacity: 0.8 }]}>
-                          {' '}({count})
-                        </Text>
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
             </View>
           )}
 
@@ -1200,6 +1195,38 @@ export default function QuizScreen() {
                     thumbColor="#FFF"
                   />
                 </View>
+                {/* 🎙️ ボイスプリセット選択 */}
+                {speechEnabled && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[{ fontSize: 13, color: colors.text, marginBottom: 8 }]}>
+                      🎙️ {locale === 'ja' ? 'ボイスプリセット' : 'Voice Preset'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {(['standard', 'yukkuri', 'slow', 'energetic', 'calm', 'deep'] as VoicePreset[]).map((preset) => (
+                        <TouchableOpacity
+                          key={preset}
+                          style={{
+                            backgroundColor: voicePreset === preset ? colors.primary : colors.background,
+                            borderColor: voicePreset === preset ? colors.primary : colors.border,
+                            borderWidth: 1,
+                            borderRadius: 10,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                          }}
+                          onPress={() => handleVoicePresetChange(preset)}
+                        >
+                          <Text style={{
+                            color: voicePreset === preset ? (isCyberpunk ? '#1A1A1A' : '#fff') : colors.text,
+                            fontSize: 13,
+                            fontWeight: '600',
+                          }}>
+                            {voicePresetLabels[preset]}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1460,7 +1487,7 @@ export default function QuizScreen() {
               : (shuffledQuestions[currentIndex].descriptiveAnswer
                 || (shuffledQuestions[currentIndex].answerType === 'truefalse'
                   ? (shuffledQuestions[currentIndex].trueFalseAnswer ? '○' : '✕')
-                  : shuffledQuestions[currentIndex].multipleChoice?.options?.[shuffledQuestions[currentIndex].multipleChoice.correctAnswer] || '')
+                  : shuffledQuestions[currentIndex].multipleChoice?.options?.[shuffledQuestions[currentIndex].multipleChoice?.correctAnswer ?? 0] || '')
               )
             }
           </Text>
