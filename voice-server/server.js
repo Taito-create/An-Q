@@ -10,8 +10,14 @@ const VOICEVOX_URL = process.env.VOICEVOX_URL || 'https://voicevox-engine.onrend
 // ずんだもんのスピーカーID
 const SPEAKER_ID = 1;
 
+// CORS を最初に設定
 app.use(cors());
 app.use(express.json());
+
+// ルートルート（テスト用）
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Voice server is running' });
+});
 
 // ヘルスチェック
 app.get('/health', (req, res) => {
@@ -87,15 +93,18 @@ app.post('/speak', async (req, res) => {
 // Keep-alive: VOICEVOX Engine のスリープを防ぐ
 setInterval(async () => {
   try {
-    await axios.get(`${VOICEVOX_URL}/`);
+    await axios.get(`${VOICEVOX_URL}/`, { timeout: 5000 });
     console.log('💓 VOICEVOX Engine ヘルスチェック OK');
   } catch (e) {
-    console.log('💔 VOICEVOX Engine ヘルスチェック失敗');
+    console.log('💔 VOICEVOX Engine ヘルスチェック失敗:', e.message);
   }
 }, 5 * 60 * 1000); // 5分ごと
 
+// サーバー起動
 app.listen(PORT, () => {
   console.log(`🎙️ Voice Server (VOICEVOX) running on port ${PORT}`);
-  console.log(`🔗 VOICEVOX Engine: ${VOICEVOX_URL}`);
-  console.log(`🗣️  Speaker ID: ${SPEAKER_ID} (ずんだもん)`);
+  console.log(`📡 VOICEVOX Engine URL: ${VOICEVOX_URL}`);
+  console.log(`🗣️  Speaker ID: ${SPEAKER_ID}`);
+}).on('error', (err) => {
+  console.error('❌ Server failed to start:', err);
 });
