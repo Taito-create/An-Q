@@ -20,5 +20,6 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src", "app"],
+  "exclude": ["../voice-server", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

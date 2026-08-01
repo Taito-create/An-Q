@@ -22,7 +22,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuizCompletion } from '../src/utils/userProgress';
-import { speakTextWithStoredPreset as speakText, stopSpeech, getStoredVoicePreset, setStoredVoicePreset, VoicePreset, voicePresetLabels, speakText as speakTextWithPreset } from './utils/speechUtils';
+import { speak as speakText, stopSpeech, getStoredVoicePreset, setStoredVoicePreset, VoicePreset, voicePresetLabels, speakText as speakTextWithPreset } from './utils/speechUtils';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -219,6 +219,22 @@ export default function QuizScreen() {
     getStoredVoicePreset().then(p => setVoicePreset(p));
   }, []);
 
+  // ──────────────────────────────────────────────
+  // 自動再生停止関数
+  // ──────────────────────────────────────────────
+  const stopAutoPlay = () => {
+    console.log('🛑 Stopping auto-play');
+    // セッションをインクリメントして逐次実行ループを確実に終了
+    autoPlaySessionRef.current += 1;
+    setAutoPlayMode(false);
+    setQuizStarted(false);
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    stopSpeech();
+  };
+
   const handleVoicePresetChange = async (preset: VoicePreset) => {
     setVoicePreset(preset);
     await setStoredVoicePreset(preset);
@@ -228,14 +244,17 @@ export default function QuizScreen() {
   };
 
   // ──────────────────────────────────────────────
-  // 自動再生タイマー（スリープ学習モード対応版）
+  // 自動再生（音声完了待ち対応版）
   // ──────────────────────────────────────────────
+  // speechEnabled=true: 音声完了を待つ逐次実行モード
+  // speechEnabled=false: 従来のタイマーベース
   useEffect(() => {
-    console.log('[AutoPlay] useEffect triggered:', { 
-      autoPlayMode, 
-      quizStarted, 
-      isPaused, 
-      shuffledQuestionsLength: shuffledQuestions.length 
+    console.log('[AutoPlay] useEffect triggered:', {
+      autoPlayMode,
+      quizStarted,
+      isPaused,
+      speechEnabled,
+      shuffledQuestionsLength: shuffledQuestions.length
     });
 
     if (!autoPlayMode || !quizStarted || isPaused || shuffledQuestions.length === 0) {
@@ -257,12 +276,111 @@ export default function QuizScreen() {
 
     const sessionId = ++autoPlaySessionRef.current;
 
-    // フェーズと残り時間をリセット
+    // ============================================================
+    // モードA: 音声完了待ちモード（speechEnabled=true）
+    // ============================================================
+    if (speechEnabled) {
+      const PAUSE_AFTER_SPEECH = 2000; // 音声終了後の待機時間（ms）
+
+      // キャンセル可能な待機ヘルパー
+      const wait = (ms: number): Promise<boolean> => {
+        return new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            autoPlayTimerRef.current = null;
+            resolve(sessionId === autoPlaySessionRef.current);
+          }, ms);
+          autoPlayTimerRef.current = timer;
+        });
+      };
+
+      // セッションが有効かチェック
+      const isActive = () => sessionId === autoPlaySessionRef.current;
+
+      const playQuestion = async (idx: number) => {
+        if (!isActive()) return;
+
+        const q = shuffledQuestions[idx];
+        if (!q) return;
+
+        // 質問フェーズ開始
+        autoPlayPhaseRef.current = 'question';
+        setAutoPlayPhase('question');
+        console.log(`[AutoPlay] Question phase: #${idx + 1}`);
+
+        // 音声再生（完了を待つ）
+        const textToSpeak = q.reading || q.question;
+        console.log('🔊 About to speak question, using:', typeof speakText);
+        await speakText(textToSpeak);
+        console.log('✅ Question speech completed');
+
+        if (!isActive()) return;
+
+        // 音声終了後の待機
+        if (!await wait(PAUSE_AFTER_SPEECH)) return;
+        if (!isActive()) return;
+
+        // 答えフェーズへ
+        await playAnswer(idx);
+      };
+
+      const playAnswer = async (idx: number) => {
+        if (!isActive()) return;
+
+        const q = shuffledQuestions[idx];
+        if (!q) return;
+
+        // 答えフェーズ開始
+        autoPlayPhaseRef.current = 'answer';
+        setAutoPlayPhase('answer');
+        console.log(`[AutoPlay] Answer phase: #${idx + 1}`);
+
+        // 音声再生（完了を待つ）
+        const answerText = getAnswerText(q);
+        await speakText(answerText);
+
+        if (!isActive()) return;
+
+        // 音声終了後の待機
+        if (!await wait(PAUSE_AFTER_SPEECH)) return;
+        if (!isActive()) return;
+
+        // 次の問題へ
+        const nextIdx = idx + 1;
+        if (nextIdx >= shuffledQuestions.length) {
+          // 全問完了 → ループ（自動再生モード）
+          console.log('[AutoPlay] All questions completed, looping');
+          currentIndexRef.current = 0;
+          setCurrentIndex(0);
+          if (!isActive()) return;
+          await playQuestion(0);
+        } else {
+          currentIndexRef.current = nextIdx;
+          setCurrentIndex(nextIdx);
+          questionStartTime.current = Date.now();
+          if (!isActive()) return;
+          await playQuestion(nextIdx);
+        }
+      };
+
+      // 開始
+      playQuestion(currentIndexRef.current);
+
+      return () => {
+        if (autoPlayTimerRef.current) {
+          clearTimeout(autoPlayTimerRef.current);
+          autoPlayTimerRef.current = null;
+        }
+      };
+    }
+
+    // ============================================================
+    // モードB: タイマーベース（speechEnabled=false）
+    // ============================================================
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
     autoPlayRemainingRef.current = autoPlayInterval;
     setAutoPlayCountdown(autoPlayRemainingRef.current);
-    console.log('[AutoPlay] Starting new timer, interval:', autoPlayInterval);
+    console.log('[AutoPlay] Starting timer-based mode, interval:', autoPlayInterval);
 
     const tick = () => {
       if (sessionId !== autoPlaySessionRef.current) {
@@ -281,16 +399,11 @@ export default function QuizScreen() {
           setAutoPlayPhase('answer');
           autoPlayRemainingRef.current = autoPlayInterval;
           setAutoPlayCountdown(autoPlayRemainingRef.current);
-          // 🔊 音声読み上げ: 答えを読み上げ
-          if (speechEnabled && shuffledQuestions[currentIndexRef.current]) {
-            const answerText = getAnswerText(shuffledQuestions[currentIndexRef.current]);
-            speakText(answerText);
-          }
         } else {
           // 回答表示終了 → 次の問題へ
           const nextIdx = currentIndexRef.current + 1;
           console.log('[AutoPlay] Moving to next question:', nextIdx, '/', shuffledQuestions.length);
-          
+
           if (nextIdx >= shuffledQuestions.length) {
             console.log('[AutoPlay] All questions completed');
             if (autoPlayMode) {
@@ -308,8 +421,8 @@ export default function QuizScreen() {
                 clearTimeout(autoPlayTimerRef.current);
                 autoPlayTimerRef.current = null;
               }
-              navigate('/results', { 
-                state: { total: shuffledQuestions.length, score: 0, results: [] } 
+              navigate('/results', {
+                state: { total: shuffledQuestions.length, score: 0, results: [] }
               });
             }
           } else {
@@ -317,17 +430,12 @@ export default function QuizScreen() {
             currentIndexRef.current = nextIdx;
             setCurrentIndex(nextIdx);
             questionStartTime.current = Date.now();
-            
+
             // 質問フェーズに戻してタイマーを継続
             autoPlayPhaseRef.current = 'question';
             setAutoPlayPhase('question');
             autoPlayRemainingRef.current = autoPlayInterval;
             setAutoPlayCountdown(autoPlayRemainingRef.current);
-            // 🔊 音声読み上げ: 問題を読み上げ
-            if (speechEnabled && shuffledQuestions[nextIdx]) {
-              const textToSpeak = shuffledQuestions[nextIdx].reading || shuffledQuestions[nextIdx].question;
-              speakText(textToSpeak);
-            }
             console.log('[AutoPlay] Moved to question', nextIdx, 'resetting timer');
           }
         }
@@ -348,10 +456,12 @@ export default function QuizScreen() {
 
   // ──────────────────────────────────────────────
   // 無操作検知（スリープ学習モード用）
-  // 10秒間操作がない場合、現在の問題を繰り返す
+  // ※ 音声完了待ちモードでは不要のため無効化
   // ──────────────────────────────────────────────
   useEffect(() => {
-    if (!autoPlayMode || !quizStarted || !speechEnabled) {
+    // speechEnabled=true（音声完了待ちモード）の場合は無操作検知を無効化
+    // 逐次実行モードが自動的に問題を進めるため、この機能は不要
+    if (!autoPlayMode || !quizStarted || speechEnabled) {
       if (inactivityTimerRef.current) {
         clearInterval(inactivityTimerRef.current);
         inactivityTimerRef.current = null;
@@ -359,26 +469,14 @@ export default function QuizScreen() {
       return;
     }
 
+    // speechEnabled=false（タイマーベース）の場合のみ無操作検知を有効化
     const checkInactivity = () => {
       const now = Date.now();
       const elapsed = (now - lastInteraction) / 1000;
       
       if (elapsed >= 10) {
-        // 10秒無操作 → 現在の問題を繰り返す
         console.log('⏰ No interaction for 10s, repeating question');
-        autoPlaySessionRef.current += 1;
         setLastInteraction(Date.now());
-        
-        // 新しいセッションで現在の問題を再読み上げ
-        setTimeout(() => {
-          const currentQ = shuffledQuestions[currentIndexRef.current];
-          if (currentQ && autoPlayMode && speechEnabled) {
-            autoPlayPhaseRef.current = 'question';
-            setAutoPlayPhase('question');
-            const textToSpeak = currentQ.reading || currentQ.question;
-            speakText(textToSpeak);
-          }
-        }, 100);
       }
     };
 
@@ -1774,7 +1872,7 @@ export default function QuizScreen() {
             <TouchableOpacity
               style={[{ backgroundColor: colors.error, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30 }]}
               onPress={() => {
-                if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+                stopAutoPlay();
                 setShowConfirmModal(true);
               }}
             >
@@ -1840,7 +1938,7 @@ export default function QuizScreen() {
               <TouchableOpacity 
                 style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
                 onPress={() => {
-                  if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
+                  stopAutoPlay();
                   setShowConfirmModal(false);
                   setIsTimerActive(false);  // タイマー停止
                   navigate('/');

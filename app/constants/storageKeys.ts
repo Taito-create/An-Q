@@ -63,6 +63,7 @@ export const STORAGE_KEYS = {
   DEV_MODE_ENABLED: 'dev_mode_enabled',
   SE_ENABLED: 'se_enabled',
   VOICE_PRESET: 'voice_preset',
+  USE_SERVER_VOICE: 'use_server_voice',
 
   // スクリーンタイム
   WEEKLY_SCREEN_TIME: 'weekly_screen_time_minutes',

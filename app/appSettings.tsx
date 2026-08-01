@@ -34,16 +34,25 @@ export default function AppSettingsScreen() {
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [seEnabled, setSeEnabled] = useState(true);
   const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
+  const [useServerVoice, setUseServerVoice] = useState(true);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEYS.DEV_MODE_ENABLED).then(v => setDevModeEnabled(v === 'true'));
     AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED).then(v => setSeEnabled(v !== 'false'));
     getStoredVoicePreset().then(p => setVoicePreset(p));
+    AsyncStorage.getItem(STORAGE_KEYS.USE_SERVER_VOICE).then(v => setUseServerVoice(v !== 'false'));
 
     // 音声エンジンを初期化し、デバッグ用にボイス一覧を出力
     initSpeechVoices();
     logAvailableVoices();
   }, []);
+
+  const toggleServerVoice = async (value: boolean) => {
+    console.log('🎤 Toggling server voice to:', value);
+    setUseServerVoice(value);
+    await AsyncStorage.setItem(STORAGE_KEYS.USE_SERVER_VOICE, String(value));
+    SoundManager.play('decide');
+  };
 
   const handleLanguage = async (lang: 'ja' | 'en') => {
     await AsyncStorage.setItem(STORAGE_KEYS.USER_LANGUAGE, lang);
@@ -168,6 +177,17 @@ export default function AppSettingsScreen() {
                   {t.details}
                 </Text>
               </TouchableOpacity>
+            }
+          />
+          <Row
+            label={locale === 'ja' ? '🎙️ ゆっくりボイス（サーバー）を使う' : '🎙️ Use Voice Server'}
+            right={
+              <Switch
+                value={useServerVoice}
+                onValueChange={toggleServerVoice}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
+              />
             }
           />
         </View>

@@ -10,7 +10,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { speakTextWithStoredPreset as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
+import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
