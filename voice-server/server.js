@@ -38,7 +38,7 @@ app.post('/speak', async (req, res) => {
       {
         params: { text, speaker: SPEAKER_ID },
         headers: { 'Content-Type': 'application/json' },
-        timeout: 30000,
+        timeout: 60000, // 60秒タイムアウト
       }
     );
     console.log(`✅ audio_query 成功`);
@@ -52,7 +52,7 @@ app.post('/speak', async (req, res) => {
         params: { speaker: SPEAKER_ID },
         responseType: 'arraybuffer',
         headers: { 'Content-Type': 'application/json' },
-        timeout: 30000,
+        timeout: 60000, // 60秒タイムアウト
       }
     );
     console.log(`✅ synthesis 成功 (${synthesisResponse.data.length} バイト)`);
@@ -83,6 +83,16 @@ app.post('/speak', async (req, res) => {
     });
   }
 });
+
+// Keep-alive: VOICEVOX Engine のスリープを防ぐ
+setInterval(async () => {
+  try {
+    await axios.get(`${VOICEVOX_URL}/`);
+    console.log('💓 VOICEVOX Engine ヘルスチェック OK');
+  } catch (e) {
+    console.log('💔 VOICEVOX Engine ヘルスチェック失敗');
+  }
+}, 5 * 60 * 1000); // 5分ごと
 
 app.listen(PORT, () => {
   console.log(`🎙️ Voice Server (VOICEVOX) running on port ${PORT}`);
