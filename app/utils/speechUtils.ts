@@ -233,33 +233,41 @@ const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'http://localh
  */
 export const speakWithServer = async (text: string): Promise<void> => {
   try {
+    console.log('🎤 speakWithServer called with:', text);
     const response = await fetch(VOICE_SERVER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
 
+    console.log('📡 Server response status:', response.status);
+    console.log('📡 Server response headers:', response.headers);
+
     if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Server error response:', errorText);
+      throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
 
     const audioBlob = await response.blob();
+    console.log('📥 Audio blob size:', audioBlob.size, 'bytes');
+    console.log('📥 Audio blob type:', audioBlob.type);
+
+    if (audioBlob.size === 0) {
+      throw new Error('Received empty audio data');
+    }
+
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
-
-    // 再生終了後にURLを解放
-    audio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
+    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    audio.onerror = (e) => {
+      console.error('❌ Audio playback error:', e);
     };
-
     await audio.play();
+    console.log('✅ Audio playback started');
 
-    console.log(`✅ サーバー音声再生: ${text}`);
   } catch (error) {
-    console.error('⚠️ サーバー音声に失敗、Web Speech APIにフォールバック:', error);
-    // フォールバック: 既存の Web Speech API を使用（保存済みプリセットを尊重）
+    console.error('⚠️ サーバー音声に失敗:', error);
     await speakTextWithStoredPreset(text);
   }
 };
