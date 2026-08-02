@@ -10,22 +10,9 @@ const VOICEVOX_URL = process.env.VOICEVOX_URL || 'https://voicevox-engine.onrend
 // ずんだもんのスピーカーID
 const SPEAKER_ID = 1;
 
-// CORS 設定（動的）
+// CORS 設定（開発用: すべてのオリジンを許可）
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow Vercel production
-    if (origin === 'https://an-q.vercel.app') {
-      callback(null, true);
-      return;
-    }
-    // Allow any localhost port
-    if (origin && origin.match(/^http:\/\/localhost:\d+$/)) {
-      callback(null, true);
-      return;
-    }
-    // Block others
-    callback(null, false);
-  },
+  origin: '*', // Allow all origins (development only)
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
 };

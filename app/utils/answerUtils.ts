@@ -73,6 +73,9 @@ export const getAnswerText = (question: Question): string => {
   console.log('🔍 getAnswerText called for:', question?.question);
   console.log('🔍 answerType:', question?.answerType);
   console.log('🔍 descriptiveAnswerGroups:', question?.descriptiveAnswerGroups);
+  console.log('🔍 descriptiveAnswerGroups type:', typeof question?.descriptiveAnswerGroups);
+  console.log('🔍 descriptiveAnswer:', question?.descriptiveAnswer);
+  console.log('🔍 Full question object keys:', question ? Object.keys(question) : 'N/A');
 
   if (!question) return '問題データがありません';
 

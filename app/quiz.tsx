@@ -122,7 +122,7 @@ export default function QuizScreen() {
   const [autoPlayMode, setAutoPlayMode] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
-  const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
+  const autoPlayInterval = 3; // 固定3秒
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const [quizCompleted, setQuizCompleted] = useState(false);
@@ -1273,26 +1273,6 @@ export default function QuizScreen() {
             </View>
             {autoPlayMode && (
               <View>
-                <Text style={[{ fontSize: 13, color: colors.text, marginBottom: 8 }]}>
-                  {locale === 'ja' ? `表示時間: ${autoPlayInterval}秒` : `Display time: ${autoPlayInterval}s`}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {[3, 5, 7, 10].map(sec => (
-                    <TouchableOpacity
-                      key={sec}
-                      style={[{
-                        flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-                        backgroundColor: autoPlayInterval === sec ? colors.primary : colors.background,
-                        borderWidth: 1, borderColor: autoPlayInterval === sec ? colors.primary : colors.border,
-                      }]}
-                      onPress={() => setAutoPlayInterval(sec)}
-                    >
-                      <Text style={{ color: autoPlayInterval === sec ? '#000' : colors.text, fontWeight: '600' }}>
-                        {sec}{locale === 'ja' ? '秒' : 's'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
                 {/* 🔊 音声読み上げトグル */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                   <Text style={[{ fontSize: 13, color: colors.text }]}>
