@@ -20,6 +20,7 @@ const corsOptions = {
     'http://localhost:3004',
     'http://localhost:3005',
     'http://localhost:3006',
+    'http://localhost:3007',
     'https://an-q.vercel.app',
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -32,6 +33,18 @@ app.use(express.json());
 // ルートルート（テスト用）
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Voice server is running' });
+});
+
+// ピングエンドポイント（デバッグ用）
+app.get('/ping', (req, res) => {
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    env: {
+      VOICEVOX_URL: process.env.VOICEVOX_URL || 'not set',
+      PORT: process.env.PORT || 'not set',
+    }
+  });
 });
 
 // ヘルスチェック
