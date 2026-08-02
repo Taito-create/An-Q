@@ -70,19 +70,29 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
  * @returns 回答テキスト（○/✕、正解選択肢、記述回答など）
  */
 export const getAnswerText = (question: Question): string => {
+  console.log('🔍 getAnswerText called for:', question?.question);
+  console.log('🔍 answerType:', question?.answerType);
+  console.log('🔍 descriptiveAnswerGroups:', question?.descriptiveAnswerGroups);
+
   if (!question) return '問題データがありません';
 
   try {
+    // Descriptive questions
     if (question.answerType === 'descriptive') {
-      // Priority 1: descriptiveAnswerGroups (new format)
+      // Priority 1: descriptiveAnswerGroups
       if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
         const groups = question.descriptiveAnswerGroups
           .filter(group => group && group.length > 0)
-          .map(group => group.filter(a => a && a.trim()).join(' / '))
-          .filter(text => text.length > 0);
+          .map(group => {
+            const clean = group.filter(a => a && a.trim());
+            return clean.length > 0 ? clean.join(' / ') : null;
+          })
+          .filter(text => text !== null);
 
         if (groups.length > 0) {
-          return groups.join(' | ');
+          const result = groups.join(' | ');
+          console.log('✅ getAnswerText result (groups):', result);
+          return result;
         }
       }
 
@@ -91,20 +101,24 @@ export const getAnswerText = (question: Question): string => {
         if (Array.isArray(question.descriptiveAnswer)) {
           const answers = question.descriptiveAnswer.filter(a => a && a.trim());
           if (answers.length > 0) {
-            return answers.join(' / ');
+            const result = answers.join(' / ');
+            console.log('✅ getAnswerText result (array):', result);
+            return result;
           }
         } else if (typeof question.descriptiveAnswer === 'string') {
+          console.log('✅ getAnswerText result (string):', question.descriptiveAnswer);
           return question.descriptiveAnswer;
         }
       }
 
+      console.warn('⚠️ No answer found for descriptive question');
       return '回答が設定されていません';
     }
-    
+
     if (question.answerType === 'truefalse') {
       return question.trueFalseAnswer ? '○ (正しい)' : '× (間違い)';
     }
-    
+
     if (question.answerType === 'multiple') {
       if (question.multipleChoice?.options) {
         const options = question.multipleChoice.options;
@@ -116,7 +130,7 @@ export const getAnswerText = (question: Question): string => {
       }
       return '正解が設定されていません';
     }
-    
+
     return '回答形式が不明です';
   } catch (e) {
     console.error('getAnswerText error:', e, question);
