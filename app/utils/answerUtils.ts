@@ -65,6 +65,33 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
 };
 
 /**
+ * descriptiveAnswerGroups が JSON 文字列の場合はパースする
+ */
+const parseAnswerGroups = (question: Question): string[][] | null => {
+  const raw = question?.descriptiveAnswerGroups;
+  if (!raw) return null;
+
+  try {
+    // 既に配列の場合
+    if (Array.isArray(raw)) {
+      return raw as string[][];
+    }
+
+    // JSON 文字列の場合
+    if (typeof raw === 'string') {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        console.log('🔍 descriptiveAnswerGroups parsed from JSON string');
+        return parsed as string[][];
+      }
+    }
+  } catch (e) {
+    console.error('⚠️ Failed to parse descriptiveAnswerGroups:', e);
+  }
+  return null;
+};
+
+/**
  * 問題オブジェクトから回答テキストを取得する
  * @param question 問題オブジェクト
  * @returns 回答テキスト（○/✕、正解選択肢、記述回答など）
@@ -82,9 +109,10 @@ export const getAnswerText = (question: Question): string => {
   try {
     // Descriptive questions
     if (question.answerType === 'descriptive') {
-      // Priority 1: descriptiveAnswerGroups
-      if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
-        const groups = question.descriptiveAnswerGroups
+      // Priority 1: descriptiveAnswerGroups (parse JSON string if needed)
+      const parsedGroups = parseAnswerGroups(question);
+      if (parsedGroups) {
+        const groups = parsedGroups
           .filter(group => group && group.length > 0)
           .map(group => {
             const clean = group.filter(a => a && a.trim());
@@ -203,10 +231,11 @@ export const getAnswerGroups = (question: Question): string[][] => {
   if (!question) return [['']];
   
   try {
-    // Priority 1: descriptiveAnswerGroups (new format)
-    if (question.descriptiveAnswerGroups && Array.isArray(question.descriptiveAnswerGroups)) {
+    // Priority 1: descriptiveAnswerGroups (new format, parse JSON string if needed)
+    const parsedGroups = parseAnswerGroups(question);
+    if (parsedGroups) {
       // Ensure all elements are arrays
-      const groups = question.descriptiveAnswerGroups.map(group => 
+      const groups = parsedGroups.map(group => 
         Array.isArray(group) ? group : [String(group)]
       );
       // Filter out empty groups
