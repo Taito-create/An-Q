@@ -21,6 +21,8 @@ const corsOptions = {
     'http://localhost:3005',
     'http://localhost:3006',
     'http://localhost:3007',
+    'http://localhost:3008',
+    'http://localhost:3009',
     'https://an-q.vercel.app',
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
