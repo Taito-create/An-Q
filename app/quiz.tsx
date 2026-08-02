@@ -125,6 +125,7 @@ export default function QuizScreen() {
   const [autoPlayInterval, setAutoPlayInterval] = useState(5); // 秒
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
+  const [quizCompleted, setQuizCompleted] = useState(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
   const autoPlayRemainingRef = useRef<number>(5);
@@ -347,12 +348,23 @@ export default function QuizScreen() {
         // 次の問題へ
         const nextIdx = idx + 1;
         if (nextIdx >= shuffledQuestions.length) {
-          // 全問完了 → ループ（自動再生モード）
-          console.log('[AutoPlay] All questions completed, looping');
-          currentIndexRef.current = 0;
-          setCurrentIndex(0);
+          // 全問完了 → 完了画面を表示
+          console.log('[AutoPlay] All questions completed');
+          setQuizCompleted(true);
+          
+          // 10秒後に自動で再開
+          await wait(10000);
           if (!isActive()) return;
-          await playQuestion(0);
+          
+          // まだ完了画面が表示されている場合（ユーザーがボタンを押していない場合）
+          if (quizCompleted) {
+            console.log('[AutoPlay] Auto-restarting after 10 seconds');
+            setQuizCompleted(false);
+            currentIndexRef.current = 0;
+            setCurrentIndex(0);
+            if (!isActive()) return;
+            await playQuestion(0);
+          }
         } else {
           currentIndexRef.current = nextIdx;
           setCurrentIndex(nextIdx);
