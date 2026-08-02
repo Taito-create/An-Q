@@ -65,6 +65,28 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
 };
 
 /**
+ * Firestoreから取得した問題データをアプリケーション用に正規化する
+ * - descriptiveAnswerGroups が JSON 文字列の場合に配列にパースする
+ */
+export const normalizeQuestionFromFirestore = (q: any): Question => {
+  if (!q) return q;
+
+  // descriptiveAnswerGroups が JSON 文字列の場合にパース
+  if (q.descriptiveAnswerGroups && typeof q.descriptiveAnswerGroups === 'string') {
+    try {
+      const parsed = JSON.parse(q.descriptiveAnswerGroups);
+      if (Array.isArray(parsed)) {
+        return { ...q, descriptiveAnswerGroups: parsed };
+      }
+    } catch (e) {
+      console.error('normalizeQuestionFromFirestore parse failed:', e, q.id);
+      return { ...q, descriptiveAnswerGroups: undefined };
+    }
+  }
+  return q;
+};
+
+/**
  * descriptiveAnswerGroups が JSON 文字列の場合はパースする
  */
 const parseAnswerGroups = (question: Question): string[][] | null => {

@@ -18,6 +18,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { Question, Folder } from '../types/question';
 import { Alert } from 'react-native';
 import { safeParseArray, loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from '../utils/storageUtils';
+import { normalizeQuestionFromFirestore } from '../utils/answerUtils';
 
 // Contextの型定義
 interface QuestionsContextType {
@@ -72,17 +73,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const data = docSnap.data();
         let questions = data.questions || [];
         
-        // Deserialize descriptiveAnswerGroups from JSON string to string[][]
-        questions = questions.map((q: any) => {
-          if (q.descriptiveAnswerGroups && typeof q.descriptiveAnswerGroups === 'string') {
-            try {
-              q.descriptiveAnswerGroups = JSON.parse(q.descriptiveAnswerGroups);
-            } catch (e) {
-              console.error('Failed to parse descriptiveAnswerGroups:', e);
-            }
-          }
-          return q;
-        });
+        // Normalize questions from Firestore (parse descriptiveAnswerGroups from JSON string)
+        questions = questions.map(normalizeQuestionFromFirestore);
         
         // Load tags from Firestore and sync to local
         const firestoreTags = data.tags || [];
@@ -574,7 +566,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     await runTransaction(db, async (transaction) => {
       const docSnap = await transaction.get(docRef);
-      const freshQuestions: Question[] = docSnap.exists() ? (docSnap.data().questions || []) : [];
+      const freshQuestions: Question[] = (docSnap.exists() ? (docSnap.data().questions || []) : [])
+        .map(normalizeQuestionFromFirestore);
       updated = mutate(freshQuestions);
 
       // Reuse the exact same sanitization logic as
