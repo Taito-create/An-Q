@@ -504,6 +504,10 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             opacity: Number(ann.opacity || 1)
           }));
         }
+        // ✅ sharedWith を保持（ACL共有用）
+        if (q.sharedWith !== undefined) {
+          sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
+        }
         
         return sanitized;
       });
@@ -640,6 +644,10 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             opacity: Number(ann.opacity || 1)
           }));
         }
+        // ✅ sharedWith を保持（ACL共有用）
+        if (q.sharedWith !== undefined) {
+          sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
+        }
         return sanitized;
       });
 
@@ -696,7 +704,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id: f.id,
         name: f.name,
         questionIds: f.questionIds || [],
-        parentId: f.parentId === undefined ? null : f.parentId
+        parentId: f.parentId === undefined ? null : f.parentId,
+        // ✅ sharedWith を保持（ACL共有用）
+        sharedWith: Array.isArray(f.sharedWith) ? f.sharedWith : []
       }));
       
       const dataToSave = {
@@ -807,7 +817,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id: f.id,
         name: f.name,
         questionIds: f.questionIds || [],
-        parentId: f.parentId === undefined ? null : f.parentId
+        parentId: f.parentId === undefined ? null : f.parentId,
+        // ✅ sharedWith を保持（ACL共有用）
+        sharedWith: Array.isArray(f.sharedWith) ? f.sharedWith : []
       }));
 
       transaction.set(docRef, { folders: sanitizedFolders, updatedAt: serverTimestamp() }, { merge: true });

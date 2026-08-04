@@ -38,6 +38,7 @@ export interface Question {
   // 外側の配列＝空欄の数（AND条件）、内側の配列＝その空欄で
   // 許容する言い換え（OR条件）
   reading?: string;  // 読み仮名（任意）例: "もり おうがい"
+  sharedWith?: string[]; // データ共有を許可するユーザーUIDの配列
 }
 
 export interface Folder {
@@ -49,4 +50,5 @@ export interface Folder {
   isShared?: boolean;
   sharedMark?: string;
   parentId?: string;
+  sharedWith?: string[]; // データ共有を許可するユーザーUIDの配列
 }
