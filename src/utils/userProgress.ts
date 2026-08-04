@@ -280,18 +280,77 @@ async function updateProgressDocument(
 ): Promise<ProgressRewardResult> {
   const ref = doc(db, 'users', userId);
 
-  const result = await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(ref);
-    const current = normalizeDocument(snapshot.exists() ? snapshot.data() : {});
-    const mutated = normalizeDocument(mutator(current));
-    const finalResult = applyLevelUps(mutated);
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = normalizeDocument(snapshot.exists() ? snapshot.data() : {});
+      const mutated = normalizeDocument(mutator(current));
+      const finalResult = applyLevelUps(mutated);
 
-    transaction.set(ref, finalResult.document, { merge: true });
-    return finalResult;
-  });
+      transaction.set(ref, finalResult.document, { merge: true });
+      return finalResult;
+    });
 
-  await syncLocalStorage(result.document);
-  return result;
+    await syncLocalStorage(result.document);
+    return result;
+  } catch (error: any) {
+    console.error('❌ updateProgressDocument failed:', error);
+    console.error('Error code:', error.code);
+
+    // permission-denied エラー時はローカルデータで処理
+    if (error.code === 'permission-denied') {
+      console.warn('⚠️ Firestore permission denied, using local data');
+      const localData = await readLocalProgress();
+      const current = normalizeDocument(localData);
+      const mutated = normalizeDocument(mutator(current));
+      const finalResult = applyLevelUps(mutated);
+      await syncLocalStorage(finalResult.document);
+      return finalResult;
+    }
+
+    throw error;
+  }
+}
+
+async function readLocalProgress(): Promise<Partial<UserProgressDocument> & Record<string, any>> {
+  try {
+    const [
+      username, bio, profileImage, currentTitle, unlockedTitles,
+      level, xp, coins, books, streak, lastStudyDate, joinDate, lastLoginDate
+    ] = await AsyncStorage.multiGet([
+      STORAGE_KEYS.username,
+      STORAGE_KEYS.bio,
+      STORAGE_KEYS.profileImage,
+      STORAGE_KEYS.currentTitle,
+      STORAGE_KEYS.unlockedTitles,
+      STORAGE_KEYS.level,
+      STORAGE_KEYS.xp,
+      STORAGE_KEYS.coins,
+      STORAGE_KEYS.books,
+      STORAGE_KEYS.streak,
+      STORAGE_KEYS.lastStudyDate,
+      STORAGE_KEYS.joinDate,
+      STORAGE_KEYS.lastLoginDate,
+    ]);
+
+    return {
+      username: username?.[1] || undefined,
+      bio: bio?.[1] || undefined,
+      profileImage: profileImage?.[1] || null,
+      currentTitle: currentTitle?.[1] || undefined,
+      unlockedTitles: unlockedTitles?.[1] ? JSON.parse(unlockedTitles[1]) : undefined,
+      level: level?.[1] ? Number(level[1]) : undefined,
+      currentXP: xp?.[1] ? Number(xp[1]) : undefined,
+      totalCoins: coins?.[1] ? Number(coins[1]) : undefined,
+      totalBooks: books?.[1] ? Number(books[1]) : undefined,
+      streakDays: streak?.[1] ? Number(streak[1]) : undefined,
+      joinDate: joinDate?.[1] ? Number(joinDate[1]) : undefined,
+      lastLoginDate: lastLoginDate?.[1] ? Number(lastLoginDate[1]) : undefined,
+    };
+  } catch (e) {
+    console.error('Failed to read local progress:', e);
+    return {};
+  }
 }
 
 export function buildInitialUserProfile(username: string, profileImage: string | null, now = Date.now()) {
@@ -333,11 +392,25 @@ export async function unlockTitle(userId: string, titleId: string) {
 
 export function subscribeUserProgress(userId: string, onChange: (document: UserProgressDocument) => void): Unsubscribe {
   const ref = doc(db, 'users', userId);
-  return onSnapshot(ref, (snapshot) => {
-    if (snapshot.exists()) {
-      onChange(normalizeDocument(snapshot.data()));
+  return onSnapshot(
+    ref,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        onChange(normalizeDocument(snapshot.data()));
+      }
+    },
+    (error: any) => {
+      console.error('❌ subscribeUserProgress error:', error);
+      console.error('Error code:', error.code);
+      // permission-denied エラー時はローカルデータで初期化
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied, using local data');
+        readLocalProgress().then((localData) => {
+          onChange(normalizeDocument(localData));
+        });
+      }
     }
-  });
+  );
 }
 
 export function normalizeUserProfileDocument(data: Partial<UserProgressDocument> & Record<string, any>) {
@@ -345,10 +418,24 @@ export function normalizeUserProfileDocument(data: Partial<UserProgressDocument>
 }
 
 export async function readUserProfileDocument(userId: string) {
-  const { getDoc } = await import('firebase/firestore');
-  const snapshot = await getDoc(doc(db, 'users', userId));
-  if (!snapshot.exists()) return null;
-  return normalizeDocument(snapshot.data());
+  try {
+    const { getDoc } = await import('firebase/firestore');
+    const snapshot = await getDoc(doc(db, 'users', userId));
+    if (!snapshot.exists()) return null;
+    return normalizeDocument(snapshot.data());
+  } catch (error: any) {
+    console.error('❌ readUserProfileDocument failed:', error);
+    console.error('Error code:', error.code);
+
+    // permission-denied エラー時はローカルデータで初期化
+    if (error.code === 'permission-denied') {
+      console.warn('⚠️ Firestore permission denied, using local data');
+      const localData = await readLocalProgress();
+      return normalizeDocument(localData);
+    }
+
+    throw error;
+  }
 }
 
 export async function syncLoginStreak(userId: string, now = Date.now()) {
