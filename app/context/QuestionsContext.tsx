@@ -101,10 +101,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error message:', error.message);
       
       if (error.code === 'permission-denied') {
-        Alert.alert(
-          '権限エラー',
-          '問題データの読み込み権限がありません。Firestoreのセキュリティルールを確認してください。'
-        );
+        console.warn('⚠️ Firestore permission denied for questions, falling back to local data');
+        return [];
       }
       
       throw error;
@@ -139,10 +137,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error message:', error.message);
       
       if (error.code === 'permission-denied') {
-        Alert.alert(
-          '権限エラー',
-          'フォルダデータの読み込み権限がありません。Firestoreのセキュリティルールを確認してください。'
-        );
+        console.warn('⚠️ Firestore permission denied for folders, falling back to local data');
+        return [];
       }
       
       return [];
@@ -401,7 +397,26 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log('✅ loadQuestions complete - state updates queued');
     } catch (e) {
       console.error('❌ Failed to load questions:', e);
-      Alert.alert('エラー', 'データの読み込みに失敗しました。');
+      
+      // エラー時はローカルデータにフォールバック
+      try {
+        console.log('🔄 Falling back to local data...');
+        const localQuestionsData = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
+        const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
+        
+        const localQuestions: Question[] = safeParseArray(localQuestionsData, []);
+        const filteredLocal = localQuestions.filter((q: any) => q.answerType);
+        const localFolders: Folder[] = safeParseArray(localFoldersData, []);
+        
+        console.log('📦 Local questions (fallback):', filteredLocal.length);
+        console.log('📦 Local folders (fallback):', localFolders.length);
+        
+        setQuestions(filteredLocal);
+        setFolders(localFolders);
+      } catch (localError) {
+        console.error('❌ Failed to load local data:', localError);
+        Alert.alert('エラー', 'データの読み込みに失敗しました。');
+      }
     }
   }, [user, loadQuestionsFromFirestore, loadFoldersFromFirestore, migrateLocalQuestionsToFirestore, migrateLocalFoldersToFirestore]);
 
@@ -564,6 +579,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const docRef = doc(db, 'userQuestions', user.uid);
     let updated: Question[] = [];
 
+    try {
     await runTransaction(db, async (transaction) => {
       const docSnap = await transaction.get(docRef);
       const freshQuestions: Question[] = (docSnap.exists() ? (docSnap.data().questions || []) : [])
@@ -632,6 +648,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       transaction.set(docRef, { questions: sanitizedQuestions, updatedAt: serverTimestamp() }, { merge: true });
     });
+    } catch (error: any) {
+      console.error('❌ applyQuestionsChange failed:', error);
+      console.error('Error code:', error.code);
+      
+      // permission-denied エラー時はローカルにフォールバック
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied, using local data');
+        const current = questions;
+        updated = mutate(current);
+      } else {
+        throw error;
+      }
+    }
 
     // Update local state and local backup to match what was actually
     // written (the fresh-read result, not the stale pre-transaction state)
@@ -766,6 +795,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const docRef = doc(db, 'userQuestions', user.uid);
     let updated: Folder[] = [];
 
+    try {
     await runTransaction(db, async (transaction) => {
       const docSnap = await transaction.get(docRef);
       const freshFolders: Folder[] = docSnap.exists() ? (docSnap.data().folders || []) : [];
@@ -782,6 +812,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       transaction.set(docRef, { folders: sanitizedFolders, updatedAt: serverTimestamp() }, { merge: true });
     });
+    } catch (error: any) {
+      console.error('❌ applyFoldersChange failed:', error);
+      console.error('Error code:', error.code);
+      
+      // permission-denied エラー時はローカルにフォールバック
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied, using local data');
+        const current = folders;
+        updated = mutate(current);
+      } else {
+        throw error;
+      }
+    }
 
     // Update local state and local backup to match what was actually
     // written (the fresh-read result, not the stale pre-transaction state)
