@@ -24,6 +24,7 @@ export default function BrowseQuestionsScreen() {
     folders, 
     deleteQuestion, 
     updateQuestion, 
+    updateFolder,
     addTagToQuestions,
     removeTagFromAllQuestions,
     createFolder,
@@ -118,6 +119,12 @@ export default function BrowseQuestionsScreen() {
   // 問題編集用 state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuestionFull, setEditingQuestionFull] = useState<Question | null>(null);
+
+  // 共有用 state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareTarget, setShareTarget] = useState<Question | Folder | null>(null);
+  const [shareEmail, setShareEmail] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
   const [editQuestionText, setEditQuestionText] = useState('');
   const [editAnswerGroups, setEditAnswerGroups] = useState<string[][]>([['']]);
   const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
@@ -308,6 +315,53 @@ export default function BrowseQuestionsScreen() {
     }
     SoundManager.play('complete');
     Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました' : 'Tags updated');
+  };
+
+  const openShareModal = (item: Question | Folder) => {
+    setShareTarget(item);
+    setShareEmail('');
+    setShowShareModal(true);
+  };
+
+  const handleShare = async () => {
+    if (!shareTarget || !shareEmail.trim()) return;
+
+    setIsSharing(true);
+    try {
+      const targetUid = shareEmail.trim();
+
+      if ('question' in shareTarget) {
+        // Question の場合
+        const updatedQuestion = {
+          ...shareTarget,
+          sharedWith: [...new Set([...(shareTarget.sharedWith || []), targetUid])]
+        };
+        await updateQuestion(updatedQuestion);
+      } else {
+        // Folder の場合
+        const updatedFolder = {
+          ...shareTarget,
+          sharedWith: [...new Set([...(shareTarget.sharedWith || []), targetUid])]
+        };
+        await updateFolder(updatedFolder);
+      }
+
+      Alert.alert(
+        locale === 'ja' ? '成功' : 'Success',
+        locale === 'ja' ? '共有しました！' : 'Shared successfully!'
+      );
+      setShowShareModal(false);
+      setShareEmail('');
+      setShareTarget(null);
+    } catch (error) {
+      console.error('Share error:', error);
+      Alert.alert(
+        locale === 'ja' ? 'エラー' : 'Error',
+        locale === 'ja' ? '共有に失敗しました' : 'Failed to share'
+      );
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const startEditQuestion = (question: Question) => {
@@ -742,6 +796,7 @@ export default function BrowseQuestionsScreen() {
                         <Text style={[styles.speakBtnText, { color: colors.primary }]}>🔊 読み上げ</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => startEditQuestion(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => openShareModal(item)}><Text style={[styles.shareBtnText, { color: colors.primary }]}>🔗 共有</Text></TouchableOpacity>
                       <TouchableOpacity onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
                         <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
                       </TouchableOpacity>
@@ -1522,6 +1577,54 @@ export default function BrowseQuestionsScreen() {
         </View>
       </Modal>
 
+      {/* 共有モーダル */}
+      <Modal visible={showShareModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              🔗 {locale === 'ja' ? '共有' : 'Share'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
+              {locale === 'ja'
+                ? '共有する相手のユーザーIDを入力してください'
+                : 'Enter the UID of the user to share with'}
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
+              placeholder={locale === 'ja' ? 'ユーザーID' : 'User ID'}
+              placeholderTextColor={colors.textSecondary}
+              value={shareEmail}
+              onChangeText={setShareEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowShareModal(false);
+                  setShareTarget(null);
+                  setShareEmail('');
+                }}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleShare}
+                disabled={isSharing || !shareEmail.trim()}
+              >
+                <Text style={styles.modalSaveText}>
+                  {isSharing ? '⏳' : `📤 ${locale === 'ja' ? '共有' : 'Share'}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 除外確認モーダル */}
       <Modal visible={showRemoveConfirmModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -1730,6 +1833,10 @@ const styles = StyleSheet.create({
   tagButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   tagButtonText: { fontSize: 13, fontWeight: 'bold' },
   speakBtnText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  shareBtnText: {
     fontWeight: 'bold',
     fontSize: 13,
   },
