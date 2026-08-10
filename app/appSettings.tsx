@@ -18,6 +18,7 @@ import {
   logAvailableVoices,
   initSpeechVoices,
 } from './utils/speechUtils';
+import { Settings, Mic, Volume2 } from 'lucide-react';
 
 const APP_VERSION = '1.0.0';
 
@@ -48,7 +49,7 @@ export default function AppSettingsScreen() {
   }, []);
 
   const toggleServerVoice = async (value: boolean) => {
-    console.log('🎤 Toggling server voice to:', value);
+    console.log(' Toggling server voice to:', value);
     setUseServerVoice(value);
     await AsyncStorage.setItem(STORAGE_KEYS.USE_SERVER_VOICE, String(value));
     SoundManager.play('decide');
@@ -98,7 +99,7 @@ export default function AppSettingsScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
-          ⚙️ {t.appSettings}
+          <Settings size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.appSettings}
         </Text>
         <TouchableOpacity
           style={{
@@ -180,7 +181,7 @@ export default function AppSettingsScreen() {
             }
           />
           <Row
-            label={locale === 'ja' ? '🎙️ ゆっくりボイス（サーバー）を使う' : '🎙️ Use Voice Server'}
+            label={locale === 'ja' ? 'ゆっくりボイス（サーバー）を使う' : 'Use Voice Server'}
             right={
               <Switch
                 value={useServerVoice}
@@ -234,7 +235,7 @@ export default function AppSettingsScreen() {
                     onPress={() => handleVoicePreview(preset)}
                   >
                     <Text style={[styles.previewBtnText, { color: colors.primary }]}>
-                      🔊 {t.voicePreview}
+                      <Volume2 size={14} color={colors.primary} style={{ marginRight: 4 }} />{t.voicePreview}
                     </Text>
                   </TouchableOpacity>
                 </View>

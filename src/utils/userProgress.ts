@@ -89,7 +89,7 @@ const STORAGE_KEYS = {
 export const TITLE_LIBRARY: TitleDefinition[] = [
   {
     id: 'apprentice',
-    icon: '👑',
+    icon: '',
     titleJa: '見習い暗記人',
     titleEn: 'Apprentice Mnemonic',
     descriptionJa: '最初に装備される基本称号です',
@@ -98,7 +98,7 @@ export const TITLE_LIBRARY: TitleDefinition[] = [
   },
   {
     id: 'memory-monk',
-    icon: '📿',
+    icon: '',
     titleJa: '暗記行者',
     titleEn: 'Memory Monk',
     descriptionJa: '覚えることを修行に変える者',
@@ -107,7 +107,7 @@ export const TITLE_LIBRARY: TitleDefinition[] = [
   },
   {
     id: 'warm-old-new',
-    icon: '📚',
+    icon: '',
     titleJa: '温故知新',
     titleEn: 'Warm Old, New Know',
     descriptionJa: '古きを温ねて新しきを知る称号',
@@ -116,7 +116,7 @@ export const TITLE_LIBRARY: TitleDefinition[] = [
   },
   {
     id: 'time-is-money',
-    icon: '⏳',
+    icon: '',
     titleJa: '時は金なり',
     titleEn: 'Time is Money',
     descriptionJa: '時間を制する学び手の称号',
@@ -125,7 +125,7 @@ export const TITLE_LIBRARY: TitleDefinition[] = [
   },
   {
     id: 'sage-of-study',
-    icon: '🧠',
+    icon: '',
     titleJa: '学びの仙人',
     titleEn: 'Sage of Study',
     descriptionJa: '知識を蓄え続ける賢者',
@@ -134,7 +134,7 @@ export const TITLE_LIBRARY: TitleDefinition[] = [
   },
   {
     id: 'unbroken-will',
-    icon: '🔥',
+    icon: '',
     titleJa: '不撓不屈',
     titleEn: 'Unbroken Will',
     descriptionJa: '何度でも立ち上がる不屈の称号',
@@ -278,7 +278,7 @@ async function updateProgressDocument(
   userId: string,
   mutator: (current: UserProgressDocument) => UserProgressDocument
 ): Promise<ProgressRewardResult> {
-  const ref = doc(db, 'users', userId);
+  const ref = doc(db, 'userProgress', userId);
 
   try {
     const result = await runTransaction(db, async (transaction) => {
@@ -294,12 +294,12 @@ async function updateProgressDocument(
     await syncLocalStorage(result.document);
     return result;
   } catch (error: any) {
-    console.error('❌ updateProgressDocument failed:', error);
+    console.error(' updateProgressDocument failed:', error);
     console.error('Error code:', error.code);
 
     // permission-denied エラー時はローカルデータで処理
     if (error.code === 'permission-denied') {
-      console.warn('⚠️ Firestore permission denied, using local data');
+      console.warn(' Firestore permission denied, using local data');
       const localData = await readLocalProgress();
       const current = normalizeDocument(localData);
       const mutated = normalizeDocument(mutator(current));
@@ -391,7 +391,7 @@ export async function unlockTitle(userId: string, titleId: string) {
 }
 
 export function subscribeUserProgress(userId: string, onChange: (document: UserProgressDocument) => void): Unsubscribe {
-  const ref = doc(db, 'users', userId);
+  const ref = doc(db, 'userProgress', userId);
   return onSnapshot(
     ref,
     (snapshot) => {
@@ -400,11 +400,11 @@ export function subscribeUserProgress(userId: string, onChange: (document: UserP
       }
     },
     (error: any) => {
-      console.error('❌ subscribeUserProgress error:', error);
+      console.error(' subscribeUserProgress error:', error);
       console.error('Error code:', error.code);
       // permission-denied エラー時はローカルデータで初期化
       if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied, using local data');
+        console.warn(' Firestore permission denied, using local data');
         readLocalProgress().then((localData) => {
           onChange(normalizeDocument(localData));
         });
@@ -420,16 +420,16 @@ export function normalizeUserProfileDocument(data: Partial<UserProgressDocument>
 export async function readUserProfileDocument(userId: string) {
   try {
     const { getDoc } = await import('firebase/firestore');
-    const snapshot = await getDoc(doc(db, 'users', userId));
+    const snapshot = await getDoc(doc(db, 'userProgress', userId));
     if (!snapshot.exists()) return null;
     return normalizeDocument(snapshot.data());
   } catch (error: any) {
-    console.error('❌ readUserProfileDocument failed:', error);
+    console.error(' readUserProfileDocument failed:', error);
     console.error('Error code:', error.code);
 
     // permission-denied エラー時はローカルデータで初期化
     if (error.code === 'permission-denied') {
-      console.warn('⚠️ Firestore permission denied, using local data');
+      console.warn(' Firestore permission denied, using local data');
       const localData = await readLocalProgress();
       return normalizeDocument(localData);
     }

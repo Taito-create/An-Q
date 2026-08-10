@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
 
 /**
  * Debug component for diagnosing GitHub Pages routing issues.
@@ -40,7 +41,7 @@ export function DebugRouter() {
       };
 
       setDebugInfo(info);
-      console.log('🔍 Debug Router Info:', info);
+      console.log(' Debug Router Info:', info);
     };
 
     // Initial log
@@ -48,7 +49,7 @@ export function DebugRouter() {
 
     // Update on URL changes
     const handlePopState = () => {
-      console.log('🔍 URL changed via popstate');
+      console.log(' URL changed via popstate');
       updateDebugInfo();
     };
 
@@ -69,9 +70,9 @@ export function DebugRouter() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>🔍 Router Debug</Text>
+        <Text style={styles.title}> Router Debug</Text>
         <TouchableOpacity onPress={() => setIsVisible(false)}>
-          <Text style={styles.closeButton}>✕</Text>
+          <X size={20} color="#888" />
         </TouchableOpacity>
       </View>
       

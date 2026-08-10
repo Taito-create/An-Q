@@ -38,7 +38,7 @@ if (!html.includes('serviceWorker')) {
   );
 }
 fs.writeFileSync(indexPath, html, 'utf8');
-console.log('✅ Paths fixed in dist/index.html');
+console.log(' Paths fixed in dist/index.html');
 
 // manifest.json の start_url / scope / icon パスを修正
 const manifestPath = path.join(__dirname, 'dist', 'manifest.json');
@@ -57,7 +57,7 @@ if (fs.existsSync(manifestPath)) {
     }));
   }
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-  console.log('✅ manifest.json start_url/scope/icons fixed');
+  console.log(' manifest.json start_url/scope/icons fixed');
 }
 
 // sw.js を正しい内容で上書き（キャッシュ名を上げて古いキャッシュを強制削除）
@@ -117,7 +117,7 @@ self.addEventListener('fetch', event => {
 });
 `;
 fs.writeFileSync(swPath, swContent, 'utf8');
-console.log('✅ sw.js rewritten with correct BASE_URL and cache busting');
+console.log(' sw.js rewritten with correct BASE_URL and cache busting');
 
 // node_modules/@xxx フォルダを assets/npm/ にコピー（@を除去）
 const srcNodeModules = path.join(__dirname, 'dist', 'assets', 'node_modules');
@@ -146,7 +146,7 @@ if (fs.existsSync(srcNodeModules)) {
       path.join(dstNodeModules, cleanName)
     );
   }
-  console.log('✅ node_modules copied to assets/npm/ (@ removed)');
+  console.log(' node_modules copied to assets/npm/ (@ removed)');
 }
 
 // JS バンドルファイルのパス修正
@@ -162,9 +162,9 @@ if (fs.existsSync(jsDir)) {
       // /An-Q/assets/node_modules/@xxx → /An-Q/assets/npm/xxx
       content = content.replace(/\/An-Q\/assets\/node_modules\/@/g, `${BASE}/assets/npm/`);
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`✅ Paths fixed in ${file}`);
+      console.log(` Paths fixed in ${file}`);
     } catch (e) {
-      console.log(`⚠️ Skip JS path fix for ${file}:`, e && e.message ? e.message : e);
+      console.log(` Skip JS path fix for ${file}:`, e && e.message ? e.message : e);
     }
   });
 }
@@ -174,7 +174,7 @@ const src404Path = path.join(__dirname, '404.html');
 const dst404Path = path.join(__dirname, 'dist', '404.html');
 if (fs.existsSync(src404Path)) {
   fs.copyFileSync(src404Path, dst404Path);
-  console.log('✅ 404.html copied to dist/');
+  console.log(' 404.html copied to dist/');
 } else {
-  console.log('⚠️ 404.html not found in root directory');
+  console.log(' 404.html not found in root directory');
 }

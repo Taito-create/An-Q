@@ -22,7 +22,7 @@ export function useLocale() {
 
     loadLocale();
 
-    // ✅ AsyncStorage の変更をリアルタイムで監視（重要）
+    //  AsyncStorage の変更をリアルタイムで監視（重要）
     const checkLocaleChange = setInterval(async () => {
       try {
         const saved = await AsyncStorage.getItem('user_language');

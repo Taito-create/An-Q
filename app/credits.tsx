@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
+import { Music, Link } from 'lucide-react';
 
 // 利用楽曲・効果音のクレジット情報
 const CREDITS = {
@@ -79,14 +80,14 @@ export default function CreditsScreen() {
       {items.map((item, i) => (
         <View key={i} style={[styles.item, { borderBottomColor: colors.border }]}>
           <Text style={[styles.itemTitle, { color: colors.text }]}>
-            🎵 {ja ? item.title : item.titleEn}
+            <Music size={16} color={colors.primary} style={{ marginRight: 6 }} />{ja ? item.title : item.titleEn}
           </Text>
           <Text style={[styles.itemComposer, { color: colors.textSecondary }]}>
             {ja ? '作曲者・提供元' : 'Composer / Source'}: {item.composer}
           </Text>
           <TouchableOpacity onPress={() => openURL(item.url)}>
             <Text style={[styles.itemLink, { color: colors.primary }]}>
-              🔗 {item.site}
+              <Link size={14} color={colors.primary} style={{ marginRight: 4 }} />{item.site}
             </Text>
           </TouchableOpacity>
           <Text style={[styles.itemLicense, { color: colors.textSecondary }]}>
@@ -101,7 +102,7 @@ export default function CreditsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {ja ? '🎼 引用BGM・効果音' : '🎼 Music & Sound Credits'}
+          {ja ? '引用BGM・効果音' : 'Music & Sound Credits'}
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}

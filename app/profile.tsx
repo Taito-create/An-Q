@@ -14,6 +14,7 @@ import { useAuth } from './auth/AuthContext';
 import ImageCropper from '../src/components/ImageCropper';
 import { equipTitle, getTitleDisplay, normalizeUserProfileDocument, resolveTitleDefinition, TITLE_LIBRARY } from '../src/utils/userProgress';
 import { safeParse, safeParseArray } from './utils/storageUtils';
+import { User, BarChart3, Flame, Camera, Trophy } from 'lucide-react';
 
 interface UserProfile {
   username: string;
@@ -72,7 +73,7 @@ export default function ProfileScreen() {
   const [editProfileImage, setEditProfileImage] = useState<string | null>(null);
   const [showTitleModal, setShowTitleModal] = useState(false);
 
-  // --- 🎥 トリミングモーダル用State群 ---
+  // ---  トリミングモーダル用State群 ---
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
 
@@ -164,9 +165,9 @@ export default function ProfileScreen() {
       totalQuestionsCreated = questions.length;
       totalQuizzesPlayed = stats?.quizPlayed || 0;
 
-      // ★ Firestoreからクラウド上の最新プロファイルを最優先で同期
+      //  Firestoreからクラウド上の最新プロファイルを最優先で同期
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userDoc = await getDoc(doc(db, 'userProgress', user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
           const mergedProfile = normalizeUserProfileDocument({
@@ -296,9 +297,9 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem('user_profile_image', editProfileImage);
       }
 
-      // 2. ★ Firestoreに保存（容量制限を受けないため確実に同期します）
+      // 2.  Firestoreに保存（容量制限を受けないため確実に同期します）
       if (user) {
-        await setDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'userProgress', user.uid), {
           username: editUsername,
           bio: editBio,
           profileImage: editProfileImage,
@@ -330,7 +331,7 @@ export default function ProfileScreen() {
 
     if (user) {
       await equipTitle(user.uid, titleId);
-      await setDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'userProgress', user.uid), {
         currentTitle: titleId,
         unlockedTitles: profile.unlockedTitles,
       }, { merge: true });
@@ -371,7 +372,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.title, { color: colors.text }]}>👤 {t.profile || 'Profile'}</Text>
+        <Text style={[styles.title, { color: colors.text }]}><User size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.profile || 'Profile'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity onPress={() => {
             if (isEditing) { saveProfile(); } else { setIsEditing(true); }
@@ -395,7 +396,7 @@ export default function ProfileScreen() {
                 SoundManager.play('decide');
 
                 if (Platform.OS === 'web') {
-                  // 🌐 Web環境（Vercel）ではブラウザ標準の確実なダイアログを使用
+                  //  Web環境（Vercel）ではブラウザ標準の確実なダイアログを使用
                   const confirmed = window.confirm(
                     locale === 'ja' ? '本当にログアウトしますか？' : 'Are you sure you want to log out?'
                   );
@@ -403,7 +404,7 @@ export default function ProfileScreen() {
                     handleLogout(); // OKが押されたら確実にログアウト関数を実行！
                   }
                 } else {
-                  // 📱 スマホ環境（iOS/Android）では既存のAlertを使用
+                  //  スマホ環境（iOS/Android）では既存のAlertを使用
                   Alert.alert(
                     locale === 'ja' ? 'ログアウト' : 'Log Out',
                     locale === 'ja' ? '本当にログアウトしますか？' : 'Are you sure you want to log out?',
@@ -434,7 +435,7 @@ export default function ProfileScreen() {
               {editProfileImage ? (
                 <Image source={{ uri: editProfileImage }} style={{ width: 120, height: 120, borderRadius: 60 }} alt="" />
               ) : (
-                <Text style={{ fontSize: 40 }}>📸</Text>
+                <Camera size={40} color={colors.primary} />
               )}
             </TouchableOpacity>
           ) : (
@@ -443,7 +444,7 @@ export default function ProfileScreen() {
                 <Image source={{ uri: profile.profileImage }} style={{ width: 120, height: 120, borderRadius: 60 }} alt="" />
               ) : (
                 <View style={{ width: 120, height: 120, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#ffffff', fontSize: 44 }}>👤</Text>
+                  <User size={44} color="#ffffff" />
                 </View>
               )}
             </View>
@@ -527,26 +528,26 @@ export default function ProfileScreen() {
 
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
           <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>✨ Qコイン</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>{locale === 'ja' ? 'コイン' : 'Coins'}</Text>
             <Text style={{ fontSize: 28, fontWeight: '700', color: colors.primary, marginTop: 4 }}>{profile.totalCoins}</Text>
           </View>
           <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>⚡ XP</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>XP</Text>
             <Text style={{ fontSize: 28, fontWeight: '700', color: colors.success || '#4CAF50', marginTop: 4 }}>{profile.currentXP}</Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>📊 {locale === 'ja' ? '統計' : 'Stats'}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}><BarChart3 size={18} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '統計' : 'Stats'}</Text>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '作成した問題' : 'Problems Created'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuestionsCreated}</Text></View>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'クイズ実施' : 'Quizzes Played'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuizzesPlayed}</Text></View>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '正答率' : 'Correct Rate'}</Text><Text style={{ color: colors.success || '#4CAF50', fontWeight: '700' }}>{profile.correctRate}%</Text></View>
-          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'ストリーク' : 'Streak'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>🔥 {profile.streakDays}</Text></View>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'ストリーク' : 'Streak'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}><Flame size={16} color={colors.primary} style={{ marginRight: 4 }} />{profile.streakDays}</Text></View>
         </View>
 
         {profile.achievements.length > 0 && (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}>🏆 {locale === 'ja' ? '称号' : 'Achievements'}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}><Trophy size={18} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '称号' : 'Achievements'}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {profile.achievements.map((achievement, i) => (
                 <View key={i} style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>

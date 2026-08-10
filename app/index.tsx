@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  ScrollView, StatusBar, Alert, Animated
+  ScrollView, StatusBar, Alert, Animated, ActivityIndicator
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,12 +13,42 @@ import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
-import { Play, Plus, Music, Settings, Globe, Palette, Share2, User } from 'lucide-react';
+import { 
+  Play, 
+  Plus, 
+  Calendar, 
+  Inbox, 
+  ClipboardList, 
+  Home, 
+  User, 
+  Settings,
+  TrendingUp,
+  Target,
+  BookOpen,
+  ChevronRight,
+  PenSquare,
+  Share2,
+  Package,
+  RefreshCw,
+  Palette,
+  Music,
+  Upload,
+  Crown,
+  Coins,
+  AlertTriangle,
+  Lightbulb,
+  GraduationCap,
+  Timer,
+  BarChart3,
+  CheckCircle2,
+  Square
+} from 'lucide-react';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { safeParse, safeParseArray } from './utils/storageUtils';
+import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission } from './missions';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -160,10 +190,13 @@ const HomeScreen = () => {
   const [displayTimer, setDisplayTimer] = useState<string | null>(null);
   const [todayQuestion, setTodayQuestion] = useState<any | null>(null);
   const [weakQuestionCount, setWeakQuestionCount] = useState(0);
+  const [dailyQuests, setDailyQuests] = useState<Mission[]>([]);
+  const [questProgress, setQuestProgress] = useState<{ current: number; completed: boolean }[]>([]);
   const [motivationalMessage, setMotivationalMessage] = useState('');
   const [examDates, setExamDates] = useState<any[]>([]);
   const [examCountdown, setExamCountdown] = useState<{daysLeft: number, examName: string} | null>(null);
   const [quickReviewQuestions, setQuickReviewQuestions] = useState<any[]>([]);
+  const [examProgress, setExamProgress] = useState(0);
 
   // questionsFromHookが更新されたら問題数を反映
   useEffect(() => {
@@ -268,28 +301,49 @@ const HomeScreen = () => {
 
   const loadExamCountdown = async () => {
     try {
-      const examDatesRaw = await AsyncStorage.getItem('EXAM_DATES');
-      if (!examDatesRaw) return;
+      // 1. Load from calendar_events (same as calendar screen)
+      const eventsRaw = await AsyncStorage.getItem('calendar_events');
+      if (!eventsRaw) {
+        setExamCountdown(null);
+        return;
+      }
+
+      const events = safeParseArray<{ date: string; name: string }>(eventsRaw, []);
       
-      const examDates = safeParseArray<{ date: string; name: string }>(examDatesRaw, []);
+      // 2. Extract exam events (events with name containing "試験")
+      const examEvents = events.filter((event: any) => 
+        event.name && event.name.includes('試験')
+      );
+
+      if (examEvents.length === 0) {
+        setExamCountdown(null);
+        return;
+      }
+
+      // 3. Get today and find the nearest upcoming exam
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      let nextExam = null;
-      for (const exam of examDates) {
+
+      let nearestExam = null;
+      for (const exam of examEvents) {
         const examDate = new Date(exam.date);
-        if (examDate >= today && (!nextExam || examDate < new Date(nextExam.date))) {
-          nextExam = exam;
+        if (examDate >= today) {
+          if (!nearestExam || examDate < new Date(nearestExam.date)) {
+            nearestExam = exam;
+          }
         }
       }
-      
-      if (nextExam) {
-        const nextExamDate = new Date(nextExam.date);
-        const daysLeft = Math.ceil((nextExamDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        setExamCountdown({ daysLeft, examName: nextExam.name });
+
+      if (nearestExam) {
+        const examDate = new Date(nearestExam.date);
+        const daysLeft = Math.ceil((examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        setExamCountdown({ daysLeft, examName: nearestExam.name });
+      } else {
+        setExamCountdown(null);
       }
     } catch (e) {
       console.error('Failed to load exam countdown:', e);
+      setExamCountdown(null);
     }
   };
 
@@ -300,6 +354,16 @@ const HomeScreen = () => {
   useEffect(() => {
     checkAndShowMotivationalMessage();
   }, [examDates]);
+
+  // 試験までの進捗率を計算
+  useEffect(() => {
+    if (examCountdown && totalQuestions > 0) {
+      // Calculate progress: more questions = better progress
+      // You can adjust this formula
+      const progress = Math.min(100, Math.round((totalQuestions / (totalQuestions + weakQuestionCount + 1)) * 100));
+      setExamProgress(progress);
+    }
+  }, [examCountdown, totalQuestions, weakQuestionCount]);
 
   const loadExamDates = async () => {
     try {
@@ -394,7 +458,7 @@ const HomeScreen = () => {
         
         // ボーナス通知（初回のみ）
         Alert.alert(
-          currentLocale === 'ja' ? '📅 ログインボーナス' : '📅 Login Bonus',
+          currentLocale === 'ja' ? 'ログインボーナス' : 'Login Bonus',
           currentLocale === 'ja'
             ? `${streak}日連続ログイン！ ${bonus}コインを獲得しました！`
             : `${streak} day streak! You got ${bonus} coins!`
@@ -467,7 +531,7 @@ const HomeScreen = () => {
     ];
     
     Alert.alert(
-      locale === 'ja' ? '⏱ タイマー設定' : '⏱ Timer Settings',
+      locale === 'ja' ? 'タイマー設定' : 'Timer Settings',
       locale === 'ja' ? 'クイズの制限時間を選択してください' : 'Select quiz time limit',
       options
     );
@@ -514,10 +578,29 @@ const HomeScreen = () => {
 
   const primaryTextColor = isCyberpunk ? '#1A1A1A' : onPrimary;
 
+  // デイリークエスト読み込み
+  useEffect(() => {
+    const loadQuests = async () => {
+      try {
+        const stats = await loadStats();
+        const progress = await loadProgress();
+        const dailyMissions = MISSIONS.filter(m => m.period === 'daily');
+        setDailyQuests(dailyMissions);
+        const qp = dailyMissions.map(m => {
+          const p = getMissionProgress(m, progress, stats);
+          return { current: p.current, completed: p.completed };
+        });
+        setQuestProgress(qp);
+      } catch (error) {
+        console.error('Failed to load quests:', error);
+      }
+    };
+    loadQuests();
+  }, []);
+
   const renderStatsCard = () => {
-    const timerDisplay = displayTimer || `${timerMinutes}${t.minutes}`;
     const isNoLimit = displayTimer === (locale === 'ja' ? 'なし' : 'No limit') || timerMinutes === 0;
-    
+
     return (
       <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
         <View style={styles.statItem}>
@@ -525,9 +608,15 @@ const HomeScreen = () => {
           <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
         </View>
         <View style={[styles.statItem, { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 20 }]}>
-          <Text style={[styles.statNumber, { color: isNoLimit ? colors.success : colors.primary, fontSize: fs(24) }]}>
-            {isNoLimit ? '∞' : timerDisplay}
-          </Text>
+          {displayTimer === null ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : isNoLimit ? (
+            <Timer size={24} color={colors.success} />
+          ) : (
+            <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>
+              {displayTimer}
+            </Text>
+          )}
           <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>
             {isNoLimit ? (locale === 'ja' ? '制限なし' : 'No Limit') : t.timer}
           </Text>
@@ -544,10 +633,10 @@ const HomeScreen = () => {
         onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
       >
         <View style={styles.todayHeader}>
-          <Text style={styles.todayEmoji}>◧</Text>
-          <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
-            {t.todayQuestion}
-          </Text>
+        <BookOpen size={16} color={colors.primary} />
+        <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
+          {t.todayQuestion}
+        </Text>
         </View>
         <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fontSize.body }]} numberOfLines={2}>
           {todayQuestion.question}
@@ -567,7 +656,7 @@ const HomeScreen = () => {
           navigate('/quiz');
         }}
       >
-        <Text style={styles.weakEmoji}>⚠</Text>
+        <AlertTriangle size={20} color={colors.error} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.weakLabel, { color: colors.error, fontSize: fontSize.body }]}>
             {t.weakQuestionsQuiz}
@@ -576,151 +665,77 @@ const HomeScreen = () => {
             {locale === 'ja' ? `${weakQuestionCount}${t.reviewWeakQuestions}` : `${t.reviewWeakQuestions} (${weakQuestionCount})`}
           </Text>
         </View>
-        <Text style={{ fontSize: 16, color: colors.error }}>›</Text>
+        <ChevronRight size={16} color={colors.error} />
       </TouchableOpacity>
     );
   };
 
-  const renderMainButtons = () => (
-    <View style={{ gap: buttonPadding[screenType].paddingVertical }}>
-      {/* クイズ開始ボタン（Shakeアニメーション対応） */}
-      {animationLevel !== 'none' ? (
-        <Animated.View style={shakeAnim}>
-          <TouchableOpacity
-            style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
-            onPress={() => {
-              SoundManager.play('decide');
-              if (questionsFromHook.length === 0) {
-                Alert.alert(
-                  locale === 'ja' ? '問題がありません' : 'No Questions',
-                  locale === 'ja'
-                    ? 'まだ、問題がありません。問題を作成しましょう。'
-                    : 'You have no questions yet. Let\'s create one!'
-                );
-                return;
-              }
-              navigate('/quiz');
-            }}
-          >
-            <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
-            <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      ) : (
-        <TouchableOpacity
-          style={[styles.primaryButton, buttonPadding[screenType], { backgroundColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB, borderColor: isCyberpunk ? colors.border : undefined }]}
-          onPress={() => {
-            SoundManager.play('decide');
-            if (questionsFromHook.length === 0) {
-              Alert.alert(
-                locale === 'ja' ? '問題がありません' : 'No Questions',
-                locale === 'ja'
-                  ? 'まだ、問題がありません。問題を作成しましょう。'
-                  : 'You have no questions yet. Let\'s create one!'
-              );
-              return;
-            }
-            navigate('/quiz');
-          }}
-        >
-          <Play size={screenType === 'desktop' ? 24 : 20} color={primaryTextColor} style={{ marginRight: 8 }} />
-          <Text style={[styles.primaryButtonText, { color: primaryTextColor, fontSize: fs(screenType === 'desktop' ? 20 : 18) }]}>{t.startQuizButton}</Text>
-        </TouchableOpacity>
-      )}
+  const renderMainActions = () => (
+    <View style={{ marginHorizontal: 4, marginBottom: 16 }}>
       <TouchableOpacity
-        style={[styles.secondaryButton, buttonPadding[screenType], { borderColor: colors.primary, backgroundColor: colors.card, borderRadius: cpR ?? 12, borderWidth: cpB ?? 2 }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+        style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
+        onPress={() => {
+          SoundManager.play('decide');
+          if (questionsFromHook.length === 0) {
+            Alert.alert(
+              locale === 'ja' ? '問題がありません' : 'No Questions',
+              locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
+            );
+            return;
+          }
+          navigate('/quiz');
+        }}
       >
-        <Plus size={screenType === 'desktop' ? 28 : 24} color={isCyberpunk ? '#E0E0E0' : colors.primary} style={{ marginRight: 8 }} />
-        <Text style={[styles.secondaryButtonText, { color: isCyberpunk ? '#E0E0E0' : colors.primary, fontSize: fontSize.title }]}>{t.createQuestion}</Text>
+        <Play size={32} color="#fff" strokeWidth={2} />
+        <Text style={styles.mainPlayText}>
+          {locale === 'ja' ? '問題を解く' : 'Start Quiz'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
 
-  // セカンダリボタン行：予定登録 / タイマー / ミッション / 受信ボックス
-  const renderSecondaryButtons = () => {
-    const buttons = [
-      { label: '予定登録', onPress: () => { SoundManager.play('decide'); navigate('/calendar'); } },
-      { label: 'タイマー', onPress: () => { SoundManager.play('decide'); navigate('/manage'); } },
-      { label: 'ミッション', onPress: () => { SoundManager.play('decide'); navigate('/missions'); } },
-      { label: '受信', onPress: () => { SoundManager.play('decide'); navigate('/inbox'); } },
-    ];
-    // 英語の場合
-    const labels = currentLocale === 'en' 
-      ? ['Calendar', 'Timer', 'Missions', 'Inbox']
-      : ['予定登録', 'タイマー', 'ミッション', '受信'];
-
-    const secBtnBg = isCyberpunk ? colors.card : colors.background;
-
+  // デイリークエストカード
+  const renderDailyQuests = () => {
+    if (dailyQuests.length === 0) return null;
     return (
-      <View style={{
-        display: 'flex',
-        flexDirection: 'row',
-        flexWrap: 'nowrap' as const,
-        gap: screenType === 'desktop' ? 12 : 8,
-        marginBottom: screenType === 'desktop' ? 20 : 12,
-      }}>
-        {buttons.map((btn, i) => {
-          const btnContent = (
-            <TouchableOpacity style={[styles.secondaryBtn, { 
-              flex: 1,
-              paddingVertical: buttonPadding[screenType].paddingVertical,
-              paddingHorizontal: buttonPadding[screenType].paddingHorizontal,
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              borderRadius: cpR ?? 10,
-              borderWidth: cpB ?? 1,
-            }]} onPress={btn.onPress}>
-              <Text style={{ fontSize: fontSize.body, color: isCyberpunk ? '#E0E0E0' : colors.text }}>{labels[i]}</Text>
-            </TouchableOpacity>
+      <View style={[styles.questCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.questHeader}>
+          <Target size={18} color={colors.primary} />
+          <Text style={[styles.questTitle, { color: colors.text }]}>
+            {locale === 'ja' ? '今日のクエスト' : 'Daily Quests'}
+          </Text>
+        </View>
+        {dailyQuests.map((mission, index) => {
+          const done = questProgress[index]?.completed;
+          return (
+            <View key={mission.id} style={styles.questItem}>
+              {done
+                ? <CheckCircle2 size={18} color={colors.success} style={{ marginRight: 10 }} />
+                : <Square size={18} color={colors.textSecondary} style={{ marginRight: 10 }} />}
+              <Text style={[styles.questText, { color: colors.text }]}>
+                {locale === 'ja' ? mission.titleJa : mission.titleEn}
+              </Text>
+              <Text style={[styles.questCount, { color: colors.textSecondary }]}>
+                {questProgress[index]?.current ?? 0}/{mission.goal}
+              </Text>
+            </View>
           );
-          // standard/rich でパルス効果
-          if (pulseAnim && (i === 0 || i === 1)) {
-            return <Animated.View key={i} style={{ flex: 1 }}>{btnContent}</Animated.View>;
-          }
-          return <React.Fragment key={i}>{btnContent}</React.Fragment>;
         })}
+        <TouchableOpacity
+          style={[styles.questMoreBtn, { borderColor: colors.border }]}
+          onPress={() => { SoundManager.play('decide'); navigate('/missions'); }}
+        >
+          <Text style={[styles.questMoreText, { color: colors.primary }]}>
+            {locale === 'ja' ? 'すべてのミッションを見る →' : 'View all missions →'}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
 
-  // フィーチャーカード：問題管理 + 週間目標
-  const renderFeatureCards = () => (
-    <View style={styles.featureCardsRow}>
-      <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}
-      >
-        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📝</Text>
-        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
-          {locale === 'ja' ? '問題管理' : 'Manage'}
-        </Text>
-        <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary }]}>
-          {locale === 'ja' ? '一覧・編集' : 'View & Edit'}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.featureCard, { flex: 1, backgroundColor: colors.primary + '10', borderColor: colors.border, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/statistics'); }}
-      >
-        <Text style={[styles.featureCardIcon, { fontSize: 24 }]}>📊</Text>
-        <Text style={[styles.featureCardTitle, { color: colors.primary }]}>
-          {locale === 'ja' ? '週間目標' : 'Weekly Goal'}
-        </Text>
-        <View style={[styles.progressBarSmall, { backgroundColor: colors.border }]}>
-          <View style={[styles.progressFill, { width: '68%', backgroundColor: colors.primary }]} />
-        </View>
-        <Text style={[styles.featureCardSubtitle, { color: colors.textSecondary, marginTop: 4 }]}>
-          68% {locale === 'ja' ? '達成中' : 'completed'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   // ヘッダー（ゲーム風UI）
   const renderHeader = () => {
-    const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '👑 見習い暗記人';
+    const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '見習い暗記人';
     
     return (
     <View style={[
@@ -744,23 +759,26 @@ const HomeScreen = () => {
             </Text>
           </View>
           <View style={[styles.currencyContainer, { gap: 8 }]}>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <Coins size={14} color={colors.warning} />
               <Text style={[styles.currencyText, { color: colors.warning, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
-                🪙 {userCoins}
+                {userCoins}
               </Text>
             </View>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.success + '20', borderColor: colors.success }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.success + '20', borderColor: colors.success, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <BookOpen size={14} color={colors.success} />
               <Text style={[styles.currencyText, { color: colors.success, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
-                📚 {profile?.totalBooks || 0}
+                {profile?.totalBooks || 0}
               </Text>
             </View>
           </View>
         </View>
 
         {/* 2段目：ユーザー名 */}
-        <View style={{ marginBottom: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <User size={20} color={colors.text} />
           <Text style={[styles.usernameText, { color: colors.text, fontSize: fs(screenType === 'desktop' ? 18 : 16) }]}>
-            👤 {profile?.username || 'An-Q Learner'}
+            {profile?.username || 'An-Q Learner'}
           </Text>
         </View>
 
@@ -812,9 +830,12 @@ const HomeScreen = () => {
                   setShowMenu(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                  {locale === 'ja' ? '🔄 更新' : '🔄 Reload'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <RefreshCw size={16} color={colors.text} />
+                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                    {locale === 'ja' ? '更新' : 'Reload'}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -825,9 +846,12 @@ const HomeScreen = () => {
                   setShowMenu(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                  {locale === 'ja' ? '🎨 テーマ設定' : '🎨 Theme Settings'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Palette size={16} color={colors.text} />
+                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                    {locale === 'ja' ? 'テーマ設定' : 'Theme Settings'}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -838,9 +862,12 @@ const HomeScreen = () => {
                   setShowMenu(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                  {locale === 'ja' ? '🎵 音楽設定' : '🎵 Music Settings'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Music size={16} color={colors.text} />
+                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                    {locale === 'ja' ? '音楽設定' : 'Music Settings'}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -851,9 +878,12 @@ const HomeScreen = () => {
                   setShowMenu(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                  {locale === 'ja' ? '📤 マルチ共有' : '📤 Multi Share'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Upload size={16} color={colors.text} />
+                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                    {locale === 'ja' ? 'マルチ共有' : 'Multi Share'}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -864,9 +894,12 @@ const HomeScreen = () => {
                   setShowMenu(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                  {locale === 'ja' ? '⚙️ 全般' : '⚙️ General'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Settings size={16} color={colors.text} />
+                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
+                    {locale === 'ja' ? '全般' : 'General'}
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -887,7 +920,10 @@ const HomeScreen = () => {
             style={[styles.todayCard, { padding: 14, backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
             onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
           >
-            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>◧ {t.todayQuestion}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <BookOpen size={16} color={colors.primary} />
+            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>{t.todayQuestion}</Text>
+          </View>
             <Text style={[styles.mobileQuestionText, { color: colors.text, marginTop: 8 }]}>
               {todayQuestion.question}
             </Text>
@@ -896,7 +932,10 @@ const HomeScreen = () => {
 
         {/* 今週の正答率（本日の学習時間削除） */}
         <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>📈 {locale === 'ja' ? '今週の正答率' : 'Weekly Accuracy'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <BarChart3 size={16} color={colors.primary} />
+            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>{locale === 'ja' ? '今週の正答率' : 'Weekly Accuracy'}</Text>
+          </View>
           <Text style={[styles.mobileAccuracyValue, { color: colors.primary, marginTop: 8 }]}>
             78%
           </Text>
@@ -904,6 +943,35 @@ const HomeScreen = () => {
             {locale === 'ja' ? '先週比 +5%' : '+5% vs last week'}
           </Text>
         </View>
+      </View>
+    );
+  };
+
+  const BottomNavBar = () => {
+    const navItems = [
+      { id: 'home', icon: Home, label: 'ホーム', path: '/' },
+      { id: 'create', icon: PenSquare, label: '作成', path: '/create' },
+      { id: 'multi', icon: Share2, label: 'マルチ', path: '/multi' },
+      { id: 'sub', icon: Package, label: 'サブ', path: '/appSettings' },
+    ];
+
+    return (
+      <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        {navItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.navItem}
+            onPress={() => {
+              SoundManager.play('decide');
+              if (item.path !== '#') navigate(item.path);
+            }}
+          >
+            <item.icon size={24} color={colors.primary} strokeWidth={1.5} />
+            <Text style={[styles.navLabel, { color: colors.textSecondary }]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   };
@@ -918,7 +986,7 @@ const HomeScreen = () => {
             containerStyles[screenType],
             { 
               flexGrow: 1, 
-              paddingBottom: 40,
+              paddingBottom: 100,
               backgroundColor: colors.background,
             }
           ]}
@@ -927,21 +995,46 @@ const HomeScreen = () => {
           
           {/* 試験カウントダウン */}
           {examCountdown && (
-            <View style={[styles.examCountdownBox, {
-              backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
-              borderColor: colors.border,
-            }]}>
-              <Text style={[styles.examCountdownTitle, { color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary }]}>
-                {examCountdown.examName}
-              </Text>
-              <Text style={[styles.examCountdownDays, {
-                color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
-                fontSize: fs(28),
-                fontWeight: 'bold',
-              }]}>
-                {locale === 'ja' ? `${examCountdown.examName} まであと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days until ${examCountdown.examName}`}
-              </Text>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[styles.examCard, { 
+                backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
+                borderColor: colors.border,
+              }]}
+              onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }}
+            >
+              <View style={styles.examHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <GraduationCap size={16} color={examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary} />
+                  <Text style={[styles.examTitle, { 
+                    color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary 
+                  }]}>
+                    {examCountdown.examName}
+                  </Text>
+                </View>
+                <Text style={[styles.examDays, {
+                  color: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary,
+                  fontWeight: 'bold',
+                  fontSize: 18,
+                }]}>
+                  {locale === 'ja' ? `あと ${examCountdown.daysLeft} 日` : `${examCountdown.daysLeft} days left`}
+                </Text>
+              </View>
+
+              {/* 進捗バー */}
+              <View style={styles.examProgressContainer}>
+                <View style={[styles.examProgressBar, { backgroundColor: colors.border }]}>
+                  <View style={[styles.examProgressFill, { 
+                    width: `${examProgress}%`, 
+                    backgroundColor: examCountdown.daysLeft <= 7 ? '#D32F2F' : examCountdown.daysLeft <= 30 ? '#F57C00' : colors.primary 
+                  }]} />
+                </View>
+                <Text style={[styles.examProgressText, { color: colors.textSecondary }]}>
+                  {examProgress}% 完了
+                </Text>
+              </View>
+
+            </TouchableOpacity>
           )}
 
           {/* Header */}
@@ -950,10 +1043,10 @@ const HomeScreen = () => {
           {/* モチベーションメッセージ */}
           {motivationalMessage && (
             <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', marginBottom: 12 }]}>
-              <Text style={{ fontSize: 14, color: colors.primary, marginRight: 6 }}>💡</Text>
-              <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
-                {motivationalMessage}
-              </Text>
+                <Lightbulb size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
+                  {motivationalMessage}
+                </Text>
             </View>
           )}
 
@@ -962,23 +1055,26 @@ const HomeScreen = () => {
             <View style={{ flexDirection: 'column' as const, gap: 0 }}>
               {renderStatsCard()}
               {renderWeakCard()}
-              {renderMainButtons()}
-              {renderSecondaryButtons()}
-              {renderFeatureCards()}
+              {/* メインアクション（解く） */}
+              {renderMainActions()}
+              {/* Main Actions */}
+              {renderDailyQuests()}
             </View>
           ) : (
             <View style={mainContentStyle[screenType]}>
               {renderStatsCard()}
               {renderWeakCard()}
-              {renderMainButtons()}
-              {renderSecondaryButtons()}
-              {renderFeatureCards()}
+              {/* メインアクション（解く） */}
+              {renderMainActions()}
+              {/* Main Actions */}
+              {renderDailyQuests()}
               {renderMobileInfoSections()}
             </View>
           )}
 
         </ScrollView>
     </PatternBackground>
+    <BottomNavBar />
     </View>
   );
 };
@@ -1087,23 +1183,43 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 16,
   },
-  examCountdownBox: {
+  examCard: {
     marginHorizontal: 0,
     marginVertical: 12,
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)'
   },
-  examCountdownTitle: {
-    fontSize: 14,
+  examHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  examTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4
   },
-  examCountdownDays: {
-    fontSize: 20,
-    fontWeight: 'bold'
+  examDays: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  examProgressContainer: {
+    marginBottom: 12,
+  },
+  examProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  examProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  examProgressText: {
+    fontSize: 12,
+    textAlign: 'right',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -1148,6 +1264,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: '22%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    position: 'sticky' as any,
+    bottom: 0,
+    zIndex: 100,
+    ...(Platform.OS !== 'web' && {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+    }),
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  navLabel: {
+    fontSize: 10,
+    fontWeight: '500',
   },
   featureCardsRow: {
     flexDirection: 'row',
@@ -1239,6 +1403,86 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  mainActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  actionCard: {
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    minHeight: 120,
+  },
+  actionCardTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  actionCardSub: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  mainPlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 16,
+    paddingVertical: 26,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  mainPlayText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 20,
+  },
+  questCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  questHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  questTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  questItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  questText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  questCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  questMoreBtn: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  questMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

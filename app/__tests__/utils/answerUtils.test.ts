@@ -67,22 +67,22 @@ describe('getAnswerText', () => {
       expect(getAnswerText(question)).toBe('○');
     });
 
-    it('正解が false の場合 ✕ を返すこと', () => {
+    it('正解が false の場合  を返すこと', () => {
       const question: Question = {
         ...baseQuestion(),
         answerType: 'truefalse',
         trueFalseAnswer: false,
       };
-      expect(getAnswerText(question)).toBe('✕');
+      expect(getAnswerText(question)).toBe('');
     });
 
-    it('trueFalseAnswer が未設定の場合 ✕ を返すこと（falsy 扱い）', () => {
+    it('trueFalseAnswer が未設定の場合  を返すこと（falsy 扱い）', () => {
       const question: Question = {
         ...baseQuestion(),
         answerType: 'truefalse',
-        // trueFalseAnswer なし → undefined → falsy → ✕
+        // trueFalseAnswer なし → undefined → falsy → 
       };
-      expect(getAnswerText(question)).toBe('✕');
+      expect(getAnswerText(question)).toBe('');
     });
   });
 

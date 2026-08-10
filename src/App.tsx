@@ -9,6 +9,7 @@ import { CURRENT_APP_VERSION } from './config/version';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { syncLoginStreak } from './utils/userProgress';
+import { Sparkles } from 'lucide-react';
 
 // キャッシュ不整合によるChunkLoadErrorを自動検知してリロードする安全なlazy loading
 const safeLazy = (importFn: () => Promise<any>) => {
@@ -265,10 +266,7 @@ export default function App() {
             maxWidth: 400,
             alignItems: 'center',
           }}>
-            <Text style={{
-              fontSize: 48,
-              marginBottom: 16,
-            }}>🎉</Text>
+            <Sparkles size={48} color="#FFB020" style={{ marginBottom: 16 }} />
             <Text style={{
               fontSize: 22,
               fontWeight: 'bold',

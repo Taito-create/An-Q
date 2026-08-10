@@ -22,9 +22,9 @@ export default function LoginScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(''); // 🌐 画面表示用エラー
-  const [selectedImage, setSelectedImage] = useState<string | null>(null); // ✂️ 切り抜き前の画像
-  const [showCropModal, setShowCropModal] = useState(false); // 📦 クロップモーダルの表示フラグ
+  const [errorMessage, setErrorMessage] = useState(''); //  画面表示用エラー
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); //  切り抜き前の画像
+  const [showCropModal, setShowCropModal] = useState(false); //  クロップモーダルの表示フラグ
 
   // 既にログイン済みの場合はホームへリダイレクト
   React.useEffect(() => {
@@ -36,7 +36,7 @@ export default function LoginScreen() {
   const isRegisterMode = mode === 'register';
   const title = isRegisterMode ? '新規登録' : 'ログイン';
 
-  // 📸 画像ファイルが選択された時の処理 (Web用)
+  //  画像ファイルが選択された時の処理 (Web用)
   const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -70,7 +70,7 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      setErrorMessage(''); // 🌟 新しい試みの前に古いエラーを消す
+      setErrorMessage(''); //  新しい試みの前に古いエラーを消す
 
       if (isRegisterMode) {
         // 1. 新規登録アカウント作成
@@ -81,7 +81,7 @@ export default function LoginScreen() {
         await updateProfile(userCredential.user, { displayName: username.trim() });
 
         // 3. 無料のFirestoreデータベースにユーザー情報を直接保存（容量制限なし）
-        await setDoc(doc(db, 'users', uid), {
+        await setDoc(doc(db, 'userProgress', uid), {
           ...buildInitialUserProfile(username.trim(), profileImage),
           username: username.trim(),
           profileImage: profileImage,
@@ -111,7 +111,7 @@ export default function LoginScreen() {
         const uid = userCredential.user.uid;
 
         // ログイン成功時、Firestoreから最新の名前とアイコンを取得して同期
-        const userDoc = await getDoc(doc(db, 'users', uid));
+        const userDoc = await getDoc(doc(db, 'userProgress', uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
           if (data.username) await AsyncStorage.setItem('user_username', data.username);
@@ -127,7 +127,7 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.error('Auth error:', error);
 
-      // 🔍 Firebaseのエラーコードに応じて親切な日本語に変換
+      //  Firebaseのエラーコードに応じて親切な日本語に変換
       if (error.code === 'auth/email-already-in-use') {
         setErrorMessage('そのメールアドレスはすでに使用されています。');
       } else if (error.code === 'auth/weak-password') {
@@ -229,7 +229,7 @@ export default function LoginScreen() {
 
         {errorMessage ? (
           <Text style={{ color: '#ff4d4f', fontSize: 13, fontWeight: '600', marginBottom: 12, textAlign: 'center' }}>
-            ⚠️ {errorMessage}
+             {errorMessage}
           </Text>
         ) : null}
 

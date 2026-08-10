@@ -39,12 +39,12 @@ class SoundManager {
 
         // 読み込み成功時の確認
         audio.addEventListener('canplaythrough', () => {
-          console.log(`✅ Loaded: ${path}`);
+          console.log(` Loaded: ${path}`);
         });
 
         // 読み込みエラーのハンドリング
         audio.addEventListener('error', (e) => {
-          console.error(`❌ Failed: ${path}`, e);
+          console.error(` Failed: ${path}`, e);
         });
 
         this.sounds[`${set}_${type}`] = audio;
@@ -54,20 +54,20 @@ class SoundManager {
     // 効果音のON/OFF設定を読み込み
     const savedSE = localStorage.getItem('se_enabled');
     this.seEnabled = savedSE !== 'false';
-    console.log('🔊 SE enabled:', this.seEnabled);
+    console.log(' SE enabled:', this.seEnabled);
 
     this.initialized = true;
     console.log('SoundManager initialized with 4 effect sets');
   }
 
   static async play(type: SoundType) {
-    // ★ 毎回 localStorage から直接読み込む（最も確実な方法）
+    //  毎回 localStorage から直接読み込む（最も確実な方法）
     const seEnabled = localStorage.getItem('se_enabled') !== 'false';
     
-    console.log(`🔊 Play called: ${type}, SE Enabled: ${seEnabled}`); // デバッグ用
+    console.log(` Play called: ${type}, SE Enabled: ${seEnabled}`); // デバッグ用
     
     if (!seEnabled) {
-      console.log(`🔇 SE is OFF, skipping: ${type}`);
+      console.log(` SE is OFF, skipping: ${type}`);
       return;
     }
     
@@ -80,24 +80,24 @@ class SoundManager {
       sound.volume = volume;
       try {
         await sound.play();
-        console.log(`✅ Played: ${type}`);
+        console.log(` Played: ${type}`);
       } catch (e) {
-        console.warn(`❌ Failed: ${type}`, e);
+        console.warn(` Failed: ${type}`, e);
       }
     } else {
-      console.warn(`❌ Sound not found: ${key}`);
+      console.warn(` Sound not found: ${key}`);
     }
   }
 
   static async setSEEnabled(enabled: boolean) {
     this.seEnabled = enabled;
     localStorage.setItem('se_enabled', enabled.toString());
-    console.log('🔊 SE enabled set to:', enabled);
+    console.log(' SE enabled set to:', enabled);
   }
 
   static async setSESet(set: SEType) {
     this.currentSESet = set;
-    console.log(`🎵 SE set changed to: ${set}`);
+    console.log(` SE set changed to: ${set}`);
     // 設定変更後にそのセットの決定音を鳴らす
     await this.play('decide');
   }

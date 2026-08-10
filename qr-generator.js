@@ -27,8 +27,8 @@ async function generateQRCode() {
     const ip = await getLocalIP();
     const url = `http://${ip}:8081`;
     
-    console.log(`\n🌐 URL: ${url}`);
-    console.log('📱 QRコードを生成中...\n');
+    console.log(`\n URL: ${url}`);
+    console.log(' QRコードを生成中...\n');
     
     // QRコードをターミナルに表示
     await QRCode.toString(url, {
@@ -36,15 +36,15 @@ async function generateQRCode() {
       small: true
     });
     
-    console.log('\n✅ QRコードが生成されました！');
-    console.log('📲 スキャンしてアクセスしてください');
+    console.log('\n QRコードが生成されました！');
+    console.log(' スキャンしてアクセスしてください');
     
   } catch (error) {
-    console.error('❌ エラー:', error.message);
+    console.error(' エラー:', error.message);
     
     // フォールバック：localhost
     const fallbackUrl = 'http://localhost:8081';
-    console.log(`\n🔄 フォールバックURL: ${fallbackUrl}`);
+    console.log(`\n フォールバックURL: ${fallbackUrl}`);
     
     await QRCode.toString(fallbackUrl, {
       type: 'terminal',

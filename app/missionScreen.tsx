@@ -11,6 +11,7 @@ import {
   getMissionProgress, UserStats, MissionProgress,
 } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BookOpen, Target, ShoppingBag } from 'lucide-react';
 
 const PERIOD_LABELS = {
   daily:   { ja: 'デイリー',  en: 'Daily' },
@@ -59,7 +60,7 @@ export default function MissionScreen() {
       await addBooks(user.uid, mission.reward);
     }
     SoundManager.play('complete');
-    setClaimMessage(ja ? `📚 ${mission.reward}冊の本を獲得！` : `📚 Got ${mission.reward} books!`);
+    setClaimMessage(ja ? `${mission.reward}冊の本を獲得！` : `Got ${mission.reward} books!`);
     setTimeout(() => setClaimMessage(''), 2500);
   };
 
@@ -70,12 +71,12 @@ export default function MissionScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
-          {ja ? '🎯 ミッション' : '🎯 Missions'}
+          <Target size={24} color={colors.primary} style={{ marginRight: 8 }} />{ja ? 'ミッション' : 'Missions'}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {stats && (
             <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
-              📚 {stats.totalBooks}
+              <BookOpen size={18} color={colors.primary} style={{ marginRight: 4 }} />{stats.totalBooks}
             </Text>
           )}
           <TouchableOpacity
@@ -132,7 +133,7 @@ export default function MissionScreen() {
                 </View>
                 <View style={[styles.rewardBadge, { backgroundColor: colors.primary + '20' }]}>
                   <Text style={[styles.rewardText, { color: colors.primary, fontSize: fs(12) }]}>
-                    📚 +{mission.reward}
+                    <BookOpen size={14} color={colors.primary} style={{ marginRight: 4 }} />+{mission.reward}
                   </Text>
                 </View>
               </View>
@@ -158,7 +159,7 @@ export default function MissionScreen() {
               )}
               {claimed && (
                 <Text style={[styles.claimedText, { color: colors.textSecondary, fontSize: fs(12) }]}>
-                  {ja ? '✓ 受け取り済み' : '✓ Claimed'}
+                  {ja ? ' 受け取り済み' : ' Claimed'}
                 </Text>
               )}
             </View>
@@ -172,7 +173,7 @@ export default function MissionScreen() {
           onPress={() => { SoundManager.play('decide'); navigate('/shop'); }}
         >
           <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: fs(16) }]}>
-            🛍️ {ja ? 'ショップを見る' : 'View Shop'}
+            <ShoppingBag size={18} color="#fff" style={{ marginRight: 6 }} />{ja ? 'ショップを見る' : 'View Shop'}
           </Text>
         </TouchableOpacity>
       </View>

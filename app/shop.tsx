@@ -10,6 +10,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { BookOpen, Music, Coins, Repeat } from 'lucide-react';
 
 export default function ShopScreen() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function ShopScreen() {
           {stats && (
             <View style={[styles.booksBadge, { backgroundColor: colors.primary + '20' }]}>
               <Text style={[styles.booksText, { color: colors.primary, fontSize: fs(15) }]}>
-                📚 {stats.totalBooks}
+                <BookOpen size={18} color={colors.primary} style={{ marginRight: 4 }} />{stats.totalBooks}
               </Text>
             </View>
           )}
@@ -133,7 +134,7 @@ export default function ShopScreen() {
                 </View>
                 <View style={[styles.costBadge, { backgroundColor: colors.primary + '15' }]}>
                   <Text style={[styles.costText, { color: colors.primary, fontSize: fs(14) }]}>
-                    📚 {item.cost}
+                    <BookOpen size={16} color={colors.primary} style={{ marginRight: 4 }} />{item.cost}
                   </Text>
                 </View>
               </View>
@@ -171,7 +172,7 @@ export default function ShopScreen() {
         {/* ──────── コイン両替所 ──────── */}
         <View style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}>
           <View style={styles.itemTop}>
-            <Text style={styles.itemIcon}>💱</Text>
+            <Repeat size={24} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.itemTitle, { color: colors.text, fontSize: fs(15) }]}>
                 {locale === 'ja' ? 'コイン両替所' : 'Coin Exchange'}
@@ -185,7 +186,7 @@ export default function ShopScreen() {
           <View style={[styles.exchangeRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.statusTitle, { color: colors.text, fontSize: fs(14) }]}>
-                📚 {locale === 'ja' ? '本1冊' : '1 Book'}
+                <BookOpen size={16} color={colors.text} style={{ marginRight: 4 }} />{locale === 'ja' ? '本1冊' : '1 Book'}
               </Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary, fontSize: fs(12) }]}>
                 {locale === 'ja' ? '問題スロット +5問' : '+5 Question Slots'}
@@ -193,7 +194,7 @@ export default function ShopScreen() {
             </View>
             <View style={[styles.costBadge, { backgroundColor: colors.primary + '15', marginRight: 12 }]}>
               <Text style={[styles.costText, { color: colors.primary, fontSize: fs(14) }]}>
-                💰 1,000 {locale === 'ja' ? 'コイン' : 'Coins'}
+                <Coins size={16} color={colors.primary} style={{ marginRight: 4 }} />1,000 {locale === 'ja' ? 'コイン' : 'Coins'}
               </Text>
             </View>
             <TouchableOpacity
@@ -278,7 +279,7 @@ function CustomBGMSection({ colors, onPrimary, fs, t }: any) {
   return (
     <View style={[styles.customBGMCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
       <Text style={[styles.itemTitle, { color: colors.text, fontSize: fs(15), marginBottom: 8 }]}>
-        🎵 {t.customBgm}
+        <Music size={18} color={colors.primary} style={{ marginRight: 6 }} />{t.customBgm}
       </Text>
       <Text style={[styles.itemDesc, { color: colors.textSecondary, fontSize: fs(12), marginBottom: 12 }]}>
         {t.audioFileSupport}

@@ -7,6 +7,7 @@ import { translations } from './translations';
 import { SoundManager } from './sound';
 import { loadStats, saveStats, loadProgress, saveProgress, DEFAULT_STATS, MISSIONS } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench } from 'lucide-react';
 
 export default function DevModeScreen() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function DevModeScreen() {
     const stats = await loadStats();
     stats.totalBooks += amount;
     await saveStats(stats);
-    addLog(`📚 本を${amount}冊付与 → 合計${stats.totalBooks}冊`);
+    addLog(`本を${amount}冊付与 → 合計${stats.totalBooks}冊`);
     SoundManager.play('complete');
   };
 
@@ -47,7 +48,7 @@ export default function DevModeScreen() {
       resetAt: 'dev',
     }));
     await saveProgress(progress);
-    addLog('✅ 全ミッション達成済みに設定');
+    addLog('全ミッション達成済みに設定');
     SoundManager.play('complete');
   };
 
@@ -59,7 +60,7 @@ export default function DevModeScreen() {
       stats.unlockedFeatures.push('custom_bgm');
     }
     await saveStats(stats);
-    addLog('🎵 カスタムBGM解放');
+    addLog('カスタムBGM解放');
     SoundManager.play('complete');
   };
 
@@ -80,7 +81,7 @@ export default function DevModeScreen() {
     const { TITLE_BADGES } = require('./missions');
     stats.unlockedTitles = TITLE_BADGES.map((b: any) => b.id);
     await saveStats(stats);
-    addLog('🔓 全機能・全称号・全統計を最大値に設定');
+    addLog('全機能・全称号・全統計を最大値に設定');
     SoundManager.play('complete');
   };
 
@@ -89,7 +90,7 @@ export default function DevModeScreen() {
     const stats = await loadStats();
     stats.questionSlots = 999;
     await saveStats(stats);
-    addLog('📝 問題スロットを999に設定');
+    addLog('問題スロットを999に設定');
     SoundManager.play('complete');
   };
 
@@ -98,7 +99,7 @@ export default function DevModeScreen() {
     confirm('全データをリセットしますか？', async () => {
       await saveStats({ ...DEFAULT_STATS });
       await saveProgress([]);
-      addLog('🗑️ 全データをリセット');
+    addLog('全データをリセット');
       SoundManager.play('decide');
     });
   };
@@ -106,25 +107,25 @@ export default function DevModeScreen() {
   // 現在の統計を表示
   const showStats = async () => {
     const stats = await loadStats();
-    addLog(`📊 本:${stats.totalBooks} クイズ:${stats.quizPlayed} 正解:${stats.correctAnswers} 作成:${stats.questionsCreated} スロット:${stats.questionSlots ?? 20} 機能:${(stats.unlockedFeatures ?? []).join(',') || 'なし'}`);
+    addLog(`本:${stats.totalBooks} クイズ:${stats.quizPlayed} 正解:${stats.correctAnswers} 作成:${stats.questionsCreated} スロット:${stats.questionSlots ?? 20} 機能:${(stats.unlockedFeatures ?? []).join(',') || 'なし'}`);
   };
 
   const buttons = [
-    { label: '📚 本を100冊付与', action: () => giveBooks(100), color: colors.primary },
-    { label: '📚 本を1000冊付与', action: () => giveBooks(1000), color: colors.primary },
-    { label: '✅ 全ミッション達成', action: completeAllMissions, color: colors.success },
-    { label: '🎵 カスタムBGM解放', action: unlockCustomBGM, color: colors.success },
-    { label: '📝 問題スロット999', action: maxQuestionSlots, color: colors.success },
-    { label: '🔓 全機能解放（最大値）', action: unlockAll, color: '#9C27B0' },
-    { label: '📊 現在の統計を表示', action: showStats, color: colors.warning },
-    { label: '🗑️ 全データリセット', action: resetAll, color: colors.error },
+    { label: '本を100冊付与', icon: BookOpen, action: () => giveBooks(100), color: colors.primary },
+    { label: '本を1000冊付与', icon: BookOpen, action: () => giveBooks(1000), color: colors.primary },
+    { label: '全ミッション達成', icon: CheckCircle, action: completeAllMissions, color: colors.success },
+    { label: 'カスタムBGM解放', icon: Music, action: unlockCustomBGM, color: colors.success },
+    { label: '問題スロット999', icon: Pencil, action: maxQuestionSlots, color: colors.success },
+    { label: '全機能解放（最大値）', icon: Lock, action: unlockAll, color: '#9C27B0' },
+    { label: '現在の統計を表示', icon: BarChart3, action: showStats, color: colors.warning },
+    { label: '全データリセット', icon: Trash2, action: resetAll, color: colors.error },
   ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: '#1A1A1A', borderBottomColor: '#333', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View>
-          <Text style={styles.headerTitle}>🛠️ Developer Mode</Text>
+          <Text style={styles.headerTitle}><Wrench size={20} color="#00FF41" style={{ marginRight: 8 }} />Developer Mode</Text>
           <Text style={styles.headerSub}>開発者モード - 本番環境では使用しないこと</Text>
         </View>
         <TouchableOpacity
@@ -144,14 +145,17 @@ export default function DevModeScreen() {
               style={[styles.devButton, { backgroundColor: btn.color }]}
               onPress={btn.action}
             >
-              <Text style={[styles.devButtonText, { color: onPrimary }]}>{btn.label}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <btn.icon size={18} color="#fff" />
+                <Text style={[styles.devButtonText, { color: onPrimary }]}>{btn.label}</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Log */}
         <View style={[styles.logBox, { backgroundColor: '#0D0D0D', borderColor: '#333' }]}>
-          <Text style={styles.logTitle}>📋 実行ログ</Text>
+          <Text style={styles.logTitle}><ClipboardList size={16} color="#00FF41" style={{ marginRight: 6 }} />実行ログ</Text>
           {log.length === 0 ? (
             <Text style={styles.logEmpty}>ボタンを押すとここにログが表示されます</Text>
           ) : (

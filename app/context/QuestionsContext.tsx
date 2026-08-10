@@ -101,7 +101,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error message:', error.message);
       
       if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for questions, falling back to local data');
+        console.warn(' Firestore permission denied for questions, falling back to local data');
         return [];
       }
       
@@ -137,7 +137,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error message:', error.message);
       
       if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for folders, falling back to local data');
+        console.warn(' Firestore permission denied for folders, falling back to local data');
         return [];
       }
       
@@ -172,11 +172,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       });
       
-      // 🟢 サニタイズ: descriptiveAnswerGroups を JSON 文字列に変換
+      //  サニタイズ: descriptiveAnswerGroups を JSON 文字列に変換
       //    （Firestore はネストされた配列をサポートしていないため）
       const sanitizedQuestions = mergedQuestions.map(q => {
         const sanitized: any = { ...q };
-        // ❌ descriptiveAnswer を削除（descriptiveAnswerGroups と重複するため）
+        //  descriptiveAnswer を削除（descriptiveAnswerGroups と重複するため）
         delete sanitized.descriptiveAnswer;
         if (q.descriptiveAnswerGroups !== undefined && Array.isArray(q.descriptiveAnswerGroups)) {
           sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
@@ -286,15 +286,15 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // 問題を読み込み（マイグレーション付き）
   // Firestoreのオフラインキャッシュが有効なので、瞬時にデータを読み込める
   const loadQuestions = useCallback(async () => {
-    console.log('📋 loadQuestions called, user:', user?.uid);
+    console.log(' loadQuestions called, user:', user?.uid);
     
     // 未ログイン時はローカルのみ
     if (!user) {
-      console.log('👤 No user, loading from AsyncStorage only');
+      console.log(' No user, loading from AsyncStorage only');
       const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
       const allQuestions: Question[] = safeParseArray(data, []);
       const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
-      console.log('📦 Loaded from AsyncStorage:', filteredQuestions.length, 'questions');
+      console.log(' Loaded from AsyncStorage:', filteredQuestions.length, 'questions');
       setQuestions(filteredQuestions);
       
       const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
@@ -306,35 +306,35 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // ログイン時はFirestoreから読み込み（オフラインキャッシュ優先）
     try {
-      console.log('🔍 Loading from Firestore...');
+      console.log(' Loading from Firestore...');
       const firestoreQuestions = await loadQuestionsFromFirestore();
       const firestoreFolders = await loadFoldersFromFirestore();
-      console.log('✅ Firestore questions:', firestoreQuestions.length);
-      console.log('✅ Firestore folders:', firestoreFolders.length);
+      console.log(' Firestore questions:', firestoreQuestions.length);
+      console.log(' Firestore folders:', firestoreFolders.length);
       
       // ローカルにデータがある場合は移行を試みる
       const localQuestionsData = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
       const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
       
-      console.log('💾 Local questions data exists:', !!localQuestionsData);
-      console.log('💾 Local folders data exists:', !!localFoldersData);
+      console.log(' Local questions data exists:', !!localQuestionsData);
+      console.log(' Local folders data exists:', !!localFoldersData);
       
       if (localQuestionsData) {
         const localQuestions: Question[] = safeParseArray(localQuestionsData, []);
         const filteredLocal = localQuestions.filter((q: any) => q.answerType);
-        console.log('📦 Local questions (filtered):', filteredLocal.length);
+        console.log(' Local questions (filtered):', filteredLocal.length);
         
         if (filteredLocal.length > 0 && firestoreQuestions.length === 0) {
           // Firestoreにデータがない場合、ローカルから移行
-          console.log('🔄 Migrating local questions to Firestore...');
+          console.log(' Migrating local questions to Firestore...');
           const migrated = await migrateLocalQuestionsToFirestore(filteredLocal);
           
           if (migrated) {
-            console.log('✅ Migration successful, using local data');
+            console.log(' Migration successful, using local data');
             setQuestions(filteredLocal);
             await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
           } else {
-            console.log('⚠️ Migration failed, using local data anyway');
+            console.log(' Migration failed, using local data anyway');
             setQuestions(filteredLocal);
             Alert.alert(
               '同期エラー',
@@ -342,35 +342,35 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreQuestions.length > 0) {
-          console.log('✅ Using Firestore questions (has data)');
+          console.log(' Using Firestore questions (has data)');
           setQuestions(firestoreQuestions);
           await AsyncStorage.removeItem(STORAGE_KEYS.QUIZ_QUESTIONS);
         } else {
-          console.log('⚠️ No questions anywhere, setting empty');
+          console.log(' No questions anywhere, setting empty');
           setQuestions([]);
         }
       } else {
-        console.log('✅ No local data, using Firestore questions');
-        console.log('📝 Setting questions to Firestore data:', firestoreQuestions.length);
+        console.log(' No local data, using Firestore questions');
+        console.log(' Setting questions to Firestore data:', firestoreQuestions.length);
         setQuestions(firestoreQuestions);
-        console.log('✅ setQuestions called with', firestoreQuestions.length, 'questions');
+        console.log(' setQuestions called with', firestoreQuestions.length, 'questions');
       }
 
       // フォルダの移行処理
       if (localFoldersData) {
         const localFolders: Folder[] = safeParseArray(localFoldersData, []);
-        console.log('📦 Local folders:', localFolders.length);
+        console.log(' Local folders:', localFolders.length);
         
         if (localFolders.length > 0 && firestoreFolders.length === 0) {
-          console.log('🔄 Migrating local folders to Firestore...');
+          console.log(' Migrating local folders to Firestore...');
           const migrated = await migrateLocalFoldersToFirestore(localFolders);
           
           if (migrated) {
-            console.log('✅ Folder migration successful');
+            console.log(' Folder migration successful');
             setFolders(localFolders);
             await AsyncStorage.removeItem(STORAGE_KEYS.QUESTION_FOLDERS);
           } else {
-            console.log('⚠️ Folder migration failed');
+            console.log(' Folder migration failed');
             setFolders(localFolders);
             Alert.alert(
               '同期エラー',
@@ -378,29 +378,29 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         } else if (firestoreFolders.length > 0) {
-          console.log('✅ Using Firestore folders');
-          console.log('📝 Setting folders to Firestore data:', firestoreFolders.length);
+          console.log(' Using Firestore folders');
+          console.log(' Setting folders to Firestore data:', firestoreFolders.length);
           setFolders(firestoreFolders);
           await AsyncStorage.removeItem(STORAGE_KEYS.QUESTION_FOLDERS);
         } else {
-          console.log('⚠️ No folders anywhere, setting empty');
+          console.log(' No folders anywhere, setting empty');
           setFolders([]);
         }
       } else {
-        console.log('✅ No local folders, using Firestore folders');
-        console.log('📝 Setting folders to Firestore data:', firestoreFolders.length);
+        console.log(' No local folders, using Firestore folders');
+        console.log(' Setting folders to Firestore data:', firestoreFolders.length);
         setFolders(firestoreFolders);
       }
       
       // Note: questions and folders state will update asynchronously
       // The UI should reflect the new values after re-render
-      console.log('✅ loadQuestions complete - state updates queued');
+      console.log(' loadQuestions complete - state updates queued');
     } catch (e) {
-      console.error('❌ Failed to load questions:', e);
+      console.error(' Failed to load questions:', e);
       
       // エラー時はローカルデータにフォールバック
       try {
-        console.log('🔄 Falling back to local data...');
+        console.log(' Falling back to local data...');
         const localQuestionsData = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
         const localFoldersData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
         
@@ -408,13 +408,13 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const filteredLocal = localQuestions.filter((q: any) => q.answerType);
         const localFolders: Folder[] = safeParseArray(localFoldersData, []);
         
-        console.log('📦 Local questions (fallback):', filteredLocal.length);
-        console.log('📦 Local folders (fallback):', localFolders.length);
+        console.log(' Local questions (fallback):', filteredLocal.length);
+        console.log(' Local folders (fallback):', localFolders.length);
         
         setQuestions(filteredLocal);
         setFolders(localFolders);
       } catch (localError) {
-        console.error('❌ Failed to load local data:', localError);
+        console.error(' Failed to load local data:', localError);
         Alert.alert('エラー', 'データの読み込みに失敗しました。');
       }
     }
@@ -443,7 +443,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: q.id,
           question: q.question || '',
           answerType: q.answerType,
-          tags: (q.tags || []).map((t: any) => String(t)), // ✅ Flat array of strings
+          tags: (q.tags || []).map((t: any) => String(t)), //  Flat array of strings
           mistakeCount: q.mistakeCount || 0,
           createdAt: q.createdAt || Date.now(),
           enabled: q.enabled !== undefined ? q.enabled : true,
@@ -455,7 +455,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (q.matchMode) {
             sanitized.matchMode = q.matchMode;
           }
-          // ✅ descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
+          //  descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
           if (q.descriptiveAnswerGroups !== undefined) {
             if (Array.isArray(q.descriptiveAnswerGroups)) {
               sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
@@ -464,7 +464,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
             }
           }
-          // ❌ descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
+          //  descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) {
             sanitized.trueFalseAnswer = q.trueFalseAnswer;
@@ -474,7 +474,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
-            // ✅ options を平坦な文字列配列に強制
+            //  options を平坦な文字列配列に強制
             const rawOptions = q.multipleChoice.options || ['', '', '', ''];
             sanitized.multipleChoice = {
               options: Array.isArray(rawOptions) 
@@ -493,7 +493,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           sanitized.image = q.image;
         }
         if (q.imageAnnotations && q.imageAnnotations.length > 0) {
-          // ✅ imageAnnotations を安全なオブジェクト配列に強制
+          //  imageAnnotations を安全なオブジェクト配列に強制
           sanitized.imageAnnotations = q.imageAnnotations.map(ann => ({
             id: String(ann.id || ''),
             x: Number(ann.x || 0),
@@ -504,7 +504,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             opacity: Number(ann.opacity || 1)
           }));
         }
-        // ✅ sharedWith を保持（ACL共有用）
+        //  sharedWith を保持（ACL共有用）
         if (q.sharedWith !== undefined) {
           sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
         }
@@ -512,8 +512,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return sanitized;
       });
       
-      // 🐛 デバッグログ: Firestoreに送信するデータを確認
-      console.log('📤 Sending to Firestore (saveQuestionsToFirestore):', JSON.stringify(sanitizedQuestions, null, 2));
+      //  デバッグログ: Firestoreに送信するデータを確認
+      console.log(' Sending to Firestore (saveQuestionsToFirestore):', JSON.stringify(sanitizedQuestions, null, 2));
       
       const dataToSave = {
         questions: sanitizedQuestions,
@@ -597,7 +597,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: q.id,
           question: q.question || '',
           answerType: q.answerType,
-          tags: (q.tags || []).map((t: any) => String(t)), // ✅ Flat array of strings
+          tags: (q.tags || []).map((t: any) => String(t)), //  Flat array of strings
           mistakeCount: q.mistakeCount || 0,
           createdAt: q.createdAt || Date.now(),
           enabled: q.enabled !== undefined ? q.enabled : true,
@@ -605,7 +605,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
         if (q.answerType === 'descriptive') {
           if (q.matchMode) sanitized.matchMode = q.matchMode;
-          // ✅ descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
+          //  descriptiveAnswerGroups を JSON 文字列に変換（ネスト配列を避ける）
           if (q.descriptiveAnswerGroups !== undefined) {
             if (Array.isArray(q.descriptiveAnswerGroups)) {
               sanitized.descriptiveAnswerGroups = JSON.stringify(q.descriptiveAnswerGroups);
@@ -614,13 +614,13 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               sanitized.descriptiveAnswerGroups = q.descriptiveAnswerGroups;
             }
           }
-          // ❌ descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
+          //  descriptiveAnswer は保存しない（重複フィールドによる競合を避ける）
         } else if (q.answerType === 'truefalse') {
           if (q.trueFalseAnswer !== undefined) sanitized.trueFalseAnswer = q.trueFalseAnswer;
           if (q.explanation) sanitized.explanation = q.explanation;
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
-            // ✅ options を平坦な文字列配列に強制
+            //  options を平坦な文字列配列に強制
             const rawOptions = q.multipleChoice.options || ['', '', '', ''];
             sanitized.multipleChoice = {
               options: Array.isArray(rawOptions)
@@ -633,7 +633,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
         if (q.image) sanitized.image = q.image;
         if (q.imageAnnotations && q.imageAnnotations.length > 0) {
-          // ✅ imageAnnotations を安全なオブジェクト配列に強制
+          //  imageAnnotations を安全なオブジェクト配列に強制
           sanitized.imageAnnotations = q.imageAnnotations.map(ann => ({
             id: String(ann.id || ''),
             x: Number(ann.x || 0),
@@ -644,25 +644,25 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             opacity: Number(ann.opacity || 1)
           }));
         }
-        // ✅ sharedWith を保持（ACL共有用）
+        //  sharedWith を保持（ACL共有用）
         if (q.sharedWith !== undefined) {
           sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
         }
         return sanitized;
       });
 
-      // 🐛 デバッグログ: Firestoreに送信するデータを確認
-      console.log('📤 Sending to Firestore (applyQuestionsChange):', JSON.stringify(sanitizedQuestions, null, 2));
+      //  デバッグログ: Firestoreに送信するデータを確認
+      console.log(' Sending to Firestore (applyQuestionsChange):', JSON.stringify(sanitizedQuestions, null, 2));
 
       transaction.set(docRef, { questions: sanitizedQuestions, updatedAt: serverTimestamp() }, { merge: true });
     });
     } catch (error: any) {
-      console.error('❌ applyQuestionsChange failed:', error);
+      console.error(' applyQuestionsChange failed:', error);
       console.error('Error code:', error.code);
       
       // permission-denied エラー時はローカルにフォールバック
       if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied, using local data');
+        console.warn(' Firestore permission denied, using local data');
         const current = questions;
         updated = mutate(current);
       } else {
@@ -705,7 +705,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         name: f.name,
         questionIds: f.questionIds || [],
         parentId: f.parentId === undefined ? null : f.parentId,
-        // ✅ sharedWith を保持（ACL共有用）
+        //  sharedWith を保持（ACL共有用）
         sharedWith: Array.isArray(f.sharedWith) ? f.sharedWith : []
       }));
       
@@ -818,19 +818,19 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         name: f.name,
         questionIds: f.questionIds || [],
         parentId: f.parentId === undefined ? null : f.parentId,
-        // ✅ sharedWith を保持（ACL共有用）
+        //  sharedWith を保持（ACL共有用）
         sharedWith: Array.isArray(f.sharedWith) ? f.sharedWith : []
       }));
 
       transaction.set(docRef, { folders: sanitizedFolders, updatedAt: serverTimestamp() }, { merge: true });
     });
     } catch (error: any) {
-      console.error('❌ applyFoldersChange failed:', error);
+      console.error(' applyFoldersChange failed:', error);
       console.error('Error code:', error.code);
       
       // permission-denied エラー時はローカルにフォールバック
       if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied, using local data');
+        console.warn(' Firestore permission denied, using local data');
         const current = folders;
         updated = mutate(current);
       } else {
@@ -851,9 +851,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user, folders]);
 
   const deleteQuestion = useCallback(async (id: number): Promise<Question[]> => {
-    console.log('🗑️ deleteQuestion called with id:', id);
+    console.log(' deleteQuestion called with id:', id);
     const result = await applyQuestionsChange(current => current.filter(q => q.id !== id));
-    console.log('🗑️ deleteQuestion result:', result.length, 'questions remaining');
+    console.log(' deleteQuestion result:', result.length, 'questions remaining');
     return result;
   }, [applyQuestionsChange]);
 
@@ -925,7 +925,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const docRef = doc(db, 'userQuestions', user.uid);
       await setDoc(docRef, { tags, updatedAt: serverTimestamp() }, { merge: true });
-      console.log('✅ Tags saved to Firestore:', tags.length);
+      console.log(' Tags saved to Firestore:', tags.length);
     } catch (error: any) {
       console.error('Failed to save tags to Firestore:', error);
       // エラー時はローカルのみ（既に保存済み）
@@ -980,7 +980,7 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Debug: Log actual state values after updates
   useEffect(() => {
-    console.log('🔄 State updated - questions:', questions.length, 'folders:', folders.length);
+    console.log(' State updated - questions:', questions.length, 'folders:', folders.length);
   }, [questions, folders]);
 
   // ContextValueの作成

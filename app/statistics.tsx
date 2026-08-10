@@ -6,6 +6,7 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
+import { Clock } from 'lucide-react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { useQuestions } from './hooks/useQuestions';
 import { safeParseArray } from './utils/storageUtils';
@@ -177,7 +178,7 @@ export default function StatisticsScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          📊 {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
+           {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
@@ -190,9 +191,12 @@ export default function StatisticsScreen() {
       <ScrollView style={styles.content}>
         {/* スクリーンタイム推移（折れ線グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            ⏱ {locale === 'ja' ? 'スクリーンタイム推移' : 'Screen Time History'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Clock size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {locale === 'ja' ? 'スクリーンタイム推移' : 'Screen Time History'}
+            </Text>
+          </View>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={screenTimeChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />
@@ -211,7 +215,7 @@ export default function StatisticsScreen() {
         {/* 問題作成数の推移（棒グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            ✏️ {locale === 'ja' ? '作成問題数の推移' : 'Problems Created'}
+             {locale === 'ja' ? '作成問題数の推移' : 'Problems Created'}
           </Text>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={questionsChartData}>
@@ -231,7 +235,7 @@ export default function StatisticsScreen() {
         {/* クイズプレイ回数の推移（棒グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            🎮 {locale === 'ja' ? 'クイズプレイ回数の推移' : 'Quiz Plays'}
+             {locale === 'ja' ? 'クイズプレイ回数の推移' : 'Quiz Plays'}
           </Text>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={quizPlaysChartData}>
@@ -251,7 +255,7 @@ export default function StatisticsScreen() {
         {/* 正答率 */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            📈 {locale === 'ja' ? '正答率' : 'Correct Rate'}
+             {locale === 'ja' ? '正答率' : 'Correct Rate'}
           </Text>
           <View style={styles.statBox}>
             <Text style={[styles.statValue, { color: colors.success, fontSize: 36 }]}>

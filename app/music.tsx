@@ -10,6 +10,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useSE } from './seContext';
 import { useBGM } from './bgmContext';
+import { Music, Volume2, Play, Pause, SkipBack, SkipForward, Trash2, Lock, Unlock, FolderOpen, Plus, ClipboardList, X } from 'lucide-react';
 
 
 export default function MusicScreen() {
@@ -36,17 +37,17 @@ export default function MusicScreen() {
   const [isBGMToggling, setIsBGMToggling] = useState(false);
 
   const bgmPresets = {
-    default:   { name: t.standardBgm,        icon: '🎵', desc: t.standardBgm,           file: 'BGM1' },
-    japanese:  { name: t.japaneseStyle,   icon: '🎋', desc: t.japaneseStyleDesc, file: 'BGM2' },
-    energetic: { name: t.hypeUp,   icon: '🔥', desc: t.hypeUpDesc, file: 'BGM3' },
-    stylish:   { name: t.stylishCafe,    icon: '☕', desc: t.stylishCafeDesc, file: 'BGM4' },
+    default:   { name: t.standardBgm,        icon: 'music', desc: t.standardBgm,           file: 'BGM1' },
+    japanese:  { name: t.japaneseStyle,   icon: 'music', desc: t.japaneseStyleDesc, file: 'BGM2' },
+    energetic: { name: t.hypeUp,   icon: 'music', desc: t.hypeUpDesc, file: 'BGM3' },
+    stylish:   { name: t.stylishCafe,    icon: 'music', desc: t.stylishCafeDesc, file: 'BGM4' },
   };
 
   const seSets: Record<string, { name: string; icon: string; sound: string }> = {
-    effect1: { name: locale === 'ja' ? 'エフェクト1' : 'Effect 1', icon: '✨', sound: 'decide' },
-    effect2: { name: locale === 'ja' ? 'エフェクト2' : 'Effect 2', icon: '💫', sound: 'decide' },
-    effect3: { name: locale === 'ja' ? 'エフェクト3' : 'Effect 3', icon: '⚡', sound: 'decide' },
-    effect4: { name: locale === 'ja' ? 'エフェクト4' : 'Effect 4', icon: '🔊', sound: 'decide' },
+    effect1: { name: locale === 'ja' ? 'エフェクト1' : 'Effect 1', icon: 'sparkle', sound: 'decide' },
+    effect2: { name: locale === 'ja' ? 'エフェクト2' : 'Effect 2', icon: 'sparkle', sound: 'decide' },
+    effect3: { name: locale === 'ja' ? 'エフェクト3' : 'Effect 3', icon: 'zap', sound: 'decide' },
+    effect4: { name: locale === 'ja' ? 'エフェクト4' : 'Effect 4', icon: 'volume2', sound: 'decide' },
   };
 
   // 試し聞きボタンの定義
@@ -142,7 +143,7 @@ export default function MusicScreen() {
             {duplicateWarning.join(', ')}
           </Text>
           <TouchableOpacity style={[styles.closeWarning, { backgroundColor: colors.border }]} onPress={clearDuplicateWarning}>
-            <Text style={[styles.closeWarningText, { color: colors.text }]}>✕</Text>
+            <X size={16} color={colors.text} />
           </TouchableOpacity>
         </View>
       )}
@@ -223,7 +224,7 @@ export default function MusicScreen() {
         {/* 試し聞きボタン */}
         <View style={[styles.subSection, { backgroundColor: colors.card }]}>
           <Text style={[styles.subTitle, { color: colors.text }]}>
-            🔊 {t.previewSounds}
+            <Volume2 size={16} color={colors.primary} style={{ marginRight: 6 }} />{t.previewSounds}
           </Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             {t.currentSet}: {seSets[seType]?.name ?? seType}
@@ -247,8 +248,7 @@ export default function MusicScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.customBgm}</Text>
         {!isUnlocked ? (
           <View style={[styles.lockedBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={styles.lockEmoji}>🔒</Text>
-            <Text style={styles.chainEmoji}>⛓️⛓️⛓️</Text>
+            <Lock size={36} color={colors.textSecondary} />
             <Text style={[styles.lockedText, { color: colors.textSecondary }]}>
               {t.unlockBgmMsg}
             </Text>
@@ -258,7 +258,7 @@ export default function MusicScreen() {
             {/* ライブラリ */}
             <View style={[styles.subSection, { backgroundColor: colors.card }]}>
               <View style={styles.subHeader}>
-                <Text style={[styles.subTitle, { color: colors.text }]}>📂 {t.library}</Text>
+                <Text style={[styles.subTitle, { color: colors.text }]}><FolderOpen size={16} color={colors.primary} style={{ marginRight: 6 }} />{t.library}</Text>
                 <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.primary }]} onPress={pickFiles}>
                   <Text style={[styles.smallBtnText, { color: onPrimary }]}>+ {t.addMusic}</Text>
                 </TouchableOpacity>
@@ -270,7 +270,7 @@ export default function MusicScreen() {
               ) : (
                 library.map(file => (
                   <View key={file.id} style={[styles.trackRow, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>🎵 {file.name}</Text>
+                    <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}><Music size={14} color={colors.primary} style={{ marginRight: 4 }} />{file.name}</Text>
                     <View style={styles.trackActions}>
                       {activePlaylistId && (
                         <TouchableOpacity
@@ -283,7 +283,7 @@ export default function MusicScreen() {
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity style={[styles.tinyBtn, { backgroundColor: colors.error }]} onPress={() => removeFromLibrary(file.id)}>
-                        <Text style={styles.tinyBtnText}>✕</Text>
+                        <X size={14} color="#fff" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -294,7 +294,7 @@ export default function MusicScreen() {
             {/* プレイリスト */}
             <View style={[styles.subSection, { backgroundColor: colors.card }]}>
               <View style={styles.subHeader}>
-                <Text style={[styles.subTitle, { color: colors.text }]}>🎶 {t.playlists}</Text>
+                <Text style={[styles.subTitle, { color: colors.text }]}><Music size={16} color={colors.primary} style={{ marginRight: 6 }} />{t.playlists}</Text>
                 <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.primary }]} onPress={() => setShowNewPlaylistInput(v => !v)}>
                   <Text style={[styles.smallBtnText, { color: onPrimary }]}>+ {t.newPlaylist}</Text>
                 </TouchableOpacity>
@@ -335,7 +335,7 @@ export default function MusicScreen() {
                       </Text>
                     </View>
                     <TouchableOpacity style={[styles.tinyBtn, { backgroundColor: colors.error }]} onPress={() => deletePlaylist(pl.id)}>
-                      <Text style={styles.tinyBtnText}>🗑️</Text>
+                      <Trash2 size={14} color="#fff" />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 ))
@@ -345,7 +345,7 @@ export default function MusicScreen() {
             {/* アクティブプレイリストの中身 */}
             {activePlaylist && activeTracks.length > 0 && (
               <View style={[styles.subSection, { backgroundColor: colors.card }]}>
-                <Text style={[styles.subTitle, { color: colors.text }]}>📋 {activePlaylist.name}</Text>
+                <Text style={[styles.subTitle, { color: colors.text }]}><ClipboardList size={16} color={colors.primary} style={{ marginRight: 6 }} />{activePlaylist.name}</Text>
                 {activeTracks.map((track, i) => {
                   const isCurrent = i === currentIndex && isPlaying;
                   return (
@@ -356,11 +356,11 @@ export default function MusicScreen() {
                   }]}>
                     <TouchableOpacity style={{ flex: 1 }} onPress={() => play(i)}>
                       <Text style={[styles.trackName, { color: isCurrent ? onPrimary : colors.text, fontWeight: isCurrent ? 'bold' : 'normal' }]} numberOfLines={1}>
-                        {isCurrent ? '▶ ' : `${i + 1}. `}{track.name}
+                        {`${i + 1}. `}{track.name}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.tinyBtn, { backgroundColor: isCurrent ? 'rgba(255,255,255,0.3)' : colors.error }]} onPress={() => removeTrackFromPlaylist(activePlaylistId!, track.id)}>
-                      <Text style={styles.tinyBtnText}>✕</Text>
+                      <X size={14} color="#fff" />
                     </TouchableOpacity>
                   </View>
                   );
@@ -369,13 +369,13 @@ export default function MusicScreen() {
                 {/* 再生コントロール */}
                 <View style={styles.controls}>
                   <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.border }]} onPress={prev}>
-                    <Text style={styles.ctrlBtnText}>⏮</Text>
+                    <SkipBack size={20} color={colors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.playBtn, { backgroundColor: isPlaying ? colors.error : colors.success }]} onPress={togglePlay}>
-                    <Text style={styles.ctrlBtnText}>{isPlaying ? '❚❚' : '❯'}</Text>
+                    {isPlaying ? <Pause size={24} color="#fff" /> : <Play size={24} color="#fff" />}
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.border }]} onPress={next}>
-                    <Text style={styles.ctrlBtnText}>⏭</Text>
+                    <SkipForward size={20} color={colors.text} />
                   </TouchableOpacity>
                 </View>
 

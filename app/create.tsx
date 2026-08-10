@@ -22,6 +22,7 @@ import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
+import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText, ClipboardList } from 'lucide-react';
 import './create.css';
 
 export default function CreateQuestionScreen() {
@@ -85,13 +86,13 @@ export default function CreateQuestionScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCropUI, setShowCropUI] = useState(false);
   const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  // 🟢 ドラッグ状態はuseRefで管理（React Stateの非同期更新によるスマホでの遅延を防止）
+  //  ドラッグ状態はuseRefで管理（React Stateの非同期更新によるスマホでの遅延を防止）
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 🟢 画像添付UIを削除（OCR機能のみ使用）
+  //  画像添付UIを削除（OCR機能のみ使用）
 
   // tagMasterList は Context から取得するため、ローカルでのロードは不要
 
@@ -100,14 +101,14 @@ export default function CreateQuestionScreen() {
     setCropArea({ x: 0, y: 0, width: 0, height: 0 });
   };
 
-  // 🟢 デバッグログ関数
+  //  デバッグログ関数
   const logDebug = (label: string, data: Record<string, any>) => {
     console.log(`[OCR Debug] ${label}:`, JSON.stringify(data, null, 2));
   };
 
-  // 🟢 現在ドラッグ中のpointerIdを保持（マルチタッチの誤爆防止）
+  //  現在ドラッグ中のpointerIdを保持（マルチタッチの誤爆防止）
   const activePointerIdRef = useRef<number | null>(null);
-  // 🟢 コンテナの矩形はpointerdown時に1回だけ取得してキャッシュ
+  //  コンテナの矩形はpointerdown時に1回だけ取得してキャッシュ
   //    （move中に毎回getBoundingClientRectを呼ぶとスクロール直後などにズレる原因になる）
   const containerRectRef = useRef({ width: 0, height: 0 });
 
@@ -122,14 +123,14 @@ export default function CreateQuestionScreen() {
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
     activePointerIdRef.current = e.pointerId;
 
-    // 🟢 コンテナ基準で座標を取得（Overlayもコンテナ基準で配置される）
+    //  コンテナ基準で座標を取得（Overlayもコンテナ基準で配置される）
     const rect = containerRef.current.getBoundingClientRect();
     containerRectRef.current = { width: rect.width, height: rect.height };
 
     const x = clamp(e.clientX - rect.left, rect.width);
     const y = clamp(e.clientY - rect.top, rect.height);
 
-    // 🟢 useRefに即座に保存（React Stateの非同期更新による遅延を防止）
+    //  useRefに即座に保存（React Stateの非同期更新による遅延を防止）
     dragStartRef.current = { x, y };
     isDraggingRef.current = true;
 
@@ -154,12 +155,12 @@ export default function CreateQuestionScreen() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    // 🟢 useRefで即座に判定（React Stateの非同期更新に依存しない）
-    // 🟢 ドラッグ中のpointerId以外は無視（マルチタッチ対策）
+    //  useRefで即座に判定（React Stateの非同期更新に依存しない）
+    //  ドラッグ中のpointerId以外は無視（マルチタッチ対策）
     if (!isDraggingRef.current || !containerRef.current) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
 
-    // 🟢 pointerdown時にキャッシュした矩形サイズを使い、現在座標をコンテナ範囲内にクランプする。
+    //  pointerdown時にキャッシュした矩形サイズを使い、現在座標をコンテナ範囲内にクランプする。
     //    クランプしないと、指が画像の外（コンテナの外）まで速く動いたときに
     //    x/yがマイナスや画像幅を超えた値になり、overflow:hiddenで見た目上「消えた」ようになる。
     const rect = containerRef.current.getBoundingClientRect();
@@ -172,7 +173,7 @@ export default function CreateQuestionScreen() {
     const startX = dragStartRef.current.x;
     const startY = dragStartRef.current.y;
 
-    // 🟢 Math.min/Math.maxで「左上座標」と「サイズ」を同時に求める。
+    //  Math.min/Math.maxで「左上座標」と「サイズ」を同時に求める。
     //    指を上下左右どちらに動かしても、start/currentのどちらが小さいかだけで
     //    left/top/width/heightが一意に決まるため、符号(マイナス)の分岐ミスが起きない。
     const left = Math.min(startX, currentX);
@@ -186,7 +187,7 @@ export default function CreateQuestionScreen() {
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
 
-    // 🟢 useRefで即座にfalse設定
+    //  useRefで即座にfalse設定
     isDraggingRef.current = false;
     activePointerIdRef.current = null;
 
@@ -237,7 +238,7 @@ export default function CreateQuestionScreen() {
       grayValues[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     }
 
-    // 🟢 二値化の前にコントラストを軽く伸長し、文字の線が薄すぎ/濃すぎで
+    //  二値化の前にコントラストを軽く伸長し、文字の線が薄すぎ/濃すぎで
     //    大津の閾値が誤った位置に決まるのを防ぐ
     const contrasted = enhanceContrast(grayValues);
 
@@ -271,21 +272,21 @@ export default function CreateQuestionScreen() {
     }
 
     try {
-      // 🟢 表示座標（cropArea）→ natural座標（img.naturalWidth/Height基準）への倍率
+      //  表示座標（cropArea）→ natural座標（img.naturalWidth/Height基準）への倍率
       //    imgはコンテナ幅いっぱいに描画された唯一の子要素なので、
       //    imgのgetBoundingClientRect()はcropAreaを計算したコンテナのrectと一致する。
       const imgRect = img.getBoundingClientRect();
       const scaleX = nw / imgRect.width;
       const scaleY = nh / imgRect.height;
 
-      // 🟢 cropArea（表示座標）を natural座標（＝写真の実ピクセル座標）に変換。
+      //  cropArea（表示座標）を natural座標（＝写真の実ピクセル座標）に変換。
       //    Math.roundで端数を丸め、切り抜き境界のにじみ（アンチエイリアスのボケ）を防ぐ。
       const nx = Math.round(Math.max(0, Math.min(cropArea.x, cropArea.x + cropArea.width)) * scaleX);
       const ny = Math.round(Math.max(0, Math.min(cropArea.y, cropArea.y + cropArea.height)) * scaleY);
       const cropW = Math.round(Math.max(1, Math.abs(cropArea.width)) * scaleX);
       const cropH = Math.round(Math.max(1, Math.abs(cropArea.height)) * scaleY);
 
-      // 🟢 Tesseractは文字の高さがおおよそ30px以上ないと誤認識しやすい。
+      //  Tesseractは文字の高さがおおよそ30px以上ないと誤認識しやすい。
       //    選択範囲のnatural解像度が低い（＝遠くから撮った写真を小さく囲んだ等）場合は
       //    出力キャンバス側で拡大してから渡すことで認識率を底上げする。
       const MIN_OUTPUT_HEIGHT = 900;
@@ -306,7 +307,7 @@ export default function CreateQuestionScreen() {
         imgRectHeight: imgRect.height,
       });
 
-      // 🟢 natural座標でCanvasに直接描画（表示サイズCanvasは経由しない＝画質劣化なし）
+      //  natural座標でCanvasに直接描画（表示サイズCanvasは経由しない＝画質劣化なし）
       const canvas = document.createElement('canvas');
       canvas.width = outW;
       canvas.height = outH;
@@ -316,15 +317,15 @@ export default function CreateQuestionScreen() {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // 🟢 img要素から直接、natural解像度の実ピクセルを正確な座標で切り抜き、
+      //  img要素から直接、natural解像度の実ピクセルを正確な座標で切り抜き、
       //    必要なら同時に拡大（第5・第6引数がoutW/outHなのでdrawImageが拡大も担う）
       ctx.drawImage(img, nx, ny, cropW, cropH, 0, 0, outW, outH);
 
-      // 🟢 グレースケール化＋大津の二値化で文字と背景のコントラストを最大化
+      //  グレースケール化＋大津の二値化で文字と背景のコントラストを最大化
       //    （紙の質感・影・ノイズを消し、Tesseractの誤認識を大幅に減らす）
       binarizeCanvas(ctx, outW, outH);
 
-      // 🟢 JPEG圧縮はエッジにモスキートノイズを乗せてOCRを悪化させるため、
+      //  JPEG圧縮はエッジにモスキートノイズを乗せてOCRを悪化させるため、
       //    ロスレスなPNGで書き出す
       return canvas.toDataURL('image/png');
     } catch (err) {
@@ -478,7 +479,7 @@ export default function CreateQuestionScreen() {
         const target = e.target as HTMLInputElement;
         const file = target.files?.[0];
         
-        // 🟢 ファイル選択後に即座にinputをリセット（再選択可能にする）
+        //  ファイル選択後に即座にinputをリセット（再選択可能にする）
         if (target) target.value = '';
 
         if (!file) {
@@ -544,7 +545,7 @@ export default function CreateQuestionScreen() {
     setOcrLoading(true);
     setOcrProgress(0);
 
-    // 🟢 PSM/文字ブラックリストなどの詳細パラメータは Tesseract.recognize() の
+    //  PSM/文字ブラックリストなどの詳細パラメータは Tesseract.recognize() の
     //    オプション経由では設定できないため、createWorkerを使い明示的に指定する
     let worker: any = null;
 
@@ -563,13 +564,13 @@ export default function CreateQuestionScreen() {
       });
 
       await worker.setParameters({
-        // 🟢 横書きの単一ブロック（切り抜いた1問分のテキスト）を想定した
+        //  横書きの単一ブロック（切り抜いた1問分のテキスト）を想定した
         //    ページ分割モード。PSM 6 = "Assume a single uniform block of text"
         tessedit_pageseg_mode: '6',
-        // 🟢 単語間・行間のスペース構造を維持（日本語の読点/句点の直後などで
+        //  単語間・行間のスペース構造を維持（日本語の読点/句点の直後などで
         //    不要な半角スペースが増えるのは後段のクレンジングで除去する）
         preserve_interword_spaces: '1',
-        // 🟢 問題文には基本的に現れない記号を除外し、
+        //  問題文には基本的に現れない記号を除外し、
         //    「/」「@」「_」「|」等のノイズ誤認識を根本から抑制する
         tessedit_char_blacklist: '|_^~｀`«»‹›¤¦',
       });
@@ -581,15 +582,15 @@ export default function CreateQuestionScreen() {
       setOcrProgress(100);
 
       if (text && text.trim().length > 0) {
-        // 🟢 1. 行頭・行末の孤立した記号ノイズ（/ @ _ | 等）を除去
+        //  1. 行頭・行末の孤立した記号ノイズ（/ @ _ | 等）を除去
         const denoised = stripNoiseSymbols(text.trim());
 
-        // 🟢 2. 日本語や句読点に挟まれた不要な半角スペースだけを自動削除する（英単語間のスペースは維持）
+        //  2. 日本語や句読点に挟まれた不要な半角スペースだけを自動削除する（英単語間のスペースは維持）
         const cleanedText = denoised.replace(/([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])\s+(?=[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF。、？！])/g, '$1');
 
         console.log("OCR Result (cleaned):", cleanedText);
 
-        // 🟢 確実にテキストを反映（コールバック形式で最新のstateを参照）
+        //  確実にテキストを反映（コールバック形式で最新のstateを参照）
         if (ocrTarget.type === 'question') {
           setQuestion(prev => prev ? `${prev}\n${cleanedText}` : cleanedText);
         } else {
@@ -617,7 +618,7 @@ export default function CreateQuestionScreen() {
       console.error("OCR Critical Catch:", err);
       Alert.alert("OCRエラー", "文字認識中にエラーが発生しました。お使いのブラウザの制限やネットワーク環境をご確認ください。");
     } finally {
-      // 🟢 workerを確実に破棄（放置するとOCRを繰り返すたびにメモリを消費し続ける）
+      //  workerを確実に破棄（放置するとOCRを繰り返すたびにメモリを消費し続ける）
       if (worker) {
         try {
           await worker.terminate();
@@ -640,7 +641,7 @@ export default function CreateQuestionScreen() {
 
   const saveQuestion = async (newQuestionData: Partial<Question>): Promise<boolean> => {
     try {
-      // 🟢 問題数の制限を一時的に無効化（学習用途のため）
+      //  問題数の制限を一時的に無効化（学習用途のため）
       // const stats = await loadStats();
       // const limit = stats.questionSlots ?? 20;
       // if (questions.length >= limit) {
@@ -681,7 +682,7 @@ export default function CreateQuestionScreen() {
   const handleManualCreate = async () => {
     // Prevent double submission
     if (isCreating) {
-      console.log('⏳ 既に作成中です');
+      console.log('既に作成中です');
       return;
     }
 
@@ -703,7 +704,7 @@ export default function CreateQuestionScreen() {
       if (cleanedGroups.length === 0) { SoundManager.play('select'); Alert.alert(t.error, t.enterAnswer); return; }
 
       dataToSave.descriptiveAnswerGroups = cleanedGroups;
-      // ❌ descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
+      //  descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
       //    （Firestore でフィールド型の競合エラーを避けるため）
       dataToSave.matchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     } else if (answerType === 'truefalse') {
@@ -719,7 +720,7 @@ export default function CreateQuestionScreen() {
     if (success) {
       SoundManager.play('complete');
       // Show toast notification instead of Alert
-      setToastMessage('✅ 問題を作成しました！');
+      setToastMessage(' 問題を作成しました！');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000); // Auto dismiss after 3s
       
@@ -803,7 +804,7 @@ export default function CreateQuestionScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* 🟢 ローディングを最前面に表示 */}
+      {/*  ローディングを最前面に表示 */}
       {ocrLoading && (
         <View style={styles.ocrLoadingOverlay}>
           <View style={[styles.ocrLoadingContent, { backgroundColor: colors.card }]}>
@@ -819,7 +820,7 @@ export default function CreateQuestionScreen() {
 
       <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0 }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          ✏️ {locale === 'ja' ? '問題作成' : 'Create Question'}
+          <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
@@ -849,7 +850,7 @@ export default function CreateQuestionScreen() {
               fontWeight: 'bold', 
               fontSize: 13 
             }]}>
-              {isTagDeleteMode ? '✕ キャンセル' : '− タグ'}
+              {isTagDeleteMode ? ' キャンセル' : '− タグ'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -858,6 +859,15 @@ export default function CreateQuestionScreen() {
           >
             <Text style={[styles.addTagHeaderBtnText, { color: onPrimary, fontWeight: 'bold', fontSize: 13 }]}>
               ＋ タグ
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary + '30', borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}
+          >
+            <ClipboardList size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>
+              {locale === 'ja' ? '管理' : 'Manage'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
@@ -919,9 +929,9 @@ export default function CreateQuestionScreen() {
                         fontSize: 13,
                       }
                     ]}>
-                      {isDeleteMode ? '✕ ' : ''}
-                      {!isDeleteMode && tagLockMode[tag] ? '🔒 ' : ''}
-                      {isSelected && !isDeleteMode && !tagLockMode[tag] ? '✓ ' : ''}{tag}
+                      {isDeleteMode ? ' ' : ''}
+                      {!isDeleteMode && tagLockMode[tag] ? ' ' : ''}
+                      {isSelected && !isDeleteMode && !tagLockMode[tag] ? ' ' : ''}{tag}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -930,7 +940,7 @@ export default function CreateQuestionScreen() {
           </ScrollView>
           {isTagDeleteMode && (
             <Text style={{ color: colors.error, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-              {locale === 'ja' ? '⚠️ 削除したいタグをタップしてください' : '⚠️ Tap the tag you want to delete'}
+              {locale === 'ja' ? ' 削除したいタグをタップしてください' : ' Tap the tag you want to delete'}
             </Text>
           )}
         </View>
@@ -957,7 +967,7 @@ export default function CreateQuestionScreen() {
               onPress={() => handleOcrExtract({ type: 'question' })}
               disabled={ocrLoading}
             >
-              <Text style={{ fontSize: 20, color: onPrimary }}>📷</Text>
+              <ScanText size={20} color={onPrimary} />
             </TouchableOpacity>
           )}
         </View>
@@ -966,7 +976,7 @@ export default function CreateQuestionScreen() {
         {/* 読み仮名入力（任意） */}
         <View style={{ marginTop: 8, marginBottom: 12 }}>
           <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>
-            📖 {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}
+             {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}
           </Text>
           <TextInput
             style={[styles.input, {
@@ -1061,7 +1071,7 @@ export default function CreateQuestionScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={[styles.answerGroupHeader, { backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }]}>
                       <Text style={[styles.answerGroupHeaderText, { color: colors.primary, fontWeight: 'bold', fontSize: 13 }]}>
-                        {locale === 'ja' ? `📝 正解 ${groupIndex + 1}` : `✅ Answer ${groupIndex + 1}`}
+                        {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
                       </Text>
                     </View>
                     <TouchableOpacity
@@ -1069,7 +1079,7 @@ export default function CreateQuestionScreen() {
                       onPress={() => handleOcrExtract({ type: 'answer', groupIndex, answerIndex: 0 })}
                       disabled={ocrLoading}
                     >
-                      <Text style={{ fontSize: 16, color: onPrimary }}>📷</Text>
+                      <Camera size={16} color={onPrimary} />
                     </TouchableOpacity>
                   </View>
                   {answerGroups.length > 1 && groupIndex > 0 && (
@@ -1080,7 +1090,7 @@ export default function CreateQuestionScreen() {
                         setAnswerGroups(newGroups.length > 0 ? newGroups : [['']]);
                       }}
                     >
-                      <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}>✕ {locale === 'ja' ? '削除' : 'Remove'}</Text>
+                      <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}> {locale === 'ja' ? '削除' : 'Remove'}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1250,19 +1260,19 @@ export default function CreateQuestionScreen() {
           disabled={isCreating}
         >
           <Text style={[styles.buttonText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#ffffff' }]}>
-            {isCreating ? '⏳ 作成中...' : t.createQuestion}
+            {isCreating ? locale === 'ja' ? '作成中...' : 'Creating...' : t.createQuestion}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* 🟢 画像添付UIを削除（OCR機能のみ使用） */}
+      {/*  画像添付UIを削除（OCR機能のみ使用） */}
 
       {/* タグ追加モーダル（問題集作成と同様のスタイル） */}
       <Modal visible={showAddTagModal} transparent animationType="fade" statusBarTranslucent={true}>
         <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {locale === 'ja' ? '🏷️ 新しいタグを追加' : '🏷️ Add New Tag'}
+              {locale === 'ja' ? ' 新しいタグを追加' : ' Add New Tag'}
             </Text>
             <TextInput
               style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
@@ -1303,7 +1313,7 @@ export default function CreateQuestionScreen() {
         <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? 'タグを削除' : 'Delete Tag'}
+               {locale === 'ja' ? 'タグを削除' : 'Delete Tag'}
             </Text>
             <Text style={[{ color: colors.textSecondary, textAlign: 'center', marginBottom: 20, fontSize: 14, lineHeight: 22 }]}>
               {locale === 'ja'
@@ -1488,7 +1498,7 @@ const styles = StyleSheet.create({
   cropButtons: { flexDirection: 'row', justifyContent: 'center' },
   cropButton: { paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', minWidth: 120 },
   cropButtonText: { fontSize: 14, fontWeight: 'bold' },
-  // 🟢 ローディングオーバーレイ用スタイル
+  //  ローディングオーバーレイ用スタイル
   ocrLoadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999999 },
   ocrLoadingContent: { padding: 30, borderRadius: 20, alignItems: 'center', minWidth: 200 },
   ocrLoadingText: { fontSize: 16, fontWeight: 'bold', marginTop: 15 },

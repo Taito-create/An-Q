@@ -1,12 +1,16 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, Dimensions, Modal } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../src/config/firebase';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { safeParseArray } from './utils/storageUtils';
+import { useAuth } from './auth/AuthContext';
+import { Trash2, X } from 'lucide-react';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -49,6 +53,7 @@ export default function CalendarScreen() {
   const locale = useLocale();
   const t = translations[locale];
   const screenType = useResponsive();
+  const { user } = useAuth();
   
   const isMobile = screenType !== 'desktop';
 
@@ -61,6 +66,18 @@ export default function CalendarScreen() {
   const [showForm, setShowForm] = useState(false);
   const [subjectInputs, setSubjectInputs] = useState<SubjectExam[]>([]);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; date: string } | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+
+  const showToastNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -72,24 +89,75 @@ export default function CalendarScreen() {
   }, []);
 
   const loadEvents = async () => {
-    try {
+    if (!user?.uid) {
+      // Fallback to AsyncStorage if not logged in
       const saved = await AsyncStorage.getItem('calendar_events');
-      const parsed = safeParseArray(saved, []);
-      setEvents(parsed);
-    } catch (e) {
-      console.error('Load failed:', e);
-      setEvents([]);
+      setEvents(safeParseArray<ScheduledEvent>(saved, []));
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'userEvents', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const events = data.events || [];
+        setEvents(events);
+        // Backup to AsyncStorage
+        await AsyncStorage.setItem('calendar_events', JSON.stringify(events));
+      } else {
+        // No Firestore data, try AsyncStorage
+        const saved = await AsyncStorage.getItem('calendar_events');
+        const events = safeParseArray<ScheduledEvent>(saved, []);
+        setEvents(events);
+        if (events.length > 0) {
+          // Migrate to Firestore
+          await saveEvents(events);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load events from Firestore:', error);
+      // Fallback to AsyncStorage
+      const saved = await AsyncStorage.getItem('calendar_events');
+      setEvents(safeParseArray<ScheduledEvent>(saved, []));
     }
   };
 
   const saveEvents = async (newEvents: ScheduledEvent[]) => {
+    // Always save to AsyncStorage first (backup)
+    await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
+    setEvents(newEvents);
+
+    // If logged in, save to Firestore
+    if (!user?.uid) return true;
+
     try {
-      await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
-      setEvents(newEvents);
+      //  Sanitize events: remove undefined values before saving to Firestore
+      const sanitizedEvents = newEvents.map(event => {
+        const sanitized: any = {
+          id: event.id,
+          date: event.date,
+          name: event.name,
+        };
+        // Only add fields if they exist and are not undefined
+        if (event.endDate !== undefined && event.endDate !== '') {
+          sanitized.endDate = event.endDate;
+        }
+        if (event.subjects !== undefined && event.subjects.length > 0) {
+          sanitized.subjects = event.subjects;
+        }
+        return sanitized;
+      });
+
+      const docRef = doc(db, 'userEvents', user.uid);
+      await setDoc(docRef, { 
+        events: sanitizedEvents, 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
+      console.log('Events saved to Firestore:', sanitizedEvents.length);
       return true;
-    } catch (e) {
-      console.error('Save failed:', e);
-      Alert.alert('エラー', '保存に失敗しました');
+    } catch (error) {
+      console.error('Failed to save events to Firestore:', error);
       return false;
     }
   };
@@ -211,8 +279,8 @@ export default function CalendarScreen() {
       id: editingEventId || Date.now().toString(),
       date: selectedDate,
       name: eventName.trim(),
-      endDate: isRange && endDate ? endDate : undefined,
-      subjects: isExam ? subjectInputs : undefined,
+      ...(isRange && endDate ? { endDate } : {}),  // Only add if exists
+      ...(isExam && subjectInputs.length > 0 ? { subjects: subjectInputs } : {}),  // Only add if exists
     };
 
     newEvents.push(newEvent);
@@ -222,7 +290,7 @@ export default function CalendarScreen() {
     if (success) {
       SoundManager.play('complete');
       resetForm();
-      Alert.alert('成功', '予定を保存しました');
+      showToastNotification(locale === 'ja' ? '予定を保存しました' : 'Event saved', 'success');
     }
   };
 
@@ -236,43 +304,80 @@ export default function CalendarScreen() {
     setEditingEventId(null);
   };
 
-  const deleteEvent = async (eventId: string, eventDate: string) => {
-    Alert.alert(
-      '確認', 
-      'この予定を削除しますか？',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const saved = await AsyncStorage.getItem('calendar_events');
-              const currentEvents = safeParseArray(saved, []);
-              const newEvents = currentEvents.filter((e: ScheduledEvent) => String(e.id) !== String(eventId));
-              
-              if (newEvents.length === currentEvents.length) {
-                Alert.alert('エラー', '削除対象が見つかりませんでした');
-                return;
-              }
-              
-              await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
-              setEvents(newEvents);
-              SoundManager.play('decide');
-              
-              if (selectedDate === eventDate) {
-                resetForm();
-              }
-              
-              Alert.alert('完了', '予定を削除しました');
-            } catch (error) {
-              console.error('削除エラー:', error);
-              Alert.alert('エラー', '削除に失敗しました');
-            }
-          },
-        },
-      ]
-    );
+  const deleteEvent = (eventId: string, eventDate: string) => {
+    console.log('deleteEvent called:', { eventId, eventDate });
+    setDeleteTarget({ id: eventId, date: eventDate });
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteTarget) return;
+    
+    const { id: eventId, date: eventDate } = deleteTarget;
+    console.log('confirmDeleteEvent called:', { eventId, eventDate });
+    
+    setShowDeleteConfirmModal(false);
+    
+    try {
+      // 1. Get current events from Firestore first (if logged in)
+      let currentEvents: ScheduledEvent[] = [];
+      if (user?.uid) {
+        try {
+          console.log(' Reading from Firestore...');
+          const docRef = doc(db, 'userEvents', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            currentEvents = data.events || [];
+            console.log(' Firestore events count:', currentEvents.length);
+          }
+        } catch (firestoreError) {
+          console.warn('Failed to load from Firestore:', firestoreError);
+        }
+      }
+      
+      // 2. If Firestore didn't return events, try AsyncStorage
+      if (currentEvents.length === 0) {
+        console.log(' Falling back to AsyncStorage...');
+        const saved = await AsyncStorage.getItem('calendar_events');
+        currentEvents = safeParseArray<ScheduledEvent>(saved, []);
+        console.log(' AsyncStorage events count:', currentEvents.length);
+      }
+      
+      const newEvents = currentEvents.filter((e: ScheduledEvent) => String(e.id) !== String(eventId));
+      
+      if (newEvents.length === currentEvents.length) {
+        console.warn('No event found to delete');
+        showToastNotification('削除対象が見つかりませんでした', 'error');
+        return;
+      }
+      
+      // 3. Save to AsyncStorage
+      await AsyncStorage.setItem('calendar_events', JSON.stringify(newEvents));
+      setEvents(newEvents);
+      
+      // 4. Save to Firestore (if logged in)
+      if (user?.uid) {
+        try {
+          const docRef = doc(db, 'userEvents', user.uid);
+          await setDoc(docRef, { events: newEvents, updatedAt: serverTimestamp() }, { merge: true });
+          console.log('Firestore synced');
+        } catch (firestoreError) {
+          console.warn('Failed to sync to Firestore:', firestoreError);
+        }
+      }
+      
+      SoundManager.play('decide');
+      if (selectedDate === eventDate) {
+        resetForm();
+      }
+      
+      showToastNotification(locale === 'ja' ? '予定を削除しました' : 'Event deleted', 'success');
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('Delete error:', error);
+      showToastNotification(locale === 'ja' ? '削除に失敗しました' : 'Delete failed', 'error');
+    }
   };
 
   const getDayStyle = (day: number) => {
@@ -455,7 +560,7 @@ export default function CalendarScreen() {
         >
           <Text style={[styles.toggleButtonText, { color: colors.primary }]}>
             {isRange
-              ? (locale === 'ja' ? '✓ 期間指定' : '✓ Date Range')
+              ? (locale === 'ja' ? ' 期間指定' : ' Date Range')
               : (locale === 'ja' ? '○ 期間指定' : '○ Date Range')}
           </Text>
         </TouchableOpacity>
@@ -498,7 +603,7 @@ export default function CalendarScreen() {
                   placeholderTextColor={colors.textSecondary}
                 />
                 <TouchableOpacity onPress={() => removeSubject(idx)} style={styles.removeSubjectBtn}>
-                  <Text style={[styles.removeSubjectText, { color: colors.error }]}>✕</Text>
+                  <X size={16} color={colors.error} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -584,7 +689,7 @@ export default function CalendarScreen() {
               style={[styles.deleteIcon, { backgroundColor: colors.error }]}
               onPress={() => deleteEvent(event.id, event.date)}
             >
-              <Text style={styles.deleteIconText}>🗑️</Text>
+              <Trash2 size={16} color="#fff" />
             </TouchableOpacity>
           </View>
         ))}
@@ -667,7 +772,7 @@ export default function CalendarScreen() {
                       style={[styles.deleteIcon, { backgroundColor: colors.error }]}
                       onPress={() => deleteEvent(event.id, event.date)}
                     >
-                      <Text style={styles.deleteIconText}>🗑️</Text>
+                      <Trash2 size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 ))
@@ -683,6 +788,73 @@ export default function CalendarScreen() {
           {renderCalendar()}
           {renderForm()}
           {renderEventList()}
+        </View>
+      )}
+
+      {/* 予定削除確認モーダル */}
+      <Modal visible={showDeleteConfirmModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
+              {locale === 'ja' ? '予定を削除' : 'Delete Event'}
+            </Text>
+            <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
+              {locale === 'ja'
+                ? 'この予定を削除してもよろしいですか？\nこの操作は取り消せません。'
+                : 'Are you sure you want to delete this event?\nThis action cannot be undone.'}
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={[styles.confirmModalCancel, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteTarget(null);
+                }}
+              >
+                <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
+                onPress={confirmDeleteEvent}
+              >
+                <Text style={styles.confirmModalConfirmText}>
+                  {locale === 'ja' ? '削除する' : 'Delete'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <View style={[styles.toastContainer, {
+          position: 'absolute',
+          bottom: 80,
+          left: '50%',
+          transform: [{ translateX: '-50%' }],
+          zIndex: 9999,
+        }]}>
+          <View style={[
+            styles.toast,
+            {
+              backgroundColor: toastType === 'success' ? colors.success : colors.error,
+              borderRadius: 12,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }
+          ]}>
+            <Text style={[styles.toastText, { color: '#fff', fontSize: 15, fontWeight: '600' }]}>
+              {toastMessage}
+            </Text>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -787,6 +959,76 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
+    color: '#fff',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  confirmModalContainer: {
+    width: '80%',
+    maxWidth: 300,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  confirmModalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmModalCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  confirmModalCancelText: {
+    fontWeight: 'bold',
+  },
+  confirmModalConfirm: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmModalConfirmText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: '50%',
+    transform: [{ translateX: '-50%' }],
+    zIndex: 9999,
+  },
+  toast: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  toastText: {
+    fontSize: 15,
+    fontWeight: '600',
     color: '#fff',
   },
 });

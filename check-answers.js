@@ -104,19 +104,19 @@ function traverseObject(obj, currentPath, userId) {
 }
 
 // 探索開始
-console.log('🔍 Firestore エクスポートを分析中...');
+console.log(' Firestore エクスポートを分析中...');
 traverseObject(data, '$', '');
 
 // 結果を表示
 console.log('\n' + '='.repeat(60));
-console.log(`📊 分析結果:`);
+console.log(` 分析結果:`);
 console.log(`   総問題数: ${totalQuestions}`);
 console.log(`   記述問題数: ${totalDescriptive}`);
-console.log(`   ❌ 回答データが失われた問題: ${affected.length}`);
+console.log(`    回答データが失われた問題: ${affected.length}`);
 console.log('='.repeat(60));
 
 if (affected.length > 0) {
-  console.log('\n❌ 影響を受けた問題一覧:');
+  console.log('\n 影響を受けた問題一覧:');
   affected.forEach((q, i) => {
     console.log(`\n${i + 1}. [${q.userId}] ID: ${q.questionId}`);
     console.log(`   問題文: ${q.question}`);
@@ -132,7 +132,7 @@ if (affected.length > 0) {
   // JSONファイルに保存
   const outputFile = path.join(process.cwd(), 'affected-questions.json');
   fs.writeFileSync(outputFile, JSON.stringify(affected, null, 2));
-  console.log(`\n✅ 詳細データを ${outputFile} に保存しました。`);
+  console.log(`\n 詳細データを ${outputFile} に保存しました。`);
 } else {
-  console.log('\n✅ 回答データが失われた問題は見つかりませんでした。');
+  console.log('\n 回答データが失われた問題は見つかりませんでした。');
 }

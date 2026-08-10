@@ -10,6 +10,7 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { loadStats, UserStats } from './missions';
+import { BarChart3 } from 'lucide-react';
 import { safeParse, safeParseArray } from './utils/storageUtils';
 
 // Type definitions
@@ -84,7 +85,7 @@ export default function ResultsScreen() {
 
   const loadData = async () => {
     try {
-      // ✅ location.state を優先
+      //  location.state を優先
       if (location.state?.results) {
         const loadedResults: QuizResult[] = location.state.results;
         setResults(loadedResults);
@@ -166,7 +167,7 @@ export default function ResultsScreen() {
 
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
-        <Text style={styles.emptyEmoji}>📊</Text>
+        <BarChart3 size={56} color={colors.primary} />
         <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{t.noQuizResults}</Text>
         <TouchableOpacity style={styles.startBtn} onPress={() => navigate('/quiz')}>
           <Text style={styles.startBtnText}>{t.takeQuizChallenge}</Text>
@@ -213,12 +214,12 @@ export default function ResultsScreen() {
       {/* Wrong Questions */}
       {wrongResults.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          <Text style={[styles.sectionTitle, { color: colors.text }]}> ⚠️ {t.questionsToReview}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>  {t.questionsToReview}</Text>
           {wrongResults.map((r, i) => (
             <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '15', borderLeftColor: colors.error, borderColor: colors.border }]}> 
               <Text style={styles.wrongQuestion}>{r.question}</Text>
               <Text style={styles.correctHint}>
-                {t.correctAnswer}: {typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '✕') : String(r.correctAnswer)}
+                {t.correctAnswer}: {typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '') : String(r.correctAnswer)}
               </Text>
             </View>
           ))}
@@ -238,7 +239,7 @@ export default function ResultsScreen() {
             <Text style={[styles.resultStatus, { color: r.isCorrect ? '#4CAF50' : '#F44336' }]}>
               {r.isCorrect 
                 ? `${t.correct} ○` 
-                : `${t.incorrect} ✕ (${t.correctAnswer}: ${typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '✕') : String(r.correctAnswer)})`}
+                : `${t.incorrect}  (${t.correctAnswer}: ${typeof r.correctAnswer === 'boolean' ? (r.correctAnswer ? '○' : '') : String(r.correctAnswer)})`}
             </Text>
           </View>
         ))}

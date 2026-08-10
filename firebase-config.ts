@@ -19,7 +19,7 @@ export const ALLOWED_DOMAINS = ['ga.ariake-nct.ac.jp'];
 export const ADMIN_EMAIL = Constants?.expoConfig?.extra?.adminEmail || 'your-admin@ga.ariake-nct.ac.jp';
 
 // デバッグログ
-console.log('🔧 Firebase Config Loaded:', {
+console.log(' Firebase Config Loaded:', {
   apiKey: firebaseConfig.apiKey?.substring(0, 15) + '...',
   projectId: firebaseConfig.projectId,
   authDomain: firebaseConfig.authDomain

@@ -5,6 +5,7 @@ import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { TITLE_BADGES, loadStats, saveStats, UserStats } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Lock } from 'lucide-react';
 
 export default function TitleScreen() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export default function TitleScreen() {
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
-            {ja ? '🏅 称号' : '🏅 Titles'}
+            {ja ? ' 称号' : ' Titles'}
           </Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontSize: fs(12) }]}>
             {unlockedCount} / {totalCount} {ja ? '解除済み' : 'unlocked'}
@@ -69,7 +70,7 @@ export default function TitleScreen() {
         {stats && (
           <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statsTitle, { color: colors.text, fontSize: fs(14) }]}>
-              {ja ? '📊 あなたの記録' : '📊 Your Stats'}
+              {ja ? ' あなたの記録' : ' Your Stats'}
             </Text>
             <View style={styles.statsGrid}>
               {[
@@ -125,7 +126,7 @@ export default function TitleScreen() {
                     </View>
                   )}
                   {!unlocked && (
-                    <Text style={[styles.lockIcon, { fontSize: fs(14) }]}>🔒</Text>
+                    <Lock size={Math.round(14 * (scale || 1))} color={colors.textSecondary} />
                   )}
                 </View>
                 <Text style={[styles.badgeDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>

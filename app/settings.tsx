@@ -6,17 +6,18 @@ import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { AnimationLevel, animationConfigs } from './animations';
+import { Check } from 'lucide-react';
 
-const themeOptions: { key: ThemeName; labelJa: string; labelEn: string; emoji: string }[] = [
-  { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue',   emoji: '🔵' },
-  { key: 'green',  labelJa: 'グリーン', labelEn: 'Green',  emoji: '🟢' },
-  { key: 'orange', labelJa: 'オレンジ', labelEn: 'Orange', emoji: '🟠' },
-  { key: 'pink',   labelJa: 'ピンク',   labelEn: 'Pink',   emoji: '🩷' },
-  { key: 'sakura', labelJa: 'サクラ',   labelEn: 'Sakura', emoji: '🌸' },
-  { key: 'purple', labelJa: 'パープル', labelEn: 'Purple', emoji: '🟣' },
-  { key: 'red',     labelJa: 'レッド',     labelEn: 'Red',     emoji: '🔴' },
-  { key: 'dark',    labelJa: 'ダーク',     labelEn: 'Dark',    emoji: '⚫' },
-  { key: 'cyberpunk', labelJa: 'サイバーパンク', labelEn: 'Cyberpunk', emoji: '🤖' },
+const themeOptions: { key: ThemeName; labelJa: string; labelEn: string }[] = [
+  { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue' },
+  { key: 'green',  labelJa: 'グリーン', labelEn: 'Green' },
+  { key: 'orange', labelJa: 'オレンジ', labelEn: 'Orange' },
+  { key: 'pink',   labelJa: 'ピンク',   labelEn: 'Pink' },
+  { key: 'sakura', labelJa: 'サクラ',   labelEn: 'Sakura' },
+  { key: 'purple', labelJa: 'パープル', labelEn: 'Purple' },
+  { key: 'red',     labelJa: 'レッド',     labelEn: 'Red' },
+  { key: 'dark',    labelJa: 'ダーク',    labelEn: 'Dark' },
+  { key: 'cyberpunk', labelJa: 'サイバーパンク', labelEn: 'Cyberpunk' },
 ];
 
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
@@ -115,11 +116,10 @@ export default function SettingsScreen() {
                 }]}
                 onPress={() => handleThemeSelect(opt.key)}
               >
-                <Text style={styles.themeEmoji}>{opt.emoji}</Text>
                 <Text style={[styles.themeLabel, { color: selected ? colors.primary : colors.text, fontSize: Math.round(11 * scale) }]}>
                   {ja ? opt.labelJa : opt.labelEn}
                 </Text>
-                {selected && <Text style={[styles.checkmark, { color: colors.primary }]}>✓</Text>}
+                {selected && <Check size={14} color={colors.primary} />}
               </TouchableOpacity>
             );
           })}
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
                   </View>
                 </View>
                 {animationLevel === level && (
-                  <Text style={[{ color: colors.primary, fontSize: 16, fontWeight: 'bold' }]}>✓</Text>
+                  <Check size={16} color={colors.primary} />
                 )}
               </TouchableOpacity>
             ))}

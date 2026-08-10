@@ -5,14 +5,15 @@ import { useBGM } from './bgmContext';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Music, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
 const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 const PRESET_NAMES: Record<string, { ja: string; en: string; icon: string }> = {
-  bgm:  { ja: 'デフォルト',     en: 'Default',        icon: '🎵' },
-  bgm2: { ja: '和の調べ',       en: 'Japanese Style',  icon: '🎋' },
-  bgm3: { ja: 'テンションUP！', en: 'Hype Up!',        icon: '🔥' },
-  bgm4: { ja: 'おしゃれカフェ', en: 'Stylish',         icon: '☕' },
+  bgm:  { ja: 'デフォルト',     en: 'Default',        icon: '' },
+  bgm2: { ja: '和の調べ',       en: 'Japanese Style',  icon: '' },
+  bgm3: { ja: 'テンションUP！', en: 'Hype Up!',        icon: '' },
+  bgm4: { ja: 'おしゃれカフェ', en: 'Stylish',         icon: '' },
 };
 
 export default function MiniPlayer() {
@@ -40,7 +41,7 @@ export default function MiniPlayer() {
         {/* メインバー */}
         <View style={styles.row}>
           <TouchableOpacity style={styles.trackInfo} onPress={() => setExpanded(v => !v)}>
-            <Text style={styles.noteIcon}>🎵</Text>
+            <Music size={16} color={colors.primary} />
             <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>
               {currentTrack?.name ?? '—'}
             </Text>
@@ -50,13 +51,13 @@ export default function MiniPlayer() {
           </TouchableOpacity>
           <View style={styles.controls}>
             <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.background }]} onPress={prev} disabled={tracks.length <= 1}>
-              <Text style={[styles.ctrlText, { color: tracks.length <= 1 ? colors.border : colors.primary }]}>⏮</Text>
+              <SkipBack size={18} color={tracks.length <= 1 ? colors.border : colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.playBtn, { backgroundColor: colors.primary }]} onPress={togglePlay}>
-              <Text style={[styles.playText, { color: onPrimary }]}>{customPlaying ? '⏸' : '▶'}</Text>
+              {customPlaying ? <Pause size={22} color={onPrimary} /> : <Play size={22} color={onPrimary} />}
             </TouchableOpacity>
             <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.background }]} onPress={next} disabled={tracks.length <= 1}>
-              <Text style={[styles.ctrlText, { color: tracks.length <= 1 ? colors.border : colors.primary }]}>⏭</Text>
+              <SkipForward size={18} color={tracks.length <= 1 ? colors.border : colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -94,7 +95,7 @@ export default function MiniPlayer() {
                     color: currentTrack?.id === t.id && customPlaying ? onPrimary : colors.text,
                     fontWeight: currentTrack?.id === t.id ? 'bold' : 'normal',
                   }]} numberOfLines={1}>
-                    {currentTrack?.id === t.id && customPlaying ? '▶ ' : `${i + 1}. `}{t.name}
+                    {`${i + 1}. `}{t.name}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -112,7 +113,7 @@ export default function MiniPlayer() {
       {/* メインバー */}
       <View style={styles.row}>
         <TouchableOpacity style={styles.trackInfo} onPress={() => setExpanded(v => !v)}>
-          <Text style={styles.noteIcon}>{preset.icon}</Text>
+          <Music size={16} color={colors.primary} />
           <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>
             {locale === 'ja' ? preset.ja : preset.en}
           </Text>
@@ -136,7 +137,7 @@ export default function MiniPlayer() {
               }
             }}
           >
-            <Text style={[styles.playText, { color: onPrimary }]}>{bgmEnabled ? '⏸' : '▶'}</Text>
+            {bgmEnabled ? <Pause size={22} color={onPrimary} /> : <Play size={22} color={onPrimary} />}
           </TouchableOpacity>
         </View>
       </View>

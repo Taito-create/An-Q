@@ -103,12 +103,12 @@ const parseAnswerGroups = (question: Question): string[][] | null => {
     if (typeof raw === 'string') {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        console.log('🔍 descriptiveAnswerGroups parsed from JSON string');
+        console.log(' descriptiveAnswerGroups parsed from JSON string');
         return parsed as string[][];
       }
     }
   } catch (e) {
-    console.error('⚠️ Failed to parse descriptiveAnswerGroups:', e);
+    console.error(' Failed to parse descriptiveAnswerGroups:', e);
   }
   return null;
 };
@@ -116,15 +116,15 @@ const parseAnswerGroups = (question: Question): string[][] | null => {
 /**
  * 問題オブジェクトから回答テキストを取得する
  * @param question 問題オブジェクト
- * @returns 回答テキスト（○/✕、正解選択肢、記述回答など）
+ * @returns 回答テキスト（○/、正解選択肢、記述回答など）
  */
 export const getAnswerText = (question: Question): string => {
-  console.log('🔍 getAnswerText called for:', question?.question);
-  console.log('🔍 answerType:', question?.answerType);
-  console.log('🔍 descriptiveAnswerGroups:', question?.descriptiveAnswerGroups);
-  console.log('🔍 descriptiveAnswerGroups type:', typeof question?.descriptiveAnswerGroups);
-  console.log('🔍 descriptiveAnswer:', question?.descriptiveAnswer);
-  console.log('🔍 Full question object keys:', question ? Object.keys(question) : 'N/A');
+  console.log(' getAnswerText called for:', question?.question);
+  console.log(' answerType:', question?.answerType);
+  console.log(' descriptiveAnswerGroups:', question?.descriptiveAnswerGroups);
+  console.log(' descriptiveAnswerGroups type:', typeof question?.descriptiveAnswerGroups);
+  console.log(' descriptiveAnswer:', question?.descriptiveAnswer);
+  console.log(' Full question object keys:', question ? Object.keys(question) : 'N/A');
 
   if (!question) return '問題データがありません';
 
@@ -144,7 +144,7 @@ export const getAnswerText = (question: Question): string => {
 
         if (groups.length > 0) {
           const result = groups.join(' | ');
-          console.log('✅ getAnswerText result (groups):', result);
+          console.log(' getAnswerText result (groups):', result);
           return result;
         }
       }
@@ -155,16 +155,16 @@ export const getAnswerText = (question: Question): string => {
           const answers = question.descriptiveAnswer.filter(a => a && a.trim());
           if (answers.length > 0) {
             const result = answers.join(' / ');
-            console.log('✅ getAnswerText result (array):', result);
+            console.log(' getAnswerText result (array):', result);
             return result;
           }
         } else if (typeof question.descriptiveAnswer === 'string') {
-          console.log('✅ getAnswerText result (string):', question.descriptiveAnswer);
+          console.log(' getAnswerText result (string):', question.descriptiveAnswer);
           return question.descriptiveAnswer;
         }
       }
 
-      console.warn('⚠️ No answer found for descriptive question');
+      console.warn(' No answer found for descriptive question');
       return '回答が設定されていません';
     }
 

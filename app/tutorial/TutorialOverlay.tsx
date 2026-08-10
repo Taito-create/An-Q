@@ -80,7 +80,7 @@ export default function TutorialOverlay() {
           <View style={[styles.taskCard, { backgroundColor: colors.card }]}>
             {/* タスクタイトル */}
             <Text style={[styles.taskTitle, { color: colors.text }]}>
-              🎯 {currentTask.taskTitle}
+               {currentTask.taskTitle}
             </Text>
             
             {/* アクションテキスト */}
@@ -92,7 +92,7 @@ export default function TutorialOverlay() {
             {currentTask.isInteractive && (
               <View style={[styles.interactiveBox, { backgroundColor: colors.primary + '20' }]}>
                 <Text style={[styles.interactiveText, { color: colors.primary }]}>
-                  ✨ 光っているボタンを押してみましょう！
+                   光っているボタンを押してみましょう！
                 </Text>
               </View>
             )}

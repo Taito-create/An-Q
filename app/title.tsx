@@ -7,6 +7,7 @@ import { TITLE_BADGES, loadStats, saveStats, UserStats } from './missions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { Lock } from 'lucide-react';
 
 export default function TitleScreen() {
   const navigate = useNavigate();
@@ -125,7 +126,7 @@ export default function TitleScreen() {
                     </View>
                   )}
                   {!unlocked && (
-                    <Text style={[styles.lockIcon, { fontSize: fs(14) }]}>🔒</Text>
+                    <Lock size={Math.round(14 * (scale || 1))} color={colors.textSecondary} />
                   )}
                 </View>
                 <Text style={[styles.badgeDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>

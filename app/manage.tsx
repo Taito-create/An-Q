@@ -7,6 +7,7 @@ import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { safeParseArray } from './utils/storageUtils';
+import { Timer, Trash2, RefreshCw, Plus } from 'lucide-react';
 
 interface CustomTimer {
   id: string;
@@ -159,7 +160,7 @@ export default function ManageScreen() {
       {/* ヘッダー */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          ⏱ {locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
+          <Timer size={20} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
@@ -253,7 +254,7 @@ export default function ManageScreen() {
               >
                 <Text style={[styles.customTimerName, { color: colors.text }]}>
                   {timer.name}
-                  {selectedTime === timer.minutes.toString() ? ` ${locale === 'ja' ? '✓ 選択中' : '✓ Active'}` : ''}
+                  {selectedTime === timer.minutes.toString() ? ` ${locale === 'ja' ? ' 選択中' : ' Active'}` : ''}
                 </Text>
                 <Text style={[styles.customTimerMinutes, { color: colors.textSecondary }]}>
                   {timer.minutes}{locale === 'ja' ? '分' : ' min'}
@@ -264,7 +265,7 @@ export default function ManageScreen() {
                 style={[styles.deleteButton, { backgroundColor: colors.error }]}
                 onPress={() => deleteCustomTimer(timer.id)}
               >
-                <Text style={styles.deleteButtonText}>🗑️</Text>
+                <Trash2 size={18} color="#fff" />
               </TouchableOpacity>
             </View>
           ))}
@@ -280,7 +281,7 @@ export default function ManageScreen() {
             }}
           >
         <Text style={[{ color: colors.error, fontWeight: '700', textAlign: 'center' }]}>
-          {locale === 'ja' ? '🔄 タイマーを解除（なし）' : '🔄 Clear Timer (No Limit)'}
+          {locale === 'ja' ? 'タイマーを解除（なし）' : 'Clear Timer (No Limit)'}
         </Text>
       </TouchableOpacity>
 

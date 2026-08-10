@@ -10,6 +10,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { safeParseArray } from './utils/storageUtils';
+import { Sparkles } from 'lucide-react';
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -56,7 +57,7 @@ export default function FeedbackScreen() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
-  // ✅ useCallback でメモ化して無限ループを防止
+  //  useCallback でメモ化して無限ループを防止
   const loadData = useCallback(async () => {
     try {
       // データの読み込み
@@ -83,7 +84,7 @@ export default function FeedbackScreen() {
 
   useEffect(() => {
     loadData();
-  }, [loadData]); // ✅ 正しい依存配列
+  }, [loadData]); //  正しい依存配列
 
   const appendHistory = async (currentResults: QuizResult[], historyRaw: string | null) => {
     try {
@@ -190,7 +191,7 @@ export default function FeedbackScreen() {
   if (total === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
-        <Text style={styles.emptyEmoji}>📋</Text>
+        <Sparkles size={56} color={colors.primary} />
         <Text style={[styles.emptyTitle, { color: colors.text }]}>{t.noResultsYet}</Text>
         <TouchableOpacity style={[styles.startBtn, { backgroundColor: colors.primary }]} onPress={() => navigate('/quiz')}>
           <Text style={[styles.startBtnText, { color: onPrimary }]}>{t.takeQuizChallenge}</Text>
@@ -261,7 +262,7 @@ export default function FeedbackScreen() {
                       styles.starText,
                       star <= rating ? styles.starActive : styles.starInactive
                     ]}>
-                      {star <= rating ? '★' : '☆'}
+                      {star <= rating ? '' : ''}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -285,7 +286,7 @@ export default function FeedbackScreen() {
                       { color: colors.textSecondary },
                       difficulty === level && [
                         styles.difficultyTextActive,
-                        // 🟢 サイバーパンク/ダークで背景がネオン色になる場合は黒文字に切り替え
+                        //  サイバーパンク/ダークで背景がネオン色になる場合は黒文字に切り替え
                         { color: (isCyberpunk || currentTheme === 'dark') ? colors.text : onPrimary },
                       ],
                     ]}>
@@ -329,7 +330,7 @@ export default function FeedbackScreen() {
 
       {wrongResults.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>⚠️ {t.questionsToReview}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> {t.questionsToReview}</Text>
           {wrongResults.map((r, i) => (
             <View key={i} style={[styles.wrongCard, { backgroundColor: colors.error + '20', borderColor: colors.border }]}>
               <Text style={[styles.wrongQuestion, { color: colors.text }]}>{r.question}</Text>
@@ -361,7 +362,7 @@ export default function FeedbackScreen() {
 
       {history.length > 0 && (
         <View style={[styles.section, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>📈 {t.progressHistory}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}> {t.progressHistory}</Text>
           {history.map((h, i) => (
             <View key={i} style={styles.historyRow}>
               <Text style={[styles.historyDate, { color: colors.textSecondary }]}>{h.date}</Text>

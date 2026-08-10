@@ -7,6 +7,7 @@ import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { loadStats, saveStats } from './missions';
+import { Coins, Sparkles, Gift } from 'lucide-react';
 
 const FORTUNES = {
   ja: [
@@ -105,11 +106,11 @@ export default function GachaScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          🎋 {locale === 'ja' ? 'おみくじ' : 'Omikuji'}
+          <Sparkles size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'おみくじ' : 'Omikuji'}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Text style={[styles.coinText, { color: colors.primary }]}>
-            💰 {coins} {locale === 'ja' ? 'コイン' : 'Coins'}
+            <Coins size={18} color={colors.primary} style={{ marginRight: 4 }} />{coins} {locale === 'ja' ? 'コイン' : 'Coins'}
           </Text>
           <TouchableOpacity
             style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
@@ -126,7 +127,7 @@ export default function GachaScreen() {
         {!result ? (
           <>
             <Text style={[styles.costText, { color: colors.text }]}>
-              🎴 {locale === 'ja' ? '1回 30コイン' : '30 coins per draw'}
+              <Gift size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '1回 30コイン' : '30 coins per draw'}
             </Text>
             <TouchableOpacity
               style={[styles.drawButton, { backgroundColor: colors.primary }]}
@@ -148,7 +149,7 @@ export default function GachaScreen() {
             </Text>
             {result.reward > 0 && (
               <Text style={[styles.resultReward, { color: colors.success }]}>
-                ✨ +{result.reward} {locale === 'ja' ? 'コイン' : 'Coins'}
+                <Sparkles size={18} color={colors.success} style={{ marginRight: 4 }} />+{result.reward} {locale === 'ja' ? 'コイン' : 'Coins'}
               </Text>
             )}
             <TouchableOpacity

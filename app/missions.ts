@@ -101,18 +101,18 @@ export const MISSIONS: Mission[] = [
 // 称号定義
 // ─────────────────────────────────────────────
 export const TITLE_BADGES: TitleBadge[] = [
-  { id: 'beginner',    icon: '🌱', titleJa: '初学者',     titleEn: 'Beginner',      descJa: 'クイズを初めてプレイした',       descEn: 'Played your first quiz',              condition: s => s.quizPlayed >= 1 },
-  { id: 'studious',    icon: '📖', titleJa: '勉強家',     titleEn: 'Studious',      descJa: 'クイズを10回プレイした',         descEn: 'Played 10 quizzes',                   condition: s => s.quizPlayed >= 10 },
-  { id: 'scholar',     icon: '🎓', titleJa: '学者',       titleEn: 'Scholar',       descJa: 'クイズを50回プレイした',         descEn: 'Played 50 quizzes',                   condition: s => s.quizPlayed >= 50 },
-  { id: 'master',      icon: '👑', titleJa: 'マスター',   titleEn: 'Master',        descJa: 'クイズを100回プレイした',        descEn: 'Played 100 quizzes',                  condition: s => s.quizPlayed >= 100 },
-  { id: 'creator',     icon: '✏️', titleJa: '問題作成者', titleEn: 'Creator',       descJa: '問題を10問作成した',             descEn: 'Created 10 questions',                condition: s => s.questionsCreated >= 10 },
-  { id: 'architect',   icon: '🏗️', titleJa: '設計者',     titleEn: 'Architect',     descJa: '問題を50問作成した',             descEn: 'Created 50 questions',                condition: s => s.questionsCreated >= 50 },
-  { id: 'perfecter',   icon: '💯', titleJa: '完璧主義者', titleEn: 'Perfectionist', descJa: 'パーフェクトを5回達成した',      descEn: 'Got 5 perfect scores',                condition: s => s.perfectQuiz >= 5 },
-  { id: 'streak7',     icon: '🔥', titleJa: '7日連続',    titleEn: '7-Day Streak',  descJa: '7日連続ログインした',            descEn: 'Logged in 7 days in a row',           condition: s => s.maxStreak >= 7 },
-  { id: 'streak30',    icon: '⚡', titleJa: '30日連続',   titleEn: '30-Day Streak', descJa: '30日連続ログインした',           descEn: 'Logged in 30 days in a row',          condition: s => s.maxStreak >= 30 },
-  { id: 'centurion',   icon: '🏆', titleJa: '百問正解',   titleEn: 'Centurion',     descJa: '累計100問正解した',              descEn: 'Answered 100 questions correctly',    condition: s => s.correctAnswers >= 100 },
-  { id: 'millionaire', icon: '📚', titleJa: '本持ち',     titleEn: 'Bookworm',      descJa: '本を100冊集めた',                descEn: 'Collected 100 books',                 condition: s => s.totalBooks >= 100 },
-  { id: 'planner',     icon: '📅', titleJa: '計画者',     titleEn: 'Planner',       descJa: '試験日を5件登録した',            descEn: 'Registered 5 exam dates',             condition: s => s.calendarEvents >= 5 },
+  { id: 'beginner',    icon: 'sprout', titleJa: '初学者',     titleEn: 'Beginner',      descJa: 'クイズを初めてプレイした',       descEn: 'Played your first quiz',              condition: s => s.quizPlayed >= 1 },
+  { id: 'studious',    icon: 'book-open', titleJa: '勉強家',     titleEn: 'Studious',      descJa: 'クイズを10回プレイした',         descEn: 'Played 10 quizzes',                   condition: s => s.quizPlayed >= 10 },
+  { id: 'scholar',     icon: 'graduation-cap', titleJa: '学者',       titleEn: 'Scholar',       descJa: 'クイズを50回プレイした',         descEn: 'Played 50 quizzes',                   condition: s => s.quizPlayed >= 50 },
+  { id: 'master',      icon: 'crown', titleJa: 'マスター',   titleEn: 'Master',        descJa: 'クイズを100回プレイした',        descEn: 'Played 100 quizzes',                  condition: s => s.quizPlayed >= 100 },
+  { id: 'creator',     icon: 'pencil', titleJa: '問題作成者', titleEn: 'Creator',       descJa: '問題を10問作成した',             descEn: 'Created 10 questions',                condition: s => s.questionsCreated >= 10 },
+  { id: 'architect',   icon: 'building-2', titleJa: '設計者',     titleEn: 'Architect',     descJa: '問題を50問作成した',             descEn: 'Created 50 questions',                condition: s => s.questionsCreated >= 50 },
+  { id: 'perfecter',   icon: 'check-circle-2', titleJa: '完璧主義者', titleEn: 'Perfectionist', descJa: 'パーフェクトを5回達成した',      descEn: 'Got 5 perfect scores',                condition: s => s.perfectQuiz >= 5 },
+  { id: 'streak7',     icon: 'flame', titleJa: '7日連続',    titleEn: '7-Day Streak',  descJa: '7日連続ログインした',            descEn: 'Logged in 7 days in a row',           condition: s => s.maxStreak >= 7 },
+  { id: 'streak30',    icon: 'zap', titleJa: '30日連続',   titleEn: '30-Day Streak', descJa: '30日連続ログインした',           descEn: 'Logged in 30 days in a row',          condition: s => s.maxStreak >= 30 },
+  { id: 'centurion',   icon: 'trophy', titleJa: '百問正解',   titleEn: 'Centurion',     descJa: '累計100問正解した',              descEn: 'Answered 100 questions correctly',    condition: s => s.correctAnswers >= 100 },
+  { id: 'millionaire', icon: 'book-open', titleJa: '本持ち',     titleEn: 'Bookworm',      descJa: '本を100冊集めた',                descEn: 'Collected 100 books',                 condition: s => s.totalBooks >= 100 },
+  { id: 'planner',     icon: 'calendar', titleJa: '計画者',     titleEn: 'Planner',       descJa: '試験日を5件登録した',            descEn: 'Registered 5 exam dates',             condition: s => s.calendarEvents >= 5 },
 ];
 
 // ─────────────────────────────────────────────
@@ -180,7 +180,7 @@ export async function loadStats(): Promise<UserStats> {
 // Firestoreからユーザー統計を読み込む（userProgress.tsと同期）
 export async function loadStatsFromFirestore(userId: string): Promise<UserStats | null> {
   try {
-    const docRef = doc(db, 'users', userId);
+    const docRef = doc(db, 'userProgress', userId);
     const snapshot = await getDoc(docRef);
     if (!snapshot.exists()) return null;
     
@@ -390,7 +390,7 @@ export interface ShopItem {
 export const SHOP_ITEMS: ShopItem[] = [
   {
     id: 'question_slot',
-    icon: '📝',
+    icon: '',
     titleJa: '問題スロット拡張 (+5問)',
     titleEn: 'Question Slot +5',
     descJa: '保存できる問題数を5問増やします（何度でも購入可）',
@@ -401,7 +401,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'custom_bgm',
-    icon: '🎵',
+    icon: '',
     titleJa: 'カスタムBGM解放',
     titleEn: 'Custom BGM Unlock',
     descJa: '自分の音楽ファイルをBGMとして使えるようになります',
@@ -413,7 +413,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'extra_theme',
-    icon: '🎨',
+    icon: '',
     titleJa: 'グラデーションテーマ解放',
     titleEn: 'Gradient Theme Unlock',
     descJa: 'テーマカラーにグラデーション模様を追加できます',

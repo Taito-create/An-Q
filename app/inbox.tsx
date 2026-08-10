@@ -8,6 +8,7 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { safeParseArray } from './utils/storageUtils';
+import { Inbox, PenSquare, BookOpen, AlertTriangle, Trash2, CheckCircle, Check } from 'lucide-react';
 
 interface ReceivedItem {
   id: string;
@@ -108,7 +109,6 @@ export default function InboxScreen() {
           ...item.data,
           id: Date.now() + Math.random(),
           isShared: true,
-          sharedMark: '🔗',
           originalInboxId: item.id,
         };
 
@@ -149,7 +149,6 @@ export default function InboxScreen() {
             ...q,
             id: newQuestionId,
             isShared: true,
-            sharedMark: '🔗',
             originalFolderId: newFolderId,
           };
 
@@ -280,9 +279,12 @@ export default function InboxScreen() {
           }
         ]}
       >
-        <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text }]}>
-          📬 {locale === 'ja' ? '受信ボックス' : 'Inbox'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Inbox size={20} color={colors.primary} />
+          <Text style={[{ fontSize: 18, fontWeight: '700', color: colors.text }]}>
+            {locale === 'ja' ? '受信ボックス' : 'Inbox'}
+          </Text>
+        </View>
 
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
@@ -356,7 +358,7 @@ export default function InboxScreen() {
                 onPress={() => toggleItemSelection(item.id)}
               >
                 {selectedItems.includes(item.id) && (
-                  <Text style={[{ color: onPrimary, fontWeight: '700' }]}>✓</Text>
+                  <Check size={14} color={onPrimary} />
                 )}
               </TouchableOpacity>
 
@@ -365,8 +367,8 @@ export default function InboxScreen() {
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                   <Text style={[{ fontSize: 14, fontWeight: '700', color: colors.text }]}>
                     {item.type === 'question' 
-                      ? `📝 ${locale === 'ja' ? '問題' : 'Question'}`
-                      : `📚 ${locale === 'ja' ? '問題集' : 'Folder'}`
+                      ? ` ${locale === 'ja' ? '問題' : 'Question'}`
+                      : ` ${locale === 'ja' ? '問題集' : 'Folder'}`
                     }
                   </Text>
                 </View>
@@ -388,8 +390,9 @@ export default function InboxScreen() {
                 {/* 重複警告 */}
                 {isDuplicate(item) && (
                   <View style={[styles.duplicateWarning, { backgroundColor: colors.warning + '20' }]}>
+                    <AlertTriangle size={12} color={colors.warning} style={{ marginRight: 4 }} />
                     <Text style={[styles.duplicateWarningText, { color: colors.warning }]}>
-                      ⚠️ {locale === 'ja' ? 'このユーザーから既に受信済みです' : 'Already received from this user'}
+                      {locale === 'ja' ? 'このユーザーから既に受信済みです' : 'Already received from this user'}
                     </Text>
                   </View>
                 )}
@@ -401,7 +404,7 @@ export default function InboxScreen() {
                 style={[{ justifyContent: 'center', alignItems: 'center', padding: 4 }]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={[styles.deleteIcon, { color: colors.error }]}>🗑️</Text>
+                <Trash2 size={18} color={colors.error} />
               </TouchableOpacity>
             </View>
           ))
@@ -425,9 +428,12 @@ export default function InboxScreen() {
             onPress={transferToManagement}
             disabled={selectedItems.length === 0}
           >
-            <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: 16 }]}>
-              ✅ {locale === 'ja' ? '問題管理に転送' : 'Transfer to Management'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CheckCircle size={18} color={onPrimary} />
+              <Text style={[{ color: onPrimary, fontWeight: '700', fontSize: 16 }]}>
+                {locale === 'ja' ? '問題管理に転送' : 'Transfer to Management'}
+              </Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -452,9 +458,12 @@ export default function InboxScreen() {
       <Modal visible={showDeleteConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? '削除確認' : 'Delete Confirmation'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Trash2 size={18} color={colors.text} />
+              <Text style={[styles.confirmModalTitle, { color: colors.text, marginBottom: 0 }]}>
+                {locale === 'ja' ? '削除確認' : 'Delete Confirmation'}
+              </Text>
+            </View>
             <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
               {locale === 'ja' 
                 ? 'このアイテムを削除してもよろしいですか？'

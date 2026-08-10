@@ -29,7 +29,7 @@ export const logAvailableVoices = (): void => {
     return;
   }
   const voices = window.speechSynthesis.getVoices();
-  console.log('🔊 Available voices:');
+  console.log(' Available voices:');
   voices.forEach((voice, i) => {
     console.log(
       `  ${i + 1}. ${voice.name} (${voice.lang}) - ${voice.localService ? 'local' : 'network'}${voice.default ? ' [default]' : ''}`
@@ -51,32 +51,32 @@ export interface VoiceConfig {
 const voicePresets: Record<VoicePreset, VoiceConfig> = {
   standard: { rate: 0.9, pitch: 1.0 },
 
-  // 🐢 ゆっくりボイス風 - 極限まで近づける
+  //  ゆっくりボイス風 - 極限まで近づける
   // 特徴: 非常に遅く、低めのピッチ、語尾が伸びる感じ
   yukkuri: {
     rate: 0.55,   // 非常に遅く (標準の半分以下)
     pitch: 0.85,  // 低め
   },
 
-  // 🐌 さらにゆっくり (極限)
+  //  さらにゆっくり (極限)
   slow: {
     rate: 0.4,    // 極端に遅い
     pitch: 0.9,
   },
 
-  // ⚡ 元気な声
+  //  元気な声
   energetic: {
     rate: 1.1,
     pitch: 1.3,   // 高め
   },
 
-  // 😌 落ち着いた声
+  //  落ち着いた声
   calm: {
     rate: 0.75,
     pitch: 0.9,
   },
 
-  // 🔊 深い声
+  //  深い声
   deep: {
     rate: 0.8,
     pitch: 0.6,   // 非常に低い
@@ -86,11 +86,11 @@ const voicePresets: Record<VoicePreset, VoiceConfig> = {
 // プリセットの表示名（日本語）
 export const voicePresetLabels: Record<VoicePreset, string> = {
   standard: 'スタンダード',
-  slow: '🐌 極限ゆっくり',
-  yukkuri: '🐢 ゆっくりボイス風',
-  energetic: '⚡ 元気な声',
-  calm: '😌 落ち着いた声',
-  deep: '🔊 深い声',
+  slow: ' 極限ゆっくり',
+  yukkuri: ' ゆっくりボイス風',
+  energetic: ' 元気な声',
+  calm: ' 落ち着いた声',
+  deep: ' 深い声',
 };
 
 // プリセットの説明（日本語）
@@ -233,25 +233,25 @@ const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'http://localh
  */
 export const speakWithServer = async (text: string): Promise<void> => {
   try {
-    console.log('🎤 speakWithServer called with:', text);
+    console.log(' speakWithServer called with:', text);
     const response = await fetch(VOICE_SERVER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
 
-    console.log('📡 Server response status:', response.status);
-    console.log('📡 Server response headers:', response.headers);
+    console.log(' Server response status:', response.status);
+    console.log(' Server response headers:', response.headers);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Server error response:', errorText);
+      console.error(' Server error response:', errorText);
       throw new Error(`Server error: ${response.status} - ${errorText}`);
     }
 
     const audioBlob = await response.blob();
-    console.log('📥 Audio blob size:', audioBlob.size, 'bytes');
-    console.log('📥 Audio blob type:', audioBlob.type);
+    console.log(' Audio blob size:', audioBlob.size, 'bytes');
+    console.log(' Audio blob type:', audioBlob.type);
 
     if (audioBlob.size === 0) {
       throw new Error('Received empty audio data');
@@ -261,13 +261,13 @@ export const speakWithServer = async (text: string): Promise<void> => {
     const audio = new Audio(audioUrl);
     audio.onended = () => URL.revokeObjectURL(audioUrl);
     audio.onerror = (e) => {
-      console.error('❌ Audio playback error:', e);
+      console.error(' Audio playback error:', e);
     };
     await audio.play();
-    console.log('✅ Audio playback started');
+    console.log(' Audio playback started');
 
   } catch (error) {
-    console.error('⚠️ サーバー音声に失敗:', error);
+    console.error(' サーバー音声に失敗:', error);
     await speakTextWithStoredPreset(text);
   }
 };
@@ -285,13 +285,13 @@ export const speakWithServer = async (text: string): Promise<void> => {
 export const speak = async (text: string): Promise<void> => {
   try {
     const useServer = await AsyncStorage.getItem(STORAGE_KEYS.USE_SERVER_VOICE);
-    console.log('🎤 speak() called, useServer:', useServer);
+    console.log(' speak() called, useServer:', useServer);
     // デフォルトはサーバー音声を有効とする（未設定時は true 扱い）
     if (useServer !== 'false') {
-      console.log('🎤 Using server voice (VOICEVOX Engine)');
+      console.log(' Using server voice (VOICEVOX Engine)');
       await speakWithServer(text);
     } else {
-      console.log('🎤 Using Web Speech API');
+      console.log(' Using Web Speech API');
       await speakTextWithStoredPreset(text);
     }
   } catch (error) {

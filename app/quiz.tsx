@@ -23,6 +23,7 @@ import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuizCompletion } from '../src/utils/userProgress';
 import { speak as speakText, stopSpeech, getStoredVoicePreset, setStoredVoicePreset, VoicePreset, voicePresetLabels, speakText as speakTextWithPreset } from './utils/speechUtils';
+import { Volume2, BookOpen, RefreshCw, Mic, ClipboardList, Flame, Folder, Play, Check, Pause, Heart, X } from 'lucide-react';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -75,7 +76,8 @@ export default function QuizScreen() {
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
   const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -88,7 +90,7 @@ export default function QuizScreen() {
   const [mistakeCount, setMistakeCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
-  const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);  // 両解モード用
+  const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isPaused, setIsPaused] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -109,7 +111,6 @@ export default function QuizScreen() {
   const isAllMatchMode = answerGroups.length > 1;
 
   // correctKeywords は互換性のため、グループ数分の配列として残す
-  // （見た目上「空欄がいくつあるか」を表すのに使われている箇所のため）
   const correctKeywords = useMemo(() => {
     return answerGroups.map((_, i) => i);
   }, [answerGroups]);
@@ -122,7 +123,7 @@ export default function QuizScreen() {
   const [autoPlayMode, setAutoPlayMode] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
-  const autoPlayInterval = 3; // 固定3秒
+  const autoPlayInterval = 3;
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const [quizCompleted, setQuizCompleted] = useState(false);
@@ -132,7 +133,7 @@ export default function QuizScreen() {
   const autoPlaySessionRef = useRef(0);
   const currentIndexRef = useRef(0);
 
-  // 🔇 無操作検知用（スリープ学習モード）
+  // 無操作検知用（スリープ学習モード）
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const inactivityTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -140,8 +141,6 @@ export default function QuizScreen() {
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
-
-  // タグフィルターは削除（フォルダフィルターのみ使用）
 
   // 長押し用 ref
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -196,7 +195,6 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // 初期ロード
   // ──────────────────────────────────────────────
-  // 長押しハンドラ
   const startLongPress = (direction: 'inc' | 'dec', maxCount: number) => {
     stepTimeoutRef.current = setTimeout(() => {
       stepIntervalRef.current = setInterval(() => {
@@ -224,8 +222,7 @@ export default function QuizScreen() {
   // 自動再生停止関数
   // ──────────────────────────────────────────────
   const stopAutoPlay = () => {
-    console.log('🛑 Stopping auto-play');
-    // セッションをインクリメントして逐次実行ループを確実に終了
+    console.log('Stopping auto-play');
     autoPlaySessionRef.current += 1;
     setAutoPlayMode(false);
     setQuizStarted(false);
@@ -240,15 +237,12 @@ export default function QuizScreen() {
     setVoicePreset(preset);
     await setStoredVoicePreset(preset);
     SoundManager.play('decide');
-    // テスト再生
     speakTextWithPreset(locale === 'ja' ? 'こんにちは！テストです。' : 'Hello! This is a test.', 'ja-JP', preset);
   };
 
   // ──────────────────────────────────────────────
   // 自動再生（音声完了待ち対応版）
   // ──────────────────────────────────────────────
-  // speechEnabled=true: 音声完了を待つ逐次実行モード
-  // speechEnabled=false: 従来のタイマーベース
   useEffect(() => {
     console.log('[AutoPlay] useEffect triggered:', {
       autoPlayMode,
@@ -268,7 +262,6 @@ export default function QuizScreen() {
       return;
     }
 
-    // 既存のタイマーをクリア
     if (autoPlayTimerRef.current) {
       console.log('[AutoPlay] Clearing existing timer');
       clearTimeout(autoPlayTimerRef.current);
@@ -277,13 +270,9 @@ export default function QuizScreen() {
 
     const sessionId = ++autoPlaySessionRef.current;
 
-    // ============================================================
-    // モードA: 音声完了待ちモード（speechEnabled=true）
-    // ============================================================
     if (speechEnabled) {
-      const PAUSE_AFTER_SPEECH = 500; // 音声終了後の待機時間（ms）
+      const PAUSE_AFTER_SPEECH = 500;
 
-      // キャンセル可能な待機ヘルパー
       const wait = (ms: number): Promise<boolean> => {
         return new Promise((resolve) => {
           const timer = setTimeout(() => {
@@ -294,7 +283,6 @@ export default function QuizScreen() {
         });
       };
 
-      // セッションが有効かチェック
       const isActive = () => sessionId === autoPlaySessionRef.current;
 
       const playQuestion = async (idx: number) => {
@@ -303,24 +291,20 @@ export default function QuizScreen() {
         const q = shuffledQuestions[idx];
         if (!q) return;
 
-        // 質問フェーズ開始
         autoPlayPhaseRef.current = 'question';
         setAutoPlayPhase('question');
         console.log(`[AutoPlay] Question phase: #${idx + 1}`);
 
-        // 音声再生（完了を待つ）
         const textToSpeak = q.reading || q.question;
-        console.log('🔊 About to speak question, using:', typeof speakText);
+        console.log('About to speak question, using:', typeof speakText);
         await speakText(textToSpeak);
-        console.log('✅ Question speech completed');
+        console.log('Question speech completed');
 
         if (!isActive()) return;
 
-        // 音声終了後の待機
         if (!await wait(PAUSE_AFTER_SPEECH)) return;
         if (!isActive()) return;
 
-        // 答えフェーズへ
         await playAnswer(idx);
       };
 
@@ -330,33 +314,26 @@ export default function QuizScreen() {
         const q = shuffledQuestions[idx];
         if (!q) return;
 
-        // 答えフェーズ開始
         autoPlayPhaseRef.current = 'answer';
         setAutoPlayPhase('answer');
         console.log(`[AutoPlay] Answer phase: #${idx + 1}`);
 
-        // 音声再生（完了を待つ）
         const answerText = getAnswerText(q);
         await speakText(answerText);
 
         if (!isActive()) return;
 
-        // 音声終了後の待機
         if (!await wait(PAUSE_AFTER_SPEECH)) return;
         if (!isActive()) return;
 
-        // 次の問題へ
         const nextIdx = idx + 1;
         if (nextIdx >= shuffledQuestions.length) {
-          // 全問完了 → 完了画面を表示
           console.log('[AutoPlay] All questions completed');
           setQuizCompleted(true);
           
-          // 10秒後に自動で再開
           await wait(10000);
           if (!isActive()) return;
           
-          // まだ完了画面が表示されている場合（ユーザーがボタンを押していない場合）
           if (quizCompleted) {
             console.log('[AutoPlay] Auto-restarting after 10 seconds');
             setQuizCompleted(false);
@@ -374,7 +351,6 @@ export default function QuizScreen() {
         }
       };
 
-      // 開始
       playQuestion(currentIndexRef.current);
 
       return () => {
@@ -385,9 +361,7 @@ export default function QuizScreen() {
       };
     }
 
-    // ============================================================
-    // モードB: タイマーベース（speechEnabled=false）
-    // ============================================================
+    // タイマーベースモード
     autoPlayPhaseRef.current = 'question';
     setAutoPlayPhase('question');
     autoPlayRemainingRef.current = autoPlayInterval;
@@ -405,21 +379,18 @@ export default function QuizScreen() {
 
       if (autoPlayRemainingRef.current <= 0) {
         if (autoPlayPhaseRef.current === 'question') {
-          // 質問 → 回答へ切り替え
           console.log('[AutoPlay] Switching to answer phase');
           autoPlayPhaseRef.current = 'answer';
           setAutoPlayPhase('answer');
           autoPlayRemainingRef.current = autoPlayInterval;
           setAutoPlayCountdown(autoPlayRemainingRef.current);
         } else {
-          // 回答表示終了 → 次の問題へ
           const nextIdx = currentIndexRef.current + 1;
           console.log('[AutoPlay] Moving to next question:', nextIdx, '/', shuffledQuestions.length);
 
           if (nextIdx >= shuffledQuestions.length) {
             console.log('[AutoPlay] All questions completed');
             if (autoPlayMode) {
-              // 自動再生モード: 常にループ（結果画面なし）
               console.log('[AutoPlay] Looping back to start (auto-play mode)');
               currentIndexRef.current = 0;
               setCurrentIndex(0);
@@ -438,12 +409,10 @@ export default function QuizScreen() {
               });
             }
           } else {
-            // 次の問題に遷移
             currentIndexRef.current = nextIdx;
             setCurrentIndex(nextIdx);
             questionStartTime.current = Date.now();
 
-            // 質問フェーズに戻してタイマーを継続
             autoPlayPhaseRef.current = 'question';
             setAutoPlayPhase('question');
             autoPlayRemainingRef.current = autoPlayInterval;
@@ -468,11 +437,8 @@ export default function QuizScreen() {
 
   // ──────────────────────────────────────────────
   // 無操作検知（スリープ学習モード用）
-  // ※ 音声完了待ちモードでは不要のため無効化
   // ──────────────────────────────────────────────
   useEffect(() => {
-    // speechEnabled=true（音声完了待ちモード）の場合は無操作検知を無効化
-    // 逐次実行モードが自動的に問題を進めるため、この機能は不要
     if (!autoPlayMode || !quizStarted || speechEnabled) {
       if (inactivityTimerRef.current) {
         clearInterval(inactivityTimerRef.current);
@@ -481,13 +447,12 @@ export default function QuizScreen() {
       return;
     }
 
-    // speechEnabled=false（タイマーベース）の場合のみ無操作検知を有効化
     const checkInactivity = () => {
       const now = Date.now();
       const elapsed = (now - lastInteraction) / 1000;
       
       if (elapsed >= 10) {
-        console.log('⏰ No interaction for 10s, repeating question');
+        console.log('No interaction for 10s, repeating question');
         setLastInteraction(Date.now());
       }
     };
@@ -515,13 +480,11 @@ export default function QuizScreen() {
 
   const loadTimerPresets = async () => {
     try {
-      // 保存されたアクティブタイマーを読み込む（実適用値）
       const savedTimer = await AsyncStorage.getItem('quiz_active_timer');
       if (savedTimer !== null) {
         const parsed = parseInt(savedTimer, 10);
         setPreTimerMinutes(isNaN(parsed) ? null : parsed);
       } else {
-        // デフォルトは APP_TIMER_SETTING から
         const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
         setPreTimerMinutes(timerVal ? parseInt(timerVal, 10) : 10);
       }
@@ -571,13 +534,10 @@ export default function QuizScreen() {
     }
   };
 
-  // 選択したタグとフォルダでフィルタリングされた問題
+  // 選択したフォルダでフィルタリングされた問題
   const getFilteredQuestions = () => {
-    // フォルダフィルタリングのみ（タグフィルターは削除）
     let filtered = allQuestions;
-    // フォルダでフィルタリング（フォルダが1つ以上選択されている場合）
     if (selectedFolderIds.length > 0) {
-      // 選択されたフォルダに含まれる全問題IDを収集
       const selectedQuestionIds = new Set<number>();
       folders
         .filter(f => selectedFolderIds.includes(f.id))
@@ -597,11 +557,8 @@ export default function QuizScreen() {
     const prevMax = prevFilteredLengthRef.current;
 
     if (preQuestionCount > filtered.length) {
-      // 絞り込みで問題数が減った場合：選択数を上限まで縮める
       setPreQuestionCount(filtered.length > 0 ? filtered.length : 1);
     } else if (prevMax !== null && preQuestionCount === prevMax && filtered.length > prevMax) {
-      // それまで「全問選択」状態だった場合のみ、
-      // 絞り込み解除で増えた分にも追従して増やす
       setPreQuestionCount(filtered.length);
     }
 
@@ -615,7 +572,6 @@ export default function QuizScreen() {
     if (!isTimerActive || !quizStarted) return;
     if (timeLeft <= 0) {
       setIsTimerActive(false);
-      // タイムアタックモードでも通常モードでも同じ処理
       handleTimeUp();
       return;
     }
@@ -628,7 +584,6 @@ export default function QuizScreen() {
   const handleTimeUp = async () => {
     setIsTimerActive(false);
     
-    // 未解答の問題を不正解として結果に追加
     const unansweredResults: QuizResult[] = [];
     for (let i = currentIndex; i < shuffledQuestions.length; i++) {
       const q = shuffledQuestions[i];
@@ -642,13 +597,12 @@ export default function QuizScreen() {
       });
     }
     
-    // 既存の結果と未解答結果を結合して終了処理
     const finalResults = [...results, ...unansweredResults];
     await finishQuizWithResults(finalResults);
   };
 
   // ──────────────────────────────────────────────
-  // クイズ開始（タグフィルター＋問題数制限＋リバース反映）
+  // クイズ開始
   // ──────────────────────────────────────────────
   const startQuiz = async () => {
     console.log('[AutoPlay] startQuiz called, quizStarted will be true');
@@ -663,7 +617,6 @@ export default function QuizScreen() {
     }
     SoundManager.play('decide');
 
-    // チャレンジモードのコインチェック（賭け金：50コイン）
     if (challengeMode) {
       const betAmount = 50;
       const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
@@ -676,25 +629,21 @@ export default function QuizScreen() {
         );
         return;
       }
-      // 賭け金を預かり
       await AsyncStorage.setItem('user_coins', (coins - betAmount).toString());
       await AsyncStorage.setItem('challenge_bet', betAmount.toString());
     }
 
-    // 選択タイマーを保存（ホーム画面表示用）
     if (preTimerMinutes !== null) {
       await AsyncStorage.setItem('quiz_active_timer', preTimerMinutes.toString());
     } else {
       await AsyncStorage.removeItem('quiz_active_timer');
     }
-    // 問題数制限（サドンデスモード時は無制限）
+
     let shuffled = [...filtered].sort(() => Math.random() - 0.5);
     if (!suddenDeathMode) {
       shuffled = shuffled.slice(0, preQuestionCount);
     } else {
-      // サドンデスモード: 問題数は全件
       setPreQuestionCount(filtered.length);
-      // シャッフルは全件
       shuffled = [...filtered].sort(() => Math.random() - 0.5);
     }
 
@@ -706,14 +655,12 @@ export default function QuizScreen() {
     setShowFeedback(false);
     setAnswered(false);
 
-    // サドンデス用の初期化
     if (suddenDeathMode) {
       setCurrentLives(suddenDeathLives);
       setComboCount(0);
       setMaxCombo(0);
     }
 
-    // タイマー設定（タイムアタック優先）
     if (timeAttackMode) {
       setTimerLimit(timeAttackLimit);
       setTimeLeft(timeAttackLimit);
@@ -738,10 +685,6 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // 回答処理
   // ──────────────────────────────────────────────
-  // 🟢 answered(State)だけでは、連打時に「更新が反映される前にもう一度呼ばれる」
-  //    競合が起き得る（Stateの反映は非同期のため）。useRefは即座に反映されるので、
-  //    ここで同期的に多重実行をブロックする。answeredがfalseに戻るたびに
-  //    下のuseEffectでrefも追従してリセットされる。
   const isSubmittingRef = useRef(false);
   useEffect(() => {
     isSubmittingRef.current = answered;
@@ -749,7 +692,7 @@ export default function QuizScreen() {
 
   const handleAnswer = async (answer: boolean | number | string) => {
     if (isSubmittingRef.current || answered) return;
-    isSubmittingRef.current = true; // Stateの反映を待たず即座にブロック
+    isSubmittingRef.current = true;
     setAnswered(true);
 
     const elapsed = Math.round((Date.now() - questionStartTime.current) / 1000);
@@ -762,7 +705,7 @@ export default function QuizScreen() {
         correct = answer === currentQuestion.trueFalseAnswer;
         actualCorrectAnswer = currentQuestion.trueFalseAnswer ?? false;
         if (!correct) {
-          setFeedbackMessage(actualCorrectAnswer ? '○' : '✕');
+          setFeedbackMessage(actualCorrectAnswer ? '○' : '');
         } else {
           setFeedbackMessage('');
         }
@@ -804,7 +747,6 @@ export default function QuizScreen() {
       timeSpent: elapsed,
     };
 
-    // サドンデス処理
     if (suddenDeathMode && !correct) {
       const newLives = currentLives - 1;
       setCurrentLives(newLives);
@@ -847,7 +789,6 @@ export default function QuizScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }).start();
 
-    // Lottieアニメーションを再生（正解・不正解時）
     if (correct) {
       setShowSuccessLottie(true);
       setTimeout(() => setShowSuccessLottie(false), 2500);
@@ -856,17 +797,15 @@ export default function QuizScreen() {
       setTimeout(() => setShowErrorLottie(false), 2500);
     }
 
-    // 正解時に解説を表示（○×問題と4択問題のみ、タイムアタックモードは除く）
     if (correct && !timeAttackMode && (currentQuestion.answerType === 'truefalse' || currentQuestion.answerType === 'multiple') && (currentQuestion.explanation || currentQuestion.wrongReason)) {
       setIsTimerActive(false);
       setShowExplanation(true);
       setExplanationText(currentQuestion.explanation || currentQuestion.wrongReason || '');
 
-      // 3秒後に解説を閉じてタイマーを再開し、次へ進む
       setTimeout(async () => {
         setShowExplanation(false);
         setExplanationText('');
-        setIsTimerActive(true); // タイマーを再開
+        setIsTimerActive(true);
 
         const finalResults = [...results, newResult];
         setResults(finalResults);
@@ -903,7 +842,6 @@ export default function QuizScreen() {
           setAnswered(false);
           setUserDescriptiveAnswer('');
           questionStartTime.current = Date.now();
-          // タイムアタックモードの場合、タイマーを再開
           if (timeAttackMode) {
             setIsTimerActive(true);
           }
@@ -922,7 +860,6 @@ export default function QuizScreen() {
     const totalQuestions = shuffledQuestions.length;
     const finalScore = finalResults.filter(r => r.isCorrect).length;
 
-    // 結果を保存（STORAGE_KEYS.STATS = 'quiz_stats' に保存）
     await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify({
       results: finalResults,
       total: totalQuestions,
@@ -943,13 +880,11 @@ export default function QuizScreen() {
       let totalCoinReward = baseCoins;
       let bookReward = 0;
 
-      // 全問正解ボーナス
       const isPerfect = finalScore === totalQuestions;
       if (isPerfect) {
         totalCoinReward += 10;
       }
 
-      // チャレンジモードの処理
       let challengeBet = 0;
       if (challengeMode) {
         challengeBet = parseInt(await AsyncStorage.getItem('challenge_bet') || '0', 10);
@@ -958,12 +893,9 @@ export default function QuizScreen() {
           totalXPReward *= 2;
           totalCoinReward *= 2;
           totalCoinReward += challengeBet;
-          // 賭け金は後で加算（すでに消費済みのため戻す）
         }
-        // 失敗時は賭け金没収（すでに消費済みのため何もしない）
       }
 
-      // ボス討伐モード（weak）: +50% XP
       const quizMode = await AsyncStorage.getItem('quiz_mode');
       const isBossMode = quizMode === 'weak';
       if (isBossMode) {
@@ -971,12 +903,10 @@ export default function QuizScreen() {
         await AsyncStorage.removeItem('quiz_mode');
       }
 
-      // サドンデス: 連続正解ボーナス
       if (suddenDeathMode && maxCombo > 0) {
         totalCoinReward += Math.floor(maxCombo / 2);
       }
 
-      // チャレンジモード成功時は本の報酬
       if (challengeMode && isPerfect) {
         const { loadStats: loadStats2, saveStats: saveStats2 } = await import('./missions');
         const stats = await loadStats2();
@@ -1000,11 +930,10 @@ export default function QuizScreen() {
 
       const levelUpMessage = rewardResult && rewardResult.leveledUp > 0
         ? locale === 'ja'
-          ? `\n🎉 レベルアップ！ +${rewardResult.levelUpCoins}コイン`
-          : `\n🎉 Level Up! +${rewardResult.levelUpCoins} coins`
+          ? `\nレベルアップ！ +${rewardResult.levelUpCoins}コイン`
+          : `\nLevel Up! +${rewardResult.levelUpCoins} coins`
         : '';
 
-      // 統計更新（missions 経由）
       try {
         const { loadStats: loadStats3, saveStats: saveStats3 } = await import('./missions');
         const stats = await loadStats3();
@@ -1015,35 +944,34 @@ export default function QuizScreen() {
         console.error('Failed to update coin stats:', e);
       }
       
-      // 報酬メッセージを表示
       let rewardMessage = locale === 'ja' 
-        ? `${finalScore}/${totalQuestions} 正解\n⚡ +${totalXPReward} XP\n✨ +${totalCoinReward} Qコイン${levelUpMessage}`
-        : `${finalScore}/${totalQuestions} correct\n⚡ +${totalXPReward} XP\n✨ +${totalCoinReward} Q Coins${levelUpMessage}`;
+        ? `${finalScore}/${totalQuestions} 正解\n+${totalXPReward} XP\n+${totalCoinReward} Qコイン${levelUpMessage}`
+        : `${finalScore}/${totalQuestions} correct\n+${totalXPReward} XP\n+${totalCoinReward} Q Coins${levelUpMessage}`;
       
       if (challengeMode && isPerfect) {
         rewardMessage += locale === 'ja'
-          ? `\n🏆 チャレンジ成功！\n💰 賭け金返還 + 📚 本1冊！`
-          : `\n🏆 Challenge Success!\n💰 Bet returned + 📚 1 book!`;
+          ? `\nチャレンジ成功！\n賭け金返還 + 本1冊！`
+          : `\nChallenge Success!\nBet returned + 1 book!`;
       } else if (challengeMode && !isPerfect) {
         rewardMessage += locale === 'ja'
-          ? `\n💔 チャレンジ失敗... 賭け金消失`
-          : `\n💔 Challenge Failed... Bet lost`;
+          ? `\nチャレンジ失敗... 賭け金消失`
+          : `\nChallenge Failed... Bet lost`;
       }
       
       if (bookReward > 0) {
         rewardMessage += locale === 'ja'
-          ? `\n📚 本を${bookReward}冊獲得！（問題スロット+5）`
-          : `\n📚 Got ${bookReward} book! (+5 question slots)`;
+          ? `\n本を${bookReward}冊獲得！（問題スロット+5）`
+          : `\nGot ${bookReward} book! (+5 question slots)`;
       }
       
       if (suddenDeathMode) {
         rewardMessage += locale === 'ja'
-          ? `\n🔥 最大連続正解: ${maxCombo}問`
-          : `\n🔥 Max Combo: ${maxCombo}`;
+          ? `\n最大連続正解: ${maxCombo}問`
+          : `\nMax Combo: ${maxCombo}`;
       }
       
       Alert.alert(
-        locale === 'ja' ? '🎉 クイズ完了！' : '🎉 Quiz Complete!',
+        locale === 'ja' ? 'クイズ完了！' : 'Quiz Complete!',
         rewardMessage
       );
     } catch (e) {
@@ -1085,27 +1013,23 @@ export default function QuizScreen() {
     const filtered = getFilteredQuestions();
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* ヘッダー（戻るボタン付き） */}
         <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            📝 {locale === 'ja' ? 'クイズ設定' : 'Quiz Settings'}
+            <ClipboardList size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'クイズ設定' : 'Quiz Settings'}
           </Text>
           <TouchableOpacity
             style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
-            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
-            </Text>
+            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 20, paddingBottom: 40 }}>
-          {/* 問題数 ステッパー + スライダー */}
+
+        <ScrollView contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
               {locale === 'ja' ? '問題数' : 'Number of Questions'}
             </Text>
-            {/* ステッパー */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
               <TouchableOpacity
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
@@ -1132,7 +1056,6 @@ export default function QuizScreen() {
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
               </TouchableOpacity>
             </View>
-            {/* スライダー */}
             <View style={{ marginBottom: 12 }}>
               <input
                 type="range"
@@ -1147,7 +1070,6 @@ export default function QuizScreen() {
                 className="quiz-range"
               />
             </View>
-            {/* スライダー下の表示: filtered.length を使う（タグ絞り込み反映） */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>
               {locale === 'ja' ? '1問' : '1 Q'}
@@ -1157,17 +1079,12 @@ export default function QuizScreen() {
               </Text>
               <Text style={[{ fontSize: 12, color: colors.textSecondary }]}>{filtered.length}{locale === 'ja' ? '問' : 'Q'}</Text>
             </View>
-            {/* タグ選択情報も併記 */}
-            <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-              {`すべての問題（全${allQuestions.length}問）`}
-            </Text>
           </View>
 
-          {/* 📁 問題集（フォルダ）で絞り込み */}
           {folders.length > 0 && (
             <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
               <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
-                📁 {locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
+                <Folder size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1198,7 +1115,7 @@ export default function QuizScreen() {
                           fontWeight: '600',
                           fontSize: 13,
                         }]}>
-                          📁 {folder.name}
+                          {folder.name}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -1215,12 +1132,11 @@ export default function QuizScreen() {
             </View>
           )}
 
-          {/* 🔄 リバースモードトグル */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: 16 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🔄 {locale === 'ja' ? 'リバースモード' : 'Reverse Mode'}
+                  <RefreshCw size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? 'リバースモード' : 'Reverse Mode'}
                 </Text>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja' ? '回答を問題文として表示し、問題文を答えます' : 'Show the answer as the question, and answer the original question'}
@@ -1243,12 +1159,11 @@ export default function QuizScreen() {
             </View>
           </View>
 
-          {/* 自動再生モード */}
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: autoPlayMode ? 16 : 0 }}>
               <View style={{ flex: 1, marginRight: 16 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  ▶ {locale === 'ja' ? '自動再生モード' : 'Auto Play Mode'}
+                  <Play size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '自動再生モード' : 'Auto Play Mode'}
                 </Text>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja'
@@ -1273,10 +1188,9 @@ export default function QuizScreen() {
             </View>
             {autoPlayMode && (
               <View>
-                {/* 🔊 音声読み上げトグル */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
                   <Text style={[{ fontSize: 13, color: colors.text }]}>
-                    🔊 {locale === 'ja' ? '音声読み上げ' : 'Voice Reading'}
+                    <Volume2 size={16} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '音声読み上げ' : 'Voice Reading'}
                   </Text>
                   <Switch
                     value={speechEnabled}
@@ -1285,11 +1199,10 @@ export default function QuizScreen() {
                     thumbColor="#FFF"
                   />
                 </View>
-                {/* 🎙️ ボイスプリセット選択 */}
                 {speechEnabled && (
                   <View style={{ marginTop: 12 }}>
                     <Text style={[{ fontSize: 13, color: colors.text, marginBottom: 8 }]}>
-                      🎙️ {locale === 'ja' ? 'ボイスプリセット' : 'Voice Preset'}
+                      <Mic size={16} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? 'ボイスプリセット' : 'Voice Preset'}
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {(['standard', 'yukkuri', 'slow', 'energetic', 'calm', 'deep'] as VoicePreset[]).map((preset) => (
@@ -1323,119 +1236,17 @@ export default function QuizScreen() {
           {autoPlayMode && (
             <Text style={{ fontSize: 11, color: colors.warning, marginTop: 6 }}>
               {locale === 'ja'
-                ? '⚠ 自動再生中は他のモードは使用できません'
-                : '⚠ Other modes are disabled during Auto Play'}
+                ? '自動再生中は他のモードは使用できません'
+                : 'Other modes are disabled during Auto Play'}
             </Text>
           )}
 
-          {/* チャレンジモード */}
-          <View
-            pointerEvents={autoPlayMode ? 'none' : 'auto'}
-            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
-              autoPlayMode && { opacity: 0.3 }
-            ]}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🪙 {locale === 'ja' ? 'チャレンジモード' : 'Challenge Mode'}
-                </Text>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-                  {locale === 'ja' ? '全問正解で報酬2倍！（参加費: 50コイン）' : 'Double rewards for perfect score! (Entry: 50 coins)'}
-                </Text>
-              </View>
-              <Switch
-                value={challengeMode}
-                onValueChange={setChallengeMode}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#FFF"
-              />
-            </View>
-          </View>
-
-          {/* サドンデスモード */}
-          <View
-            pointerEvents={autoPlayMode ? 'none' : 'auto'}
-            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
-              autoPlayMode && { opacity: 0.3 }
-            ]}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  🤍 {locale === 'ja' ? 'サドンデスモード' : 'Sudden Death'}
-                </Text>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-                  {locale === 'ja' ? '間違えるとライフ減少。0で即終了！' : 'Lose life on mistake. Game over at 0!'}
-                </Text>
-              </View>
-              <Switch
-                value={suddenDeathMode}
-                onValueChange={(val) => { setSuddenDeathMode(val); if (val) setPreQuestionCount(999); }}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#FFF"
-              />
-            </View>
-            {suddenDeathMode && (
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-                {[3, 2, 1].map(lives => (
-                  <TouchableOpacity
-                    key={lives}
-                    style={[{ flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, backgroundColor: suddenDeathLives === lives ? colors.primary : 'transparent' }]}
-                    onPress={() => setSuddenDeathLives(lives)}
-                  >
-                    <Text style={[{ color: suddenDeathLives === lives ? '#fff' : colors.primary, fontWeight: 'bold', fontSize: 14 }]}>🤍 x {lives}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* タイムアタックモード */}
-          <View
-            pointerEvents={autoPlayMode ? 'none' : 'auto'}
-            style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
-              autoPlayMode && { opacity: 0.3 }
-            ]}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  ⚡ {locale === 'ja' ? 'タイムアタック' : 'Time Attack'}
-                </Text>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
-                  {locale === 'ja' ? '1問あたりの制限時間内に回答！' : 'Answer within time limit per question!'}
-                </Text>
-              </View>
-              <Switch
-                value={timeAttackMode}
-                onValueChange={setTimeAttackMode}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#FFF"
-              />
-            </View>
-            {timeAttackMode && (
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-                {[3, 5, 10].map(seconds => (
-                  <TouchableOpacity
-                    key={seconds}
-                    style={[{ flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, backgroundColor: timeAttackLimit === seconds ? colors.primary : 'transparent' }]}
-                    onPress={() => setTimeAttackLimit(seconds)}
-                  >
-                    <Text style={[{ color: timeAttackLimit === seconds ? '#fff' : colors.primary, fontWeight: 'bold', fontSize: 14 }]}>{seconds}{locale === 'ja' ? '秒' : 'sec'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* スタートボタン */}
           <TouchableOpacity
-            style={[{ backgroundColor: colors.primary, padding: 18, borderRadius: isCyberpunk ? 0 : 16, alignItems: 'center', marginBottom: 12 }]}
+            style={[styles.startButton, { backgroundColor: colors.primary }]}
             onPress={startQuiz}
           >
-            <Text style={{ color: isCyberpunk ? '#1A1A1A' : '#fff', fontSize: 18, fontWeight: 'bold' }}>
-              ▶ {locale === 'ja' ? 'スタート' : 'Start'}
+            <Text style={[styles.startButtonText, { color: onPrimary }]}>
+              {locale === 'ja' ? 'クイズを開始' : 'Start Quiz'}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1497,15 +1308,12 @@ export default function QuizScreen() {
 
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
-      {/* 最上部：タイマー・一時停止・中断ボタン */}
       {!autoPlayMode && (
         <View style={styles.topBar}>
-          {/* 左側：タイマー */}
           <Text style={[styles.timer, { color: timerColor }]}>
             {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
           </Text>
           
-          {/* 中央：一時停止ボタン（絶対配置で中央に） */}
           <Pressable
             style={({ pressed }) => [
               styles.pauseBtn, 
@@ -1521,12 +1329,13 @@ export default function QuizScreen() {
               setIsTimerActive(isPaused);
             }}
           >
-            <Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>
-              {isPaused ? '▶ 再開' : '⏸ 一時停止'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {isPaused
+                ? <><Play size={18} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>再開</Text></>
+                : <><Pause size={18} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>一時停止</Text></>}
+            </View>
           </Pressable>
           
-          {/* 右側：中断ボタン（テーマカラー使用） */}
           <Pressable
             style={({ pressed }) => [
               styles.quitBtnTop, 
@@ -1555,7 +1364,7 @@ export default function QuizScreen() {
       {autoPlayMode && (
         <View style={[{ backgroundColor: colors.primary + '20', paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
           <Text style={[{ color: colors.primary, fontSize: 13, fontWeight: '600' }]}>
-            ▶ {locale === 'ja'
+            {locale === 'ja'
               ? (autoPlayPhase === 'question' ? '問題表示中' : '答え表示中')
               : (autoPlayPhase === 'question' ? 'Showing Question' : 'Showing Answer')}
           </Text>
@@ -1565,18 +1374,17 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* 自動再生中の答え表示エリア */}
       {autoPlayMode && autoPlayPhase === 'answer' && shuffledQuestions[currentIndex] && (
         <View style={[{ margin: 16, padding: 20, backgroundColor: colors.card, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: colors.success }]}>
           <Text style={[{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }]}>
-            {locale === 'ja' ? '✅ 答え' : '✅ Answer'}
+            {locale === 'ja' ? '答え' : 'Answer'}
           </Text>
           <Text style={[{ fontSize: 20, fontWeight: '700', color: colors.text }]}>
             {isReverseMode
               ? shuffledQuestions[currentIndex].question
               : (shuffledQuestions[currentIndex].descriptiveAnswer
                 || (shuffledQuestions[currentIndex].answerType === 'truefalse'
-                  ? (shuffledQuestions[currentIndex].trueFalseAnswer ? '○' : '✕')
+                  ? (shuffledQuestions[currentIndex].trueFalseAnswer ? '○' : '')
                   : shuffledQuestions[currentIndex].multipleChoice?.options?.[shuffledQuestions[currentIndex].multipleChoice?.correctAnswer ?? 0] || '')
               )
             }
@@ -1584,31 +1392,25 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* サドンデスモード: ライフ表示 */}
       {suddenDeathMode && quizStarted && (
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           {Array.from({ length: currentLives }).map((_, i) => (
-            <Text key={i} style={{ fontSize: 20, color: colors.error }}>🤍</Text>
+            <Heart key={i} size={20} color={colors.error} fill={colors.error} />
           ))}
           {comboCount > 0 && (
             <Text style={{ fontSize: 14, color: colors.success, marginLeft: 12 }}>
-              🔥 {comboCount}{locale === 'ja' ? '連続正解' : 'Combo'}
+               {comboCount}{locale === 'ja' ? '連続正解' : 'Combo'}
             </Text>
           )}
         </View>
       )}
 
-      {/* スクロールが必要な部分 */}
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
       >
         <View style={[{ backgroundColor: colors.primary + '15', borderColor: colors.border, borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1 }]}>
-          {/* 🟢 カウンターを position:absolute でなく通常のflexレイアウトに変更。
-              絶対配置だと問題文の長さに関わらず常に同じ場所に重なって描画されるため、
-              長文の1行目と衝突していた。トピックバッジと同じ行に並べることで
-              構造的に重なりが起きないようにする。 */}
           {(currentQuestion.topic || !autoPlayMode) && (
             <View style={styles.questionHeaderRow}>
               {currentQuestion.topic ? (
@@ -1657,7 +1459,6 @@ export default function QuizScreen() {
             }
           </Text>
 
-          {/* 正解時のLottieアニメーション（カード内の右下に配置） */}
           {showSuccessLottie && (
             <View style={{
               position: 'absolute',
@@ -1675,7 +1476,6 @@ export default function QuizScreen() {
             </View>
           )}
 
-          {/* 不正解時のLottieアニメーション（カード内の右下に配置） */}
           {showErrorLottie && (
             <View style={{
               position: 'absolute',
@@ -1754,7 +1554,7 @@ export default function QuizScreen() {
                     onPress={() => handleAnswer(i)}
                     disabled={answered || isPaused}
                   >
-                    <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}️⃣</Text>
+                    <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}⃣</Text>
                     <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1764,7 +1564,6 @@ export default function QuizScreen() {
             {currentQuestion.answerType === 'descriptive' && (
               <View style={styles.descriptiveContainer}>
                 {isAllMatchMode && correctKeywords.length > 0 ? (
-                  // 両解モード：複数の入力欄
                   <View style={{ width: '100%', gap: 12 }}>
                     <Text style={[{ fontSize: 14, color: colors.textSecondary, marginBottom: 8, fontWeight: '600' }]}>
                       {locale === 'ja' ? '各キーワードを入力してください' : 'Enter each keyword'}
@@ -1790,7 +1589,6 @@ export default function QuizScreen() {
                         textContentType="none"
                         importantForAutofill="no"
                         onSubmitEditing={() => {
-                          // 最後の入力欄でEnterを押したら回答を送信
                           if (index === correctKeywords.length - 1) {
                             const fullAnswer = userDescriptiveAnswers.join(' ');
                             handleAnswer(fullAnswer);
@@ -1813,7 +1611,6 @@ export default function QuizScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  // 通常モード：単一の入力欄
                   <View style={{ width: '100%' }}>
                     <TextInput
                       style={[styles.descriptiveInput, { borderColor: colors.border, backgroundColor: colors.card, color: colors.text }]}
@@ -1822,26 +1619,16 @@ export default function QuizScreen() {
                       placeholder={locale === 'ja' ? '回答を入力（空欄でスキップ可）' : 'Enter answer (leave empty to skip)'}
                       placeholderTextColor="#999"
                       editable={!answered && !isPaused}
-                      // 🟢 multilineをやめる（=単一行入力にする）のが最重要ポイント。
-                      //    multiline=trueのままだとEnterは「改行」として扱われ、
-                      //    onSubmitEditing/returnKeyTypeの「確定」動作が効かなくなる。
                       autoCorrect={false}
                       autoCapitalize="none"
                       spellCheck={false}
-                      // 🟢 "off"はChrome等で無視されることが多いため、
-                      //    より確実に候補・自動入力を抑制できる"new-password"を使うハック
                       autoComplete="new-password"
                       textContentType="none"
                       importantForAutofill="no"
-                      // 🟢 パスワード欄相当の入力として扱わせることで、IME/ブラウザの
-                      //    予測変換・自動保存候補（＝答えの丸見え）を強力に抑止する定番のハック
                       keyboardType="visible-password"
                       onSubmitEditing={() => {
-                        // Enter(キーボード右下)キーで回答送信（空欄でも送信可能）
                         handleAnswer(userDescriptiveAnswer);
                       }}
-                      // 🟢 単一行なのでEnter＝送信として自然に機能する
-                      //   （multilineをやめたことで初めてこの設定が意味を持つ）
                       blurOnSubmit={true}
                       returnKeyType="done"
                     />
@@ -1869,7 +1656,7 @@ export default function QuizScreen() {
               }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-                {locale === 'ja' ? '⏹ 自動再生を終了' : '⏹ Stop Auto Play'}
+                {locale === 'ja' ? '自動再生を終了' : 'Stop Auto Play'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1877,12 +1664,11 @@ export default function QuizScreen() {
 
       </ScrollView>
       
-      {/* ポーズ時のフルスクリーンモーダル */}
       <Modal visible={isPaused} transparent animationType="fade">
         <View style={styles.pausedOverlay}>
           <View style={styles.pausedContent}>
             <Text style={styles.pausedText}>
-              {locale === 'ja' ? '⏸ 一時停止中' : '⏸ Paused'}
+              {locale === 'ja' ? '一時停止中' : 'Paused'}
             </Text>
             <Text style={styles.pausedSubText}>
               {locale === 'ja' ? '再開ボタンを押して続ける' : 'Press resume to continue'}
@@ -1896,14 +1682,13 @@ export default function QuizScreen() {
               }}
             >
               <Text style={[styles.pauseBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
-                {locale === 'ja' ? '▶ 再開' : '▶ Resume'}
+                {locale === 'ja' ? '再開' : 'Resume'}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* 中断確認モーダル（フルスクリーン改善） */}
       {showConfirmModal && (
         <View style={[styles.fullScreenOverlay, { backgroundColor: colors.background }]}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.background }]}>
@@ -1920,7 +1705,7 @@ export default function QuizScreen() {
                 style={[styles.confirmModalCancel, { borderColor: colors.border }]}
                 onPress={() => {
                   setShowConfirmModal(false);
-                  setIsTimerActive(true);  // タイマー再開
+                  setIsTimerActive(true);
                 }}
               >
                 <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
@@ -1932,7 +1717,7 @@ export default function QuizScreen() {
                 onPress={() => {
                   stopAutoPlay();
                   setShowConfirmModal(false);
-                  setIsTimerActive(false);  // タイマー停止
+                  setIsTimerActive(false);
                   navigate('/');
                 }}
               >
@@ -1945,11 +1730,10 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* 備考（解説）の表示エリア */}
       {showExplanation && (
         <View style={[styles.explanationContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
           <Text style={[styles.explanationTitle, { color: colors.primary }]}>
-            💡 {locale === 'ja' ? '解説・備考' : 'Explanation'}
+            {locale === 'ja' ? '解説・備考' : 'Explanation'}
           </Text>
           <ScrollView style={{ maxHeight: 150 }}>
             <Text style={[styles.explanationText, { color: colors.text }]}>
@@ -1962,11 +1746,10 @@ export default function QuizScreen() {
         </View>
       )}
 
-      {/* 誤答時のフルスクリーンモーダル（長文対応） */}
       <Modal visible={showFeedback && !isCorrect && !!feedbackMessage} transparent animationType="fade">
         <View style={styles.fullScreenFeedback}>
           <View style={[styles.fullScreenCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.fullScreenIcon, { color: colors.error }]}>✗</Text>
+            <X size={64} color={colors.error} />
             <Text style={[styles.fullScreenTitle, { color: colors.error }]}>
               {locale === 'ja' ? '不正解' : 'Incorrect'}
             </Text>
@@ -2090,7 +1873,6 @@ const styles = StyleSheet.create({
   },
   pauseBtnText: { fontSize: 13, fontWeight: '600' },
   questionCounter: { fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
-  // 🟢 トピックバッジとカウンターを同じ行に並べるための行コンテナ
   questionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2098,8 +1880,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   questionCounterBadge: {
-    // 🟢 absoluteをやめて通常のflow配置に。面積も一回り小さくして
-    //    問題文と衝突する余地そのものをなくす。
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -2116,7 +1896,6 @@ const styles = StyleSheet.create({
   progressFill: { height: 7, backgroundColor: '#007AFF', borderRadius: 999 },
   questionBox: { backgroundColor: '#F0F4FF', borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
   topicBadge: { fontSize: 11, color: '#6366F1', backgroundColor: '#EEF2FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, alignSelf: 'flex-start', fontWeight: '600' },
-  // 🟢 中央揃え→左揃えに変更。読みやすさ向上のため
   questionText: { fontSize: 21, textAlign: 'left', color: '#1A1A1A', lineHeight: 32 },
   feedbackContainer: {
     marginVertical: 14,
@@ -2161,7 +1940,6 @@ const styles = StyleSheet.create({
   quitBtn: { alignItems: 'center', justifyContent: 'center' },
   bottomButtons: { marginTop: 18, marginBottom: 28, alignItems: 'center' },
   quitBtnText: { color: '#CCC', fontSize: 13 },
-  // Review styles
   reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, gap: 12, paddingHorizontal: 2 },
   reviewTitle: { fontSize: 24, fontWeight: 'bold', color: '#1A1A1A', letterSpacing: 0.2 },
   reviewList: { gap: 14, paddingBottom: 8 },
@@ -2243,7 +2021,6 @@ const styles = StyleSheet.create({
   fullScreenTimer: {
     marginTop: 8,
   },
-  // 中断確認モーダル（フルスクリーン改善）
   fullScreenOverlay: {
     position: 'absolute',
     top: 0,
@@ -2254,17 +2031,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
-  },
-  confirmModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
   },
   confirmModalContainer: {
     width: '100%',
@@ -2363,41 +2129,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  tagFilterSection: {
-    width: '100%',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 18,
-    borderWidth: 1,
-  },
-  tagFilterTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 14,
-  },
-  tagFilterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-    gap: 8,
-  },
-  tagFilterList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  tagFilterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginBottom: 4,
-    marginRight: 4,
-  },
-  tagFilterChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2411,7 +2142,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // Lottieアニメーション用スタイル
   lottieOverlay: {
     position: 'absolute',
     top: 0,

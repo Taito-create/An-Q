@@ -11,6 +11,7 @@ import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
+import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Upload, Tag, Loader2, X } from 'lucide-react';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -38,8 +39,8 @@ export default function BrowseQuestionsScreen() {
   } = useQuestionsContext();
   
   // Debug: Log questions when component renders
-  console.log('📋 Browse render - questions:', questions.length, 'items');
-  console.log('📋 First question (if any):', questions.length > 0 ? questions[0] : 'none');
+  console.log('Browse render - questions:', questions.length, 'items');
+  console.log('First question (if any):', questions.length > 0 ? questions[0] : 'none');
 
   // Determine checkbox text color based on theme luminance
   const getCheckboxTextColor = (): string => {
@@ -216,7 +217,7 @@ export default function BrowseQuestionsScreen() {
   };
 
   const batchDeleteQuestions = async () => {
-    console.log('🗑️ batchDeleteQuestions called, selected:', selectedQuestionIds);
+    console.log('batchDeleteQuestions called, selected:', selectedQuestionIds);
     
     if (selectedQuestionIds.length === 0) {
       window.alert(locale === 'ja' ? 'エラー\n削除する問題を選択してください' : 'Error\nPlease select questions to delete');
@@ -229,18 +230,18 @@ export default function BrowseQuestionsScreen() {
   };
 
   const confirmBatchDelete = async () => {
-    console.log('🗑️ confirmBatchDelete called');
+    console.log('confirmBatchDelete called');
     setShowBatchDeleteModal(false);
     
     try {
-      console.log('🗑️ Starting batch delete for:', selectedQuestionIds);
+      console.log('Starting batch delete for:', selectedQuestionIds);
       
       // Delete each question
       let currentQuestions = questions;
       for (const id of selectedQuestionIds) {
-        console.log(`🗑️ Deleting question ${id}`);
+        console.log(`Deleting question ${id}`);
         currentQuestions = await deleteQuestion(id);
-        console.log(`🗑️ After delete, ${currentQuestions.length} questions remaining`);
+        console.log(`After delete, ${currentQuestions.length} questions remaining`);
       }
 
       // Clear selection
@@ -248,9 +249,9 @@ export default function BrowseQuestionsScreen() {
       setIsSelectionMode(false);
 
       SoundManager.play('complete');
-      // ✅ No success alert - just close modal and refresh list
+      // No success alert - just close modal and refresh list
     } catch (e) {
-      console.error('❌ Batch delete error:', e);
+      console.error('Batch delete error:', e);
       window.alert(locale === 'ja' ? 'エラー\n削除に失敗しました' : 'Error\nFailed to delete questions');
     }
   };
@@ -365,7 +366,7 @@ export default function BrowseQuestionsScreen() {
   };
 
   const startEditQuestion = (question: Question) => {
-    console.log('✏️ startEditQuestion called:', question);
+    console.log('startEditQuestion called:', question);
     
     setEditingQuestionFull(question);
     setEditQuestionText(question.question || '');
@@ -398,7 +399,7 @@ export default function BrowseQuestionsScreen() {
         groups = [['']];
       }
       
-      console.log('✏️ Set editAnswerGroups:', groups);
+      console.log(' Set editAnswerGroups:', groups);
       setEditAnswerGroups(groups);
     } else {
       // Reset for non-descriptive questions
@@ -423,7 +424,7 @@ export default function BrowseQuestionsScreen() {
         .map(group => group.map(a => a.trim()).filter(Boolean))
         .filter(group => group.length > 0);
       updatedDescriptiveAnswerGroups = cleanedGroups.length > 0 ? cleanedGroups : undefined;
-      // ❌ descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
+      //  descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
       //    （Firestore でフィールド型の競合エラーを避けるため）
       updatedMatchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     }
@@ -558,7 +559,7 @@ export default function BrowseQuestionsScreen() {
             onPress={() => { setIsCompactMode(!isCompactMode); if (isCompactMode) setExpandedQuestionId(null); }}
           >
             <Text style={[styles.compactToggleBtnText, { color: '#000000' }]}>
-              {isCompactMode ? '≡' : '☰'}
+              {isCompactMode ? '≡' : ''}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -584,7 +585,7 @@ export default function BrowseQuestionsScreen() {
             }}
           >
             <Text style={[styles.headerBtnText, { color: isFolderDeleteMode ? onPrimary : colors.error }]}>
-              🧹
+              
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -657,7 +658,7 @@ export default function BrowseQuestionsScreen() {
                 : colors.text
               }
             ]}>
-              📁 {locale === 'ja' ? '問題集' : 'Folders'}
+              <FolderIcon size={18} color={colors.primary} /> {locale === 'ja' ? '問題集' : 'Folders'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -668,16 +669,16 @@ export default function BrowseQuestionsScreen() {
             style={[styles.batchTagBar, { backgroundColor: colors.primary, flex: 1 }]} 
             onPress={() => { setShowBatchTagModal(true); }}
           >
-            <Text style={[styles.batchTagBarText, { color: onPrimary }]}>🏷️ {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
+            <Text style={[styles.batchTagBarText, { color: onPrimary }]}> {t.addTagsToSelected} ({selectedQuestionIds.length}{t.questionsSelected})</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
             onPress={() => {
-              console.log('🗑️ Delete button pressed, selected:', selectedQuestionIds.length);
+              console.log(' Delete button pressed, selected:', selectedQuestionIds.length);
               batchDeleteQuestions();
             }}
           >
-            <Text style={[styles.batchTagBarText, { color: '#ffffff' }]}>🗑️ {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
+            <Text style={[styles.batchTagBarText, { color: '#ffffff' }]}><Trash2 size={16} color="#fff" /> {locale === 'ja' ? '選択した問題を削除' : 'Delete Selected'} ({selectedQuestionIds.length})</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -725,7 +726,7 @@ export default function BrowseQuestionsScreen() {
                             fontWeight: 'bold',
                           }
                         ]}>
-                          ✓
+                          
                         </Text>
                       )}
                     </View>
@@ -740,7 +741,7 @@ export default function BrowseQuestionsScreen() {
                     {!isCompactMode && (
                       <>
                         <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
-                        {item.isShared && <Text style={[{ fontSize: 10, color: colors.success, fontWeight: '700', marginLeft: 4 }]}>🔗</Text>}
+                        {item.isShared && <Share2 size={12} color={colors.success} />}
                       </>
                     )}
                     <View style={{ flex: 1 }}>
@@ -764,7 +765,7 @@ export default function BrowseQuestionsScreen() {
                         style={styles.headerDeleteBtn}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
-                        <Text style={[styles.headerDeleteBtnText, { color: colors.error }]}>🗑️</Text>
+                        <Trash2 size={18} color={colors.error} />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
                         <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
@@ -775,7 +776,7 @@ export default function BrowseQuestionsScreen() {
 
                 {!isCompactMode && expandedQuestionId === item.id && (
                   <View style={styles.expandedContent}>
-                    {item.isShared && <Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>🔗 {locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text>}
+                    {item.isShared && <><Share2 size={14} color={colors.success} style={{ marginRight: 6 }} /><Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>{locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text></>}
                     <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
                     {item.tags && item.tags.length > 0 && (
                       <View style={styles.tagRow}>
@@ -793,10 +794,10 @@ export default function BrowseQuestionsScreen() {
                           speakText(textToSpeak);
                         }}
                       >
-                        <Text style={[styles.speakBtnText, { color: colors.primary }]}>🔊 読み上げ</Text>
+                        <><Volume2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.speakBtnText, { color: colors.primary }]}>読み上げ</Text></>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => startEditQuestion(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>✏️ 編集</Text></TouchableOpacity>
-                      <TouchableOpacity onPress={() => openShareModal(item)}><Text style={[styles.shareBtnText, { color: colors.primary }]}>🔗 共有</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={() => startEditQuestion(item)}><><PenSquare size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.editTagBtnText, { color: colors.primary }]}>編集</Text></></TouchableOpacity>
+                      <TouchableOpacity onPress={() => openShareModal(item)}><><Share2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.shareBtnText, { color: colors.primary }]}>共有</Text></></TouchableOpacity>
                       <TouchableOpacity onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
                         <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
                       </TouchableOpacity>
@@ -821,7 +822,7 @@ export default function BrowseQuestionsScreen() {
               <View style={styles.folderDetailView}>
                 <View style={[styles.folderDetailHeader, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={[styles.folderDetailTitle, { color: colors.text }]}>📁 {selectedFolder.name}</Text>
+                    <Text style={[styles.folderDetailTitle, { color: colors.text }]}><FolderIcon size={20} color={colors.primary} style={{ marginRight: 6 }} />{selectedFolder.name}</Text>
                     <Text style={[styles.folderDetailCount, { color: colors.textSecondary }]}>
                       {folderQuestions.length}{locale === 'ja' ? '問' : ' questions'}
                     </Text>
@@ -830,7 +831,7 @@ export default function BrowseQuestionsScreen() {
                     <TouchableOpacity
                       style={[styles.addQuestionsBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
-                        console.log('★物理クリック発火: 問題追加ボタン');
+                        console.log('物理クリック発火: 問題追加ボタン');
                         console.log('selectedFolder:', selectedFolder);
                         setSelectedFolderForAdd(selectedFolder);
                         setAvailableQuestionsForAdd(questions);
@@ -846,19 +847,19 @@ export default function BrowseQuestionsScreen() {
                     <TouchableOpacity
                       style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
                       onPress={() => {
-                        console.log('★物理クリック発火: 削除ボタン');
+                        console.log('物理クリック発火: 削除ボタン');
                         handleDeleteFolder();
                       }}
                     >
-                      <Text style={[styles.deleteFolderBtnText, { color: colors.text }]}>🗑️</Text>
+                    <Trash2 size={20} color={colors.text} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setSelectedFolder(null); setFolderQuestions([]); }}>
-                      <Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text>
+                      <X size={18} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                 </View>
                 
-                <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>📋 この問題集の問題</Text>
+                <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>この問題集の問題</Text>
                 {folderQuestions.length === 0 ? (
                   <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
                 ) : (
@@ -874,7 +875,7 @@ export default function BrowseQuestionsScreen() {
                           style={styles.checkbox}
                         >
                           <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
-                            {selectedFolderQuestionIds.includes(question.id) ? '☑' : '☐'}
+                            {selectedFolderQuestionIds.includes(question.id) ? '' : ''}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -909,7 +910,7 @@ export default function BrowseQuestionsScreen() {
                     }}
                   >
                     <Text style={[styles.batchTagBarText, { color: '#fff' }]}>
-                      🗑️ {locale === 'ja' ? `選択した${selectedFolderQuestionIds.length}問を除外` : `Remove ${selectedFolderQuestionIds.length} questions`}
+                      <Trash2 size={16} color="#fff" style={{ marginRight: 6 }} />{locale === 'ja' ? `選択した${selectedFolderQuestionIds.length}問を除外` : `Remove ${selectedFolderQuestionIds.length} questions`}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -968,11 +969,11 @@ export default function BrowseQuestionsScreen() {
                           {isFolderDeleteMode && (
                             <View style={styles.folderCardCheckbox}>
                               <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
-                                {isSelected ? '☑' : '☐'}
+                                {isSelected ? '' : ''}
                               </Text>
                             </View>
                           )}
-                          <Text style={styles.folderCardIcon}>📁</Text>
+                          <FolderIcon size={32} color={colors.primary} />
                           <Text style={[styles.folderCardName, { color: colors.text }]} numberOfLines={2}>
                             {folder.name}
                           </Text>
@@ -998,7 +999,7 @@ export default function BrowseQuestionsScreen() {
                     }}
                   >
                     <Text style={[styles.deleteSelectedBtnText, { color: '#ffffff' }]}>
-                      🗑️ {locale === 'ja' ? `${selectedFolderIds.length}個を削除` : `Delete ${selectedFolderIds.length}`}
+                      <Trash2 size={16} color="#fff" style={{ marginRight: 6 }} />{locale === 'ja' ? `${selectedFolderIds.length}個を削除` : `Delete ${selectedFolderIds.length}`}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -1012,10 +1013,10 @@ export default function BrowseQuestionsScreen() {
       <Modal visible={showEditModal} transparent={false} animationType="slide">
         <View style={{ flex: 1, backgroundColor: colors.card }}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20 }}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>✏️ 問題を編集</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}> 問題を編集</Text>
             <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>問題文</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
-            <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6, marginTop: 12 }]}>📖 {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}</Text>
+            <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6, marginTop: 12 }]}> {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={editReading} onChangeText={setEditReading} placeholder={locale === 'ja' ? '例: もり おうがい' : 'e.g., mori ougai'} placeholderTextColor={colors.textSecondary} />
 {editingQuestionFull?.answerType === 'descriptive' && (
   <>
@@ -1032,7 +1033,7 @@ export default function BrowseQuestionsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <View style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
             <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 13 }}>
-              {locale === 'ja' ? `📝 正解 ${groupIndex + 1}` : `✅ Answer ${groupIndex + 1}`}
+              {locale === 'ja' ? ` 正解 ${groupIndex + 1}` : ` Answer ${groupIndex + 1}`}
             </Text>
           </View>
           {editAnswerGroups.length > 1 && groupIndex > 0 && (
@@ -1043,7 +1044,7 @@ export default function BrowseQuestionsScreen() {
                 setEditAnswerGroups(newGroups.length > 0 ? newGroups : [['']]);
               }}
             >
-              <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}>✕ {locale === 'ja' ? '削除' : 'Remove'}</Text>
+              <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}> {locale === 'ja' ? '削除' : 'Remove'}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1144,7 +1145,7 @@ export default function BrowseQuestionsScreen() {
               <>
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
                 {editMultipleOptions.map((opt, i) => (
-                  <TextInput key={i} style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? ' ✓ 正解' : ''}`} placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary} />
+                  <TextInput key={i} style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? '  正解' : ''}`} placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary} />
                 ))}
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>正解番号</Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
@@ -1169,7 +1170,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              🏷️ {locale === 'ja' ? 'タグを選択' : 'Select Tags'}
+               {locale === 'ja' ? 'タグを選択' : 'Select Tags'}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
               {locale === 'ja' ? 'タグをタップして選択/解除' : 'Tap to select/deselect tags'}
@@ -1229,7 +1230,7 @@ export default function BrowseQuestionsScreen() {
                           fontSize: 13,
                         }
                       ]}>
-                        {isSelected ? '✓ ' : ''}{tag}
+                        {isSelected ? ' ' : ''}{tag}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -1284,7 +1285,7 @@ export default function BrowseQuestionsScreen() {
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     {tagArray.map(tag => (
                       <View key={tag} style={[styles.miniTag, { backgroundColor: colors.primary + '20', paddingHorizontal: 12, paddingVertical: 6 }]}>
-                        <Text style={[styles.miniTagText, { color: colors.primary, fontSize: 13, fontWeight: 'bold' }]}>🏷️ {tag}</Text>
+                        <Text style={[styles.miniTagText, { color: colors.primary, fontSize: 13, fontWeight: 'bold' }]}> {tag}</Text>
                       </View>
                     ))}
                   </View>
@@ -1370,7 +1371,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? '問題を削除' : 'Delete Question'}
+               {locale === 'ja' ? '問題を削除' : 'Delete Question'}
             </Text>
             <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
               {locale === 'ja'
@@ -1447,7 +1448,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? '一括削除の確認' : 'Batch Delete Confirmation'}
+               {locale === 'ja' ? '一括削除の確認' : 'Batch Delete Confirmation'}
             </Text>
             <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
               {locale === 'ja'
@@ -1483,14 +1484,14 @@ export default function BrowseQuestionsScreen() {
       <Modal visible={showTagFilterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>🏷️ {t.filterByTags || 'タグで絞り込み'}</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}> {t.filterByTags || 'タグで絞り込み'}</Text>
             <ScrollView style={{ maxHeight: 400 }}>
               <TouchableOpacity style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: selectedFilterTag === null ? colors.primary : 'transparent' }} onPress={() => { setSelectedFilterTag(null); setShowTagFilterModal(false); }}>
-                <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === null ? '#fff' : colors.text }}>📋 {locale === 'ja' ? '全問' : 'All'}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === null ? '#fff' : colors.text }}> {locale === 'ja' ? '全問' : 'All'}</Text>
               </TouchableOpacity>
               {availableTags.map(tag => (
                 <TouchableOpacity key={tag} style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, marginBottom: 10, borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: selectedFilterTag === tag ? colors.primary : 'transparent' }} onPress={() => { setSelectedFilterTag(tag); setShowTagFilterModal(false); }}>
-                  <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === tag ? '#fff' : colors.text }}>🏷️ {tag}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '500', color: selectedFilterTag === tag ? '#fff' : colors.text }}> {tag}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1503,7 +1504,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.folderDetailContainer, { backgroundColor: colors.card }]}>
             <View style={styles.folderDetailHeader}>
-              <Text style={[styles.folderDetailTitle, { color: colors.text }]}>➕ {selectedFolderForAdd?.name} に問題を追加</Text>
+              <Text style={[styles.folderDetailTitle, { color: colors.text }]}> {selectedFolderForAdd?.name} に問題を追加</Text>
               <TouchableOpacity onPress={() => { setShowAddToFolderModal(false); setSelectedFolderForAdd(null); setSelectedQuestionIdsForAdd([]); }}><Text style={[styles.closeIconButton, { color: colors.textSecondary }]}>✕</Text></TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={styles.modalListContent}>
@@ -1554,7 +1555,7 @@ export default function BrowseQuestionsScreen() {
               ) : (
                 availableQuestionsForAdd.map(question => (
                   <TouchableOpacity key={question.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => { setSelectedQuestionIdsForAdd(prev => prev.includes(question.id) ? prev.filter(id => id !== question.id) : [...prev, question.id]); }}>
-                    <Text style={[styles.checkboxText, { color: colors.primary }]}>{selectedQuestionIdsForAdd.includes(question.id) ? '☑' : '☐'}</Text>
+                    <Text style={[styles.checkboxText, { color: colors.primary }]}>{selectedQuestionIdsForAdd.includes(question.id) ? '' : ''}</Text>
                     <Text style={{ fontSize: 15, flex: 1, lineHeight: 22, color: colors.text }} numberOfLines={2}>{question.question}</Text>
                   </TouchableOpacity>
                 ))
@@ -1564,13 +1565,13 @@ export default function BrowseQuestionsScreen() {
               <TouchableOpacity 
                 style={[styles.addToFolderBar, { backgroundColor: colors.primary, zIndex: 999 }]} 
                 onPress={() => {
-                  console.log('★物理クリック発火: 追加確定ボタン');
+                  console.log('物理クリック発火: 追加確定ボタン');
                   console.log('ガード節判定直前 - selectedFolderForAdd:', selectedFolderForAdd);
                   console.log('ガード節判定直前 - selectedQuestionIdsForAdd:', selectedQuestionIdsForAdd);
                   handleAddQuestionsToFolder();
                 }}
               >
-                <Text style={[styles.addToFolderBarText, { color: onPrimary }]}>➕ 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
+                <Text style={[styles.addToFolderBarText, { color: onPrimary }]}> 選択した{selectedQuestionIdsForAdd.length}問を追加</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1582,7 +1583,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              🔗 {locale === 'ja' ? '共有' : 'Share'}
+               {locale === 'ja' ? '共有' : 'Share'}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
               {locale === 'ja'
@@ -1617,7 +1618,7 @@ export default function BrowseQuestionsScreen() {
                 disabled={isSharing || !shareEmail.trim()}
               >
                 <Text style={styles.modalSaveText}>
-                  {isSharing ? '⏳' : `📤 ${locale === 'ja' ? '共有' : 'Share'}`}
+                  {isSharing ? <Loader2 size={16} color="#fff" /> : (locale === 'ja' ? '共有' : 'Share')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1630,7 +1631,7 @@ export default function BrowseQuestionsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModalContainer, { backgroundColor: colors.card }]}>
             <Text style={[styles.confirmModalTitle, { color: colors.text }]}>
-              🗑️ {locale === 'ja' ? '問題を除外' : 'Remove Question'}
+               {locale === 'ja' ? '問題を除外' : 'Remove Question'}
             </Text>
             <Text style={[styles.confirmModalMessage, { color: colors.textSecondary }]}>
               {locale === 'ja'

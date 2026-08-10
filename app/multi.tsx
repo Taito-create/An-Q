@@ -15,6 +15,7 @@ import { SoundManager } from './sound';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { safeParseArray } from './utils/storageUtils';
+import { Share2, Upload, Download, CheckSquare, ClipboardList } from 'lucide-react';
 
 // ランダムな6文字の英数字IDを生成
 const generateShortId = (): string => {
@@ -301,7 +302,7 @@ export default function MultiScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <Text style={[styles.title, { color: colors.text, flex: 1 }]}>
-          🔗 {locale === 'ja' ? 'マルチ・共有' : 'Multi Share'}
+          <Share2 size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'マルチ・共有' : 'Multi Share'}
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
@@ -319,7 +320,7 @@ export default function MultiScreen() {
           onPress={() => setShareMode('send')}
         >
           <Text style={[styles.tabText, { color: shareMode === 'send' ? colors.primary : colors.textSecondary, fontWeight: shareMode === 'send' ? '700' : '500' }]}>
-            📤 {locale === 'ja' ? '送信' : 'Send'}
+            <Upload size={16} color={shareMode === 'send' ? colors.primary : colors.textSecondary} style={{ marginRight: 4 }} />{locale === 'ja' ? '送信' : 'Send'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -327,7 +328,7 @@ export default function MultiScreen() {
           onPress={() => setShareMode('receive')}
         >
           <Text style={[styles.tabText, { color: shareMode === 'receive' ? colors.primary : colors.textSecondary, fontWeight: shareMode === 'receive' ? '700' : '500' }]}>
-            📥 {locale === 'ja' ? '受信' : 'Receive'}
+            <Download size={16} color={shareMode === 'receive' ? colors.primary : colors.textSecondary} style={{ marginRight: 4 }} />{locale === 'ja' ? '受信' : 'Receive'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -379,7 +380,7 @@ export default function MultiScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 16, color: selectedQuestions.includes(q.id) ? colors.primary : colors.textSecondary }}>
-                        {selectedQuestions.includes(q.id) ? '☑️' : '☐'}
+                        {selectedQuestions.includes(q.id) ? <CheckSquare size={20} color={colors.primary} /> : <CheckSquare size={20} color={colors.textSecondary} />}
                       </Text>
                       <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{q.question?.substring(0, 50)}...</Text>
                     </TouchableOpacity>
@@ -425,7 +426,7 @@ export default function MultiScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 16, color: selectedFolders.includes(f.id) ? colors.primary : colors.textSecondary }}>
-                        {selectedFolders.includes(f.id) ? '☑️' : '☐'}
+                        {selectedFolders.includes(f.id) ? <CheckSquare size={20} color={colors.primary} /> : <CheckSquare size={20} color={colors.textSecondary} />}
                       </Text>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: colors.text, fontSize: 13 }}>{f.name}</Text>
@@ -445,7 +446,7 @@ export default function MultiScreen() {
               disabled={!canGenerate}
             >
               <Text style={[styles.buttonText, { color: onPrimary }]}>
-                🔗 {locale === 'ja' ? 'コード生成' : 'Generate Code'}
+                <Share2 size={16} color={onPrimary} style={{ marginRight: 4 }} />{locale === 'ja' ? 'コード生成' : 'Generate Code'}
               </Text>
             </TouchableOpacity>
 
@@ -475,7 +476,7 @@ export default function MultiScreen() {
                   }}
                 >
                   <Text style={{ color: colors.primary, fontWeight: '700', textAlign: 'center' }}>
-                    📋 {locale === 'ja' ? 'コピー' : 'Copy Code'}
+                    <ClipboardList size={16} color={colors.primary} style={{ marginRight: 4 }} />{locale === 'ja' ? 'コピー' : 'Copy Code'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -504,7 +505,7 @@ export default function MultiScreen() {
               disabled={receiveCode.length !== 6}
             >
               <Text style={[styles.buttonText, { color: onPrimary }]}>
-                📥 {locale === 'ja' ? '受け取る' : 'Receive'}
+                <Download size={16} color={onPrimary} style={{ marginRight: 4 }} />{locale === 'ja' ? '受け取る' : 'Receive'}
               </Text>
             </TouchableOpacity>
           </>
