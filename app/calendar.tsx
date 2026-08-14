@@ -844,10 +844,7 @@ export default function CalendarScreen() {
               borderRadius: 12,
               paddingVertical: 12,
               paddingHorizontal: 24,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
+              boxShadow: '0px 2px 4px rgba(0,0,0,0.25)',
               elevation: 5,
             }
           ]}>
@@ -1020,10 +1017,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.25)',
     elevation: 5,
   },
   toastText: {

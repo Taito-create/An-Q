@@ -57,7 +57,8 @@ export const STORAGE_KEYS = {
   USER_COINS: 'user_coins',
   USER_LEVEL: 'user_level',
   STREAK_COUNT: 'streakCount',
-  LAST_STUDY_DATE: 'lastStudyDate',
+    LAST_STUDY_DATE: 'lastStudyDate',
+  DAILY_GOAL: 'daily_goal',
 
   // アプリ設定
   DEV_MODE_ENABLED: 'dev_mode_enabled',

@@ -50,13 +50,19 @@ export default function MiniPlayer() {
             </Text>
           </TouchableOpacity>
           <View style={styles.controls}>
-            <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.background }]} onPress={prev} disabled={tracks.length <= 1}>
+            <TouchableOpacity
+              style={[styles.ctrlBtn, { backgroundColor: colors.background, opacity: tracks.length <= 1 ? 0.5 : 1 }]}
+              onPress={tracks.length <= 1 ? undefined : prev}
+            >
               <SkipBack size={18} color={tracks.length <= 1 ? colors.border : colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.playBtn, { backgroundColor: colors.primary }]} onPress={togglePlay}>
               {customPlaying ? <Pause size={22} color={onPrimary} /> : <Play size={22} color={onPrimary} />}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.ctrlBtn, { backgroundColor: colors.background }]} onPress={next} disabled={tracks.length <= 1}>
+            <TouchableOpacity
+              style={[styles.ctrlBtn, { backgroundColor: colors.background, opacity: tracks.length <= 1 ? 0.5 : 1 }]}
+              onPress={tracks.length <= 1 ? undefined : next}
+            >
               <SkipForward size={18} color={tracks.length <= 1 ? colors.border : colors.primary} />
             </TouchableOpacity>
           </View>

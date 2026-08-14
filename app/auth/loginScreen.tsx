@@ -289,7 +289,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 24 },
-  card: { width: '100%', maxWidth: 440, borderWidth: 1, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
+  card: { width: '100%', maxWidth: 440, borderWidth: 1, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 24, boxShadow: '0px 4px 10px rgba(0,0,0,0.06)', elevation: 2 },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 8 },
   subtitle: { fontSize: 14, lineHeight: 22, marginBottom: 18 },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     zIndex: 9999 
   },
-  cropPreview: { width: 200, height: 200, borderRadius: 100, overflow: 'hidden', backgroundColor: '#000', position: 'relative', marginVertical: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 0, elevation: 0 },
+  cropPreview: { width: 200, height: 200, borderRadius: 100, overflow: 'hidden', backgroundColor: '#000', position: 'relative', marginVertical: 20, boxShadow: '0px 0px 0px rgba(0,0,0,0.5)', elevation: 0 },
   modalContent: { backgroundColor: '#ffffff', borderRadius: 20, padding: 24, width: '90%', maxWidth: 320, alignItems: 'center', overflow: 'hidden' },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
   modalButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

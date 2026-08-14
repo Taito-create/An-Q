@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  StyleSheet, Text, View, TouchableOpacity,
+    StyleSheet, Text, View, TouchableOpacity,
   ScrollView, StatusBar, Alert, Animated, ActivityIndicator
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
@@ -14,13 +14,11 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { 
-  Play, 
-  Plus, 
-  Calendar, 
-  Inbox, 
-  ClipboardList, 
-  Home, 
-  User, 
+  Play,
+  Calendar,
+  ClipboardList,
+  Home,
+  User,
   Settings,
   TrendingUp,
   Target,
@@ -33,22 +31,29 @@ import {
   Palette,
   Music,
   Upload,
-  Crown,
   Coins,
   AlertTriangle,
   Lightbulb,
   GraduationCap,
-  Timer,
-  BarChart3,
   CheckCircle2,
-  Square
+  Flame,
+  Square,
+  Zap,
+  Award,
+  Sprout,
+  Crown,
+  Pencil,
+  Building2,
+  Trophy
 } from 'lucide-react';
+import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission, UserStats, loadTodayCorrect, loadWeeklyProgress, WeeklyProgress, setQuickQuizCountCache, TITLE_BADGES } from './missions';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { safeParse, safeParseArray } from './utils/storageUtils';
-import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission } from './missions';
+import LottieView from 'lottie-react-native';
+import FireAnimation from '../src/assets/animations/Fire.json';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -70,19 +75,67 @@ const useResponsive = () => {
   return screenType;
 };
 
-const HomeScreen = () => {
+const badgeIconMap: Record<string, React.ComponentType<any>> = {
+  sprout: Sprout,
+  'book-open': BookOpen,
+  'graduation-cap': GraduationCap,
+  crown: Crown,
+  pencil: Pencil,
+  'building-2': Building2,
+  'check-circle-2': CheckCircle2,
+  flame: Flame,
+  zap: Zap,
+  trophy: Trophy,
+  calendar: Calendar,
+};
+
+const HomeScreen = React.memo(() => {
   const navigate = useNavigate();
+
+  // ナビゲーションを遅らせてフリッカー防止
+  const navigateWithAnimation = useCallback((path: string) => {
+    // Small delay to prevent flash
+    setTimeout(() => {
+      requestAnimationFrame(() => navigate(path));
+    }, 50);
+  }, [navigate]);
   const { colors, fs, pattern, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
   const { user } = useAuth();
-  const { questions: questionsFromHook } = useQuestionsContext();
+    const { questions: questionsFromHook, loading: questionsLoading } = useQuestionsContext();
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [xpProgress, setXpProgress] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const fireAnimationRef = useRef<LottieView>(null);
+
+  // データロード完了フラグ（初回遷移時のフリッカー防止）
+  const [isDataReady, setIsDataReady] = useState(false);
+
+  // メインプレイボタンのパルス／押下アニメーション
+  const playButtonPulse = useRef(new Animated.Value(1)).current;
+  const playButtonPress = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // 初回マウント時のフリッカー防止のため、少し遅らせてパルス開始
+    let anim: ReturnType<typeof Animated.loop> | null = null;
+    const timeout = setTimeout(() => {
+      anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(playButtonPulse, { toValue: 1.03, duration: 1500, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(playButtonPulse, { toValue: 1, duration: 1500, useNativeDriver: Platform.OS !== 'web' }),
+        ])
+      );
+      anim.start();
+    }, 200);
+    return () => {
+      clearTimeout(timeout);
+      anim?.stop();
+    };
+  }, [playButtonPulse]);
 
   // アニメーションレベル設定
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
@@ -116,6 +169,13 @@ const HomeScreen = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Sync currentLocale with locale from hook to prevent inconsistency
+  useEffect(() => {
+    if (locale !== currentLocale) {
+      setCurrentLocale(locale);
+    }
+  }, [locale, currentLocale]);
 
   useEffect(() => {
     const loadAnimationLevel = async () => {
@@ -197,6 +257,12 @@ const HomeScreen = () => {
   const [examCountdown, setExamCountdown] = useState<{daysLeft: number, examName: string} | null>(null);
   const [quickReviewQuestions, setQuickReviewQuestions] = useState<any[]>([]);
   const [examProgress, setExamProgress] = useState(0);
+  // 統計カード用のステート
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [todayCorrect, setTodayCorrect] = useState(0);
+  const [weeklyProgress, setWeeklyProgress] = useState<WeeklyProgress>({ thisWeek: 0, lastWeek: 0, changePercent: 0 });
+  // デイリーゴール（デフォルト10問）
+  const [dailyGoal, setDailyGoal] = useState(10);
 
   // questionsFromHookが更新されたら問題数を反映
   useEffect(() => {
@@ -223,9 +289,12 @@ const HomeScreen = () => {
         await loadQuickReviewQuestions();
         await updateTimerDisplay();
         await loadUserProgress();
+        await loadDailyGoal();
       } catch (error) {
         console.error('Failed to initialize home screen:', error);
       }
+      // 読み込み完了（エラー時も表示は行う）
+      setIsDataReady(true);
     };
 
     loadAllData();
@@ -469,6 +538,17 @@ const HomeScreen = () => {
     }
   };
 
+    // デイリーゴール設定を読み込み
+  const loadDailyGoal = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_GOAL);
+      const parsed = raw ? parseInt(raw, 10) : NaN;
+      setDailyGoal(Number.isFinite(parsed) && parsed > 0 ? parsed : 10);
+    } catch {
+      setDailyGoal(10);
+    }
+  };
+
   const loadSettings = async () => {
     try {
       // 未ログイン時のみローカルストレージから読み込み
@@ -567,7 +647,7 @@ const HomeScreen = () => {
   const leftColumnStyle = {
     mobile: { flex: 1 },
     tablet: { flex: 1 },
-    desktop: { flex: 2, minWidth: 0 },
+    desktop: { flex: 1.5, minWidth: 0 },
   };
 
   const rightColumnStyle = {
@@ -598,29 +678,116 @@ const HomeScreen = () => {
     loadQuests();
   }, []);
 
+  // 統計カードのデータ読み込み（streak・accuracy・today・weekly）
+  const loadStatSnapshot = async () => {
+    try {
+      const [stats, today, weekly] = await Promise.all([
+        loadStats(),
+        loadTodayCorrect(),
+        loadWeeklyProgress(),
+      ]);
+      setUserStats(stats);
+      setTodayCorrect(today);
+      setWeeklyProgress(weekly);
+    } catch (e) {
+      console.error('Failed to load stats snapshot:', e);
+    }
+  };
+
+  // 統計カード読み込み（画面表示中はフォーカス復帰時にも更新）
+  useEffect(() => {
+    loadStatSnapshot();
+    const refresh = () => {
+      if (!document.hidden) loadStatSnapshot();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [currentLocale]);
+
   const renderStatsCard = () => {
-    const isNoLimit = displayTimer === (locale === 'ja' ? 'なし' : 'No limit') || timerMinutes === 0;
+    const stats = userStats;
+    const streak = stats?.loginStreak ?? 0;
+    const accuracy = stats && stats.quizPlayed > 0
+      ? Math.min(100, Math.round((stats.correctAnswers / stats.quizPlayed) * 100))
+      : 0;
+
+    // 週間進捗の表示テキスト
+    const weekly = weeklyProgress;
+    const weeklyChangeText =
+      weekly.lastWeek === 0 && weekly.thisWeek === 0
+        ? t.noWeeklyChange
+        : `${weekly.thisWeek}${locale === 'ja' ? '' : ' '}${t.weeklyAnsweredUnit} ・ ${weekly.changePercent >= 0 ? '+' : ''}${weekly.changePercent}% ${t.vsLastWeek}`;
+    const isWeeklyUp = weekly.changePercent >= 0;
+
+    const statItems: { key: string; icon: React.ReactNode; value: React.ReactNode; label: string }[] = [
+      { key: 'total', icon: <ClipboardList size={18} color={colors.primary} />, value: totalQuestions, label: t.questionsCountLabel },
+      { key: 'today', icon: <CheckCircle2 size={18} color={colors.success} />, value: todayCorrect, label: t.todayCorrectLabel },
+      { key: 'streak', icon: <View style={{ position: 'relative', width: 18, height: 18 }}>
+          <Flame size={18} color={colors.warning} />
+          {streak >= 3 && (
+            <LottieView
+              ref={fireAnimationRef}
+              source={FireAnimation}
+              autoPlay
+              loop
+              style={styles.fireAnimation}
+              resizeMode="contain"
+            />
+          )}
+        </View>, value: streak, label: t.streakLabel },
+      { key: 'accuracy', icon: <Target size={18} color={colors.secondary} />, value: `${accuracy}%`, label: t.accuracyLabel },
+    ];
 
     return (
       <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>{totalQuestions}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{t.questionsCountLabel}</Text>
+        {/* 2×2 グリッド：問題数・今日の正解・連続学習・正答率 */}
+        <View style={styles.statsGrid}>
+          {statItems.map(item => (
+            <View key={item.key} style={styles.statsTile}>
+              {item.icon}
+              <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(20) }]}>{item.value}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{item.label}</Text>
+            </View>
+          ))}
         </View>
-        <View style={[styles.statItem, { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 20 }]}>
-          {displayTimer === null ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : isNoLimit ? (
-            <Timer size={24} color={colors.success} />
-          ) : (
-            <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(24) }]}>
-              {displayTimer}
+
+        {/* 週間進捗（クリックで統計画面へ） */}
+        <TouchableOpacity
+          style={[styles.weeklyRow, { backgroundColor: colors.primary + '0D', borderColor: colors.border }]}
+          onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/statistics'); }}
+          activeOpacity={0.7}
+        >
+          <Calendar size={16} color={colors.primary} />
+          <View style={styles.weeklyRowText}>
+            <Text style={[styles.weeklyRowTitle, { color: colors.text, fontSize: fontSize.small }]}>{t.weeklyProgressLabel}</Text>
+            <Text style={[styles.weeklyRowDesc, { color: colors.textSecondary, fontSize: fontSize.small }]} numberOfLines={1}>{weeklyChangeText}</Text>
+          </View>
+          <TrendingUp size={16} color={isWeeklyUp ? colors.success : colors.error} />
+        </TouchableOpacity>
+
+        {/* ストリークマイルストーン */}
+        {streak >= 3 && (
+          <View style={styles.streakMilestone}>
+            <Flame size={14} color={colors.warning} />
+            <Text style={[styles.streakMilestoneText, { color: colors.warning, fontSize: fontSize.small }]}>
+              {streak}{t.daysInRow}
             </Text>
-          )}
-          <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>
-            {isNoLimit ? (locale === 'ja' ? '制限なし' : 'No Limit') : t.timer}
-          </Text>
-        </View>
+          </View>
+        )}
+
+        {/* すべての統計を見る */}
+        <TouchableOpacity
+          style={styles.seeAllRow}
+          onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/statistics'); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.seeAllText, { color: colors.primary, fontSize: fontSize.small }]}>{t.seeAllStats}</Text>
+          <ChevronRight size={16} color={colors.primary} />
+        </TouchableOpacity>
       </View>
     );
   };
@@ -630,7 +797,7 @@ const HomeScreen = () => {
     return (
       <TouchableOpacity
         style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
-        onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
+        onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/quiz'); }}
       >
         <View style={styles.todayHeader}>
         <BookOpen size={16} color={colors.primary} />
@@ -653,7 +820,7 @@ const HomeScreen = () => {
         onPress={async () => {
           SoundManager.play('decide');
           await AsyncStorage.setItem('quiz_mode', 'weak');
-          navigate('/quiz');
+          navigateWithAnimation('/quiz');
         }}
       >
         <AlertTriangle size={20} color={colors.error} />
@@ -670,10 +837,12 @@ const HomeScreen = () => {
     );
   };
 
-  const renderMainActions = () => (
-    <View style={{ marginHorizontal: 4, marginBottom: 16 }}>
+  // クイックアクション（クイッククイズ／デイリーチャレンジ）
+  const renderQuickActions = () => (
+    <View style={[styles.actionGrid, { marginHorizontal: 4 }]}>
       <TouchableOpacity
-        style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
+        style={[styles.actionButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+        activeOpacity={0.7}
         onPress={() => {
           SoundManager.play('decide');
           if (questionsFromHook.length === 0) {
@@ -683,14 +852,87 @@ const HomeScreen = () => {
             );
             return;
           }
-          navigate('/quiz');
+          setQuickQuizCountCache(10);
+          navigateWithAnimation('/quiz');
         }}
       >
-        <Play size={32} color="#fff" strokeWidth={2} />
-        <Text style={styles.mainPlayText}>
-          {locale === 'ja' ? '問題を解く' : 'Start Quiz'}
-        </Text>
+        <Zap size={20} color={colors.primary} />
+        <Text style={[styles.actionLabel, { color: colors.primary }]}>{t.quickQuiz}</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.actionButton, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}
+        activeOpacity={0.7}
+        onPress={() => {
+          SoundManager.play('decide');
+          if (questionsFromHook.length === 0) {
+            Alert.alert(
+              locale === 'ja' ? '問題がありません' : 'No Questions',
+              locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
+            );
+            return;
+          }
+          navigateWithAnimation('/missions');
+        }}
+      >
+        <Award size={20} color={colors.warning} />
+        <Text style={[styles.actionLabel, { color: colors.warning }]}>{t.dailyChallenge}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // 問題が0件のときの空状態
+  const renderEmptyState = () => (
+    <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <ClipboardList size={48} color={colors.primary} style={styles.emptyStateIcon} />
+      <Text style={[styles.emptyStateTitle, { color: colors.text }]}>{t.emptyStateTitle}</Text>
+      <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>{t.emptyStateDesc}</Text>
+      <TouchableOpacity
+        style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+        activeOpacity={0.8}
+        onPress={() => {
+          SoundManager.play('decide');
+          navigateWithAnimation('/create');
+        }}
+      >
+        <Text style={styles.emptyStateButtonText}>{t.goCreate}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderMainActions = () => (
+    <View style={{ marginHorizontal: 4, marginBottom: 20 }}>
+      <Animated.View style={{ transform: [{ scale: Animated.multiply(playButtonPulse, playButtonPress) }] }}>
+        <TouchableOpacity
+          style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
+          activeOpacity={0.85}
+          onPressIn={() =>
+            Animated.spring(playButtonPress, { toValue: 0.96, friction: 5, tension: 300, useNativeDriver: Platform.OS !== 'web' }).start()
+          }
+          onPressOut={() =>
+            Animated.spring(playButtonPress, { toValue: 1, friction: 5, tension: 300, useNativeDriver: Platform.OS !== 'web' }).start()
+          }
+          onPress={() => {
+            SoundManager.play('decide');
+            if (questionsFromHook.length === 0) {
+              Alert.alert(
+                locale === 'ja' ? '問題がありません' : 'No Questions',
+                locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
+              );
+              return;
+            }
+            // ナビゲーションを1フレーム遅らせてフリッカー防止
+            navigateWithAnimation('/quiz');
+          }}
+        >
+          {/* 上部のグロスハイライト（光沢感） */}
+          <View style={[styles.playButtonHighlight, { pointerEvents: 'none' }]} />
+          <Play size={32} color="#fff" strokeWidth={2} />
+          <Text style={styles.mainPlayText}>
+            {locale === 'ja' ? '問題を解く' : 'Start Quiz'}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 
@@ -723,12 +965,53 @@ const HomeScreen = () => {
         })}
         <TouchableOpacity
           style={[styles.questMoreBtn, { borderColor: colors.border }]}
-          onPress={() => { SoundManager.play('decide'); navigate('/missions'); }}
+          onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/missions'); }}
         >
           <Text style={[styles.questMoreText, { color: colors.primary }]}>
             {locale === 'ja' ? 'すべてのミッションを見る →' : 'View all missions →'}
           </Text>
         </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // アチーブメントバッジ
+  const renderAchievementBadges = () => {
+    const unlocked = userStats?.unlockedTitles ?? [];
+    const badges = TITLE_BADGES.filter((b) => unlocked.includes(b.id));
+    if (badges.length === 0) return null;
+    return (
+      <View style={styles.achievementSection}>
+        <View style={styles.achievementHeader}>
+          <Text style={[styles.achievementHeaderTitle, { color: colors.textSecondary, fontSize: fontSize.small }]}>
+            {t.achievements}
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+            onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/achievements'); }}
+          >
+            <Text style={[styles.achievementMoreText, { color: colors.primary, fontSize: fontSize.small }]}>{t.viewAllAchievements}</Text>
+            <ChevronRight size={14} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }} style={{ width: '100%' }}>
+          {badges.map((badge, index) => {
+            const IconComp = badgeIconMap[badge.icon] ?? Award;
+            const palette = [colors.warning, colors.success, colors.primary, colors.secondary, colors.error];
+            const accent = palette[index % palette.length];
+            return (
+              <View
+                key={badge.id}
+                style={[styles.achievementBadge, { backgroundColor: accent + '20', borderColor: accent }]}
+              >
+                <IconComp size={16} color={accent} />
+                <Text style={[styles.achievementBadgeLabel, { color: colors.text }]} numberOfLines={1}>
+                  {locale === 'ja' ? badge.titleJa : badge.titleEn}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
       </View>
     );
   };
@@ -797,6 +1080,20 @@ const HomeScreen = () => {
             {profile?.currentXP || 0} / {profile?.nextLevelXP || 100} XP
           </Text>
         </View>
+
+        {/* デイリーゴール進捗 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <Target size={14} color={colors.primary} />
+          <Text style={[styles.dailyGoalLabel, { color: colors.text, fontSize: fontSize.small }]}>
+            {t.dailyGoalLabel}: {todayCorrect}/{dailyGoal}
+          </Text>
+          <View style={[styles.dailyGoalBar, { backgroundColor: colors.border, flex: 1 }]}>
+            <View style={[styles.dailyGoalFill, {
+              width: `${Math.min(100, dailyGoal > 0 ? (todayCorrect / dailyGoal) * 100 : 0)}%`,
+              backgroundColor: colors.primary,
+            }]} />
+          </View>
+        </View>
       </View>
 
       {/* 右側：設定ボタン + ドロップダウンメニュー */}
@@ -842,7 +1139,7 @@ const HomeScreen = () => {
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
-                  navigate('/settings');
+                  navigateWithAnimation('/settings');
                   setShowMenu(false);
                 }}
               >
@@ -858,7 +1155,7 @@ const HomeScreen = () => {
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
-                  navigate('/music');
+                  navigateWithAnimation('/music');
                   setShowMenu(false);
                 }}
               >
@@ -874,7 +1171,7 @@ const HomeScreen = () => {
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
-                  navigate('/multi');
+                  navigateWithAnimation('/multi');
                   setShowMenu(false);
                 }}
               >
@@ -890,7 +1187,7 @@ const HomeScreen = () => {
                 style={styles.dropdownItem}
                 onPress={() => {
                   SoundManager.play('decide');
-                  navigate('/appSettings');
+                  navigateWithAnimation('/appSettings');
                   setShowMenu(false);
                 }}
               >
@@ -909,72 +1206,17 @@ const HomeScreen = () => {
   );
 };
 
-  // モバイル用：正答率のみ（本日の学習時間削除）
-  const renderMobileInfoSections = () => {
-    if (screenType === 'desktop') return null;
+  // データ未準備・問題読み込み中の間はローディングを表示
+  // （ヘッダーや「問題がありません」の一瞬表示＝フラッシュを防止するため、
+  //   isDataReady と questionsLoading の両方が完了するまで何も出さない）
+  if (!isDataReady || questionsLoading) {
     return (
-      <View style={{ marginTop: 12, gap: 12 }}>
-        {/* 今日の1問 */}
-        {todayQuestion && (
-          <TouchableOpacity
-            style={[styles.todayCard, { padding: 14, backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-            onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
-          >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <BookOpen size={16} color={colors.primary} />
-            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>{t.todayQuestion}</Text>
-          </View>
-            <Text style={[styles.mobileQuestionText, { color: colors.text, marginTop: 8 }]}>
-              {todayQuestion.question}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* 今週の正答率（本日の学習時間削除） */}
-        <View style={[styles.infoCard, { padding: 14, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <BarChart3 size={16} color={colors.primary} />
-            <Text style={[styles.mobileSectionLabel, { color: colors.primary }]}>{locale === 'ja' ? '今週の正答率' : 'Weekly Accuracy'}</Text>
-          </View>
-          <Text style={[styles.mobileAccuracyValue, { color: colors.primary, marginTop: 8 }]}>
-            78%
-          </Text>
-          <Text style={[styles.mobileInfoSubtext, { color: colors.textSecondary }]}>
-            {locale === 'ja' ? '先週比 +5%' : '+5% vs last week'}
-          </Text>
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, fontSize: 14, marginTop: 12 }}>{locale === 'ja' ? '読み込み中...' : 'Loading...'}</Text>
       </View>
     );
-  };
-
-  const BottomNavBar = () => {
-    const navItems = [
-      { id: 'home', icon: Home, label: 'ホーム', path: '/' },
-      { id: 'create', icon: PenSquare, label: '作成', path: '/create' },
-      { id: 'multi', icon: Share2, label: 'マルチ', path: '/multi' },
-      { id: 'sub', icon: Package, label: 'サブ', path: '/appSettings' },
-    ];
-
-    return (
-      <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        {navItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.navItem}
-            onPress={() => {
-              SoundManager.play('decide');
-              if (item.path !== '#') navigate(item.path);
-            }}
-          >
-            <item.icon size={24} color={colors.primary} strokeWidth={1.5} />
-            <Text style={[styles.navLabel, { color: colors.textSecondary }]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, minHeight: '100%' }}>
@@ -1001,7 +1243,7 @@ const HomeScreen = () => {
                 backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
                 borderColor: colors.border,
               }]}
-              onPress={() => { SoundManager.play('decide'); navigate('/calendar'); }}
+              onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/calendar'); }}
             >
               <View style={styles.examHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1050,34 +1292,46 @@ const HomeScreen = () => {
             </View>
           )}
 
-          {/* デスクトップ時1カラムレイアウト（右カラム削除） */}
-          {screenType === 'desktop' ? (
-            <View style={{ flexDirection: 'column' as const, gap: 0 }}>
-              {renderStatsCard()}
-              {renderWeakCard()}
-              {/* メインアクション（解く） */}
-              {renderMainActions()}
-              {/* Main Actions */}
-              {renderDailyQuests()}
+                    {/* 問題が0件のときは空状態ガイドを表示（ローディング中はスピナーで「問題がありません」の一瞬表示を防止） */}
+          {questionsLoading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : questionsFromHook.length === 0 ? (
+            renderEmptyState()
+          ) : screenType === 'desktop' ? (
+            /* デスクトップ：2カラムレイアウト */
+            <View style={mainContentStyle.desktop}>
+              <View style={leftColumnStyle.desktop}>
+                {renderMainActions()}
+                {renderQuickActions()}
+                {renderStatsCard()}
+                {renderWeakCard()}
+              </View>
+              <View style={rightColumnStyle.desktop}>
+                {renderDailyQuests()}
+                {renderTodayQuestion()}
+                {renderAchievementBadges()}
+              </View>
             </View>
           ) : (
+            /* モバイル／タブレット：1カラムレイアウト */
             <View style={mainContentStyle[screenType]}>
-              {renderStatsCard()}
-              {renderWeakCard()}
-              {/* メインアクション（解く） */}
               {renderMainActions()}
-              {/* Main Actions */}
+              {renderQuickActions()}
+              {renderStatsCard()}
+              {renderTodayQuestion()}
               {renderDailyQuests()}
-              {renderMobileInfoSections()}
+              {renderWeakCard()}
+              {renderAchievementBadges()}
             </View>
           )}
 
         </ScrollView>
     </PatternBackground>
-    <BottomNavBar />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -1162,12 +1416,27 @@ const styles = StyleSheet.create({
   levelText: {
     fontWeight: '600',
   },
-  todayCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12 },
+  todayCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
+  },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   todayEmoji: { fontSize: 16 },
   todayLabel: { fontWeight: 'bold' },
   todayQuestion: { lineHeight: 20 },
-  weakCard: { borderWidth: 1, borderRadius: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  weakCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
+  },
   weakEmoji: { fontSize: 20 },
   weakLabel: { fontWeight: 'bold', marginBottom: 2 },
   weakDesc: {},
@@ -1222,13 +1491,21 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: 'column',
     marginBottom: 12,
     borderRadius: 12,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
   },
-  statItem: {
-    alignItems: 'center',
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  statsTile: {
+    width: '50%',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    gap: 2,
   },
   statNumber: {
     fontWeight: 'bold',
@@ -1237,6 +1514,68 @@ const styles = StyleSheet.create({
   statLabel: {
     color: '#666',
     marginTop: 4,
+  },
+  weeklyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  weeklyRowText: {
+    flex: 1,
+  },
+  weeklyRowTitle: {
+    fontWeight: '600',
+  },
+  weeklyRowDesc: {
+    marginTop: 2,
+  },
+  seeAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+    paddingVertical: 4,
+  },
+  seeAllText: {
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  emptyStateIcon: {
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
   primaryButton: {
     borderRadius: 12,
@@ -1288,37 +1627,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    position: 'sticky' as any,
-    bottom: 0,
-    zIndex: 100,
-    ...(Platform.OS !== 'web' && {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-    }),
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  navLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  featureCardsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 12,
-  },
   featureCard: {
     borderRadius: 12,
     padding: 14,
@@ -1346,30 +1654,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
-  mobileSectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  mobileQuestionText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  mobileInfoValue: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  mobileAccuracyValue: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  mobileInfoSubtext: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  infoCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-  },
   statBlock: {
     borderRadius: 12,
     alignItems: 'center',
@@ -1389,10 +1673,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     zIndex: 999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
     elevation: 5,
   },
   dropdownItem: {
@@ -1430,26 +1711,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    borderRadius: 16,
-    paddingVertical: 26,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 8,
+    gap: 14,
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    // 3D効果：厚みのある下辺＋シャドウ
+    borderBottomWidth: 6,
+    borderBottomColor: 'rgba(0,0,0,0.15)',
+    boxShadow: '0px 6px 20px rgba(0,0,0,0.25)',
+    elevation: 10,
   },
   mainPlayText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 20,
+    fontWeight: '800',
+    fontSize: 24,
+    letterSpacing: 0.5,
+  },
+  playButtonHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   questCard: {
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 16,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
   },
   questHeader: {
     flexDirection: 'row',
@@ -1483,6 +1777,68 @@ const styles = StyleSheet.create({
   questMoreText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  dailyGoalLabel: {
+    fontWeight: '600',
+    minWidth: 90,
+  },
+  dailyGoalBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  dailyGoalFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  streakMilestone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  streakMilestoneText: {
+    fontWeight: '600',
+  },
+  achievementSection: {
+    marginTop: 12,
+    marginBottom: 8,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  achievementHeaderTitle: {
+    fontWeight: '600',
+  },
+  achievementMoreText: {
+    fontWeight: '600',
+  },
+  achievementBadge: {
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 64,
+  },
+  achievementBadgeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  fireAnimation: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    top: -6,
+    right: -6,
   },
 });
 

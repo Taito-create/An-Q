@@ -1,0 +1,13 @@
+diff --git a/app/constants/storageKeys.ts b/app/constants/storageKeys.ts
+index e86b8637..cbf3700a 100644
+--- a/app/constants/storageKeys.ts
++++ b/app/constants/storageKeys.ts
+@@ -57,7 +57,8 @@ export const STORAGE_KEYS = {
+   USER_COINS: 'user_coins',
+   USER_LEVEL: 'user_level',
+   STREAK_COUNT: 'streakCount',
+-  LAST_STUDY_DATE: 'lastStudyDate',
++    LAST_STUDY_DATE: 'lastStudyDate',
++  DAILY_GOAL: 'daily_goal',
+ 
+   // 繧｢繝励Μ險ｭ螳・   DEV_MODE_ENABLED: 'dev_mode_enabled',

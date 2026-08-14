@@ -6,10 +6,11 @@ import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
-import { Clock } from 'lucide-react';
+import { Clock, TrendingUp, Target, Award } from 'lucide-react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { useQuestions } from './hooks/useQuestions';
 import { safeParseArray } from './utils/storageUtils';
+import { loadStats, UserStats } from './missions';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -28,6 +29,7 @@ export default function StatisticsScreen() {
     quizPlayed: 0,
     correctRate: 0,
   });
+  const [lifetimeStats, setLifetimeStats] = useState<UserStats | null>(null);
   const [screenTimeData, setScreenTimeData] = useState<number[]>([]);
   const [questionsCreatedData, setQuestionsCreatedData] = useState<number[]>([]);
   const [quizPlaysData, setQuizPlaysData] = useState<number[]>([]);
@@ -60,8 +62,18 @@ export default function StatisticsScreen() {
       loadWeeklyScreenTimeHistory(),
       loadWeeklyQuestionsHistory(),
       loadWeeklyQuizHistory(),
+      loadLifetimeStats(),
     ]);
     if (showLoading) setIsLoading(false);
+  };
+
+  const loadLifetimeStats = async () => {
+    try {
+      const stats = await loadStats();
+      setLifetimeStats(stats);
+    } catch (error) {
+      console.error('Failed to load lifetime stats:', error);
+    }
   };
 
   const loadWeeklyStats = async () => {
@@ -189,6 +201,73 @@ export default function StatisticsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Lifetime Summary */}
+        {lifetimeStats && (
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+              <TrendingUp size={16} color={colors.text} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t.lifetimeSummary}
+              </Text>
+            </View>
+            
+            <View style={styles.lifetimeGrid}>
+              <View style={[styles.lifetimeCard, { backgroundColor: colors.background }]}>
+                <Text style={[styles.lifetimeValue, { color: colors.primary }]}>
+                  {lifetimeStats.quizPlayed}
+                </Text>
+                <Text style={[styles.lifetimeLabel, { color: colors.textSecondary }]}>
+                  {t.totalQuizzes}
+                </Text>
+              </View>
+              
+              <View style={[styles.lifetimeCard, { backgroundColor: colors.background }]}>
+                <Text style={[styles.lifetimeValue, { color: colors.success }]}>
+                  {lifetimeStats.correctAnswers}
+                </Text>
+                <Text style={[styles.lifetimeLabel, { color: colors.textSecondary }]}>
+                  {t.totalCorrect}
+                </Text>
+              </View>
+              
+              <View style={[styles.lifetimeCard, { backgroundColor: colors.background }]}>
+                <Text style={[styles.lifetimeValue, { color: colors.primary }]}>
+                  {lifetimeStats.quizPlayed > 0 
+                    ? Math.round((lifetimeStats.correctAnswers / lifetimeStats.quizPlayed) * 100) 
+                    : 0}%
+                </Text>
+                <Text style={[styles.lifetimeLabel, { color: colors.textSecondary }]}>
+                  {t.overallAccuracy}
+                </Text>
+              </View>
+              
+              <View style={[styles.lifetimeCard, { backgroundColor: colors.background }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Target size={16} color={colors.warning || '#FFB020'} />
+                  <Text style={[styles.lifetimeValue, { color: colors.warning || '#FFB020' }]}>
+                    {lifetimeStats.loginStreak}
+                  </Text>
+                </View>
+                <Text style={[styles.lifetimeLabel, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? '現在の連続' : 'Current Streak'}
+                </Text>
+              </View>
+              
+              <View style={[styles.lifetimeCard, { backgroundColor: colors.background }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Award size={16} color={colors.warning || '#FFB020'} />
+                  <Text style={[styles.lifetimeValue, { color: colors.warning || '#FFB020' }]}>
+                    {lifetimeStats.maxStreak}
+                  </Text>
+                </View>
+                <Text style={[styles.lifetimeLabel, { color: colors.textSecondary }]}>
+                  {t.maxStreak}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* スクリーンタイム推移（折れ線グラフ） */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -270,6 +349,59 @@ export default function StatisticsScreen() {
           </View>
         </View>
 
+        {/* Tag Performance */}
+        {lifetimeStats?.tagStats && Object.keys(lifetimeStats.tagStats).length > 0 ? (
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t.tagPerformance}
+            </Text>
+            {Object.entries(lifetimeStats.tagStats)
+              .map(([tag, data]) => ({
+                tag,
+                ...data,
+                accuracy: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0
+              }))
+              .sort((a, b) => b.accuracy - a.accuracy)
+              .map((item) => (
+                <View key={item.tag} style={[styles.tagRow, { borderBottomColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.tagName, { color: colors.text }]}>
+                      {item.tag}
+                    </Text>
+                    <Text style={[styles.tagCount, { color: colors.textSecondary }]}>
+                      {item.correct} / {item.total} {locale === 'ja' ? '問' : 'questions'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={[styles.tagProgressBar, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.tagProgressFill,
+                          {
+                            width: `${item.accuracy}%`,
+                            backgroundColor: item.accuracy >= 80 ? colors.success : item.accuracy >= 50 ? colors.warning || '#FFB020' : colors.error || '#FF4757'
+                          }
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.tagAccuracy, { color: colors.text }]}>
+                      {item.accuracy}%
+                    </Text>
+                  </View>
+                </View>
+              ))}
+          </View>
+        ) : (
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t.tagPerformance}
+            </Text>
+            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+              {t.noTagData}
+            </Text>
+          </View>
+        )}
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -289,4 +421,61 @@ const styles = StyleSheet.create({
   statDetail: { fontSize: 12, marginTop: 8, textAlign: 'center' },
   progressBar: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
+  lifetimeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  lifetimeCard: {
+    flex: 1,
+    minWidth: '30%',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  lifetimeValue: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  lifetimeLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  tagName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  tagCount: {
+    fontSize: 12,
+  },
+  tagProgressBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  tagProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  tagAccuracy: {
+    fontSize: 14,
+    fontWeight: '600',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  noDataText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
 });

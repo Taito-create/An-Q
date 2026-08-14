@@ -63,6 +63,23 @@ export const translations = {
     minutes: '分',
     timer: 'タイマー',
     questionsCountLabel: '問題',
+    todayCorrectLabel: '今日の正解',
+    streakLabel: '連続学習',
+    accuracyLabel: '正答率',
+    seeAllStats: 'すべての統計を見る',
+    weeklyProgressLabel: '今週の進捗',
+    noWeeklyChange: '今週の記録はまだありません',
+    weeklyAnsweredUnit: '問',
+    vsLastWeek: '先週比',
+    quickQuiz: 'クイッククイズ',
+    dailyChallenge: 'デイリーチャレンジ',
+    emptyStateTitle: '問題がまだありません',
+    emptyStateDesc: 'まずは問題を作成して、学習を始めましょう！',
+    goCreate: '問題を作成する',
+    dailyGoalLabel: '今日の目標',
+    daysInRow: '日連続！',
+    achievements: '称号',
+    viewAllAchievements: 'すべての称号を見る',
     todayQuestion: '今日の1問',
     reviewWeakQuestions: '復習',
     selectTimer: 'タイマーを選択',
@@ -216,6 +233,13 @@ export const translations = {
     insufficientBooks: '本が不足しています',
     exchangeRow: '交換',
     
+    // Daily Goal
+    dailyGoalSetting: 'デイリーゴール設定',
+    dailyGoalDesc: '1日の目標正解数を設定します',
+    currentGoal: '現在の目標',
+    saveGoal: '目標を保存',
+    goalSaved: '目標を保存しました',
+    
     // Title
     titlesTitle: '称号',
     unlockedLabel: 'アンロック済み',
@@ -227,6 +251,14 @@ export const translations = {
     maxStreak: '最大ストリーク',
     books: '本',
     equipped: '装備中',
+    
+    // Statistics
+    lifetimeSummary: '総合統計',
+    totalQuizzes: '総クイズ数',
+    totalCorrect: '総正解数',
+    overallAccuracy: '総合正答率',
+    tagPerformance: 'タグ別正答率',
+    noTagData: 'タグデータがありません',
     
     // Tutorial
     skipTutorial: 'スキップ',
@@ -298,6 +330,23 @@ export const translations = {
     minutes: 'min',
     timer: 'Timer',
     questionsCountLabel: 'Questions',
+    todayCorrectLabel: 'Correct Today',
+    streakLabel: 'Streak',
+    accuracyLabel: 'Accuracy',
+    seeAllStats: 'See All Stats',
+    weeklyProgressLabel: 'Weekly Progress',
+    noWeeklyChange: 'No activity this week yet',
+    weeklyAnsweredUnit: 'answered',
+    vsLastWeek: 'vs last week',
+    quickQuiz: 'Quick Quiz',
+    dailyChallenge: 'Daily Challenge',
+    emptyStateTitle: 'No questions yet',
+    emptyStateDesc: 'Create your first question and start learning!',
+    goCreate: 'Create Questions',
+    dailyGoalLabel: "Today's Goal",
+    daysInRow: ' days in a row!',
+    achievements: 'Achievements',
+    viewAllAchievements: 'View all achievements',
     todayQuestion: 'Today\'s Question',
     reviewWeakQuestions: 'Review',
     selectTimer: 'Select Timer',
@@ -451,6 +500,13 @@ export const translations = {
     insufficientBooks: 'Not enough books',
     exchangeRow: 'Exchange',
     
+    // Daily Goal
+    dailyGoalSetting: 'Daily Goal Setting',
+    dailyGoalDesc: 'Set your daily correct answer target',
+    currentGoal: 'Current Goal',
+    saveGoal: 'Save Goal',
+    goalSaved: 'Goal saved',
+    
     // Title
     titlesTitle: 'Titles',
     unlockedLabel: 'Unlocked',
@@ -462,6 +518,14 @@ export const translations = {
     maxStreak: 'Max Streak',
     books: 'Books',
     equipped: 'Equipped',
+    
+    // Statistics
+    lifetimeSummary: 'Lifetime Summary',
+    totalQuizzes: 'Total Quizzes',
+    totalCorrect: 'Total Correct',
+    overallAccuracy: 'Overall Accuracy',
+    tagPerformance: 'Tag Performance',
+    noTagData: 'No tag data yet',
     
     // Tutorial
     skipTutorial: 'Skip',

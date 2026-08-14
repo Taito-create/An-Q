@@ -519,3 +519,111 @@ export async function recordQuizAnswers(answers: QuizAnswerRecord[]): Promise<vo
   }
   await saveStats(stats);
 }
+
+// ─────────────────────────────────────────────
+// 日別・週別の学習統計（ホーム画面の統計カード用）
+// ─────────────────────────────────────────────
+const TODAY_CORRECT_KEY = 'TODAY_CORRECT_STATS';
+const WEEKLY_ANSWERS_KEY = 'WEEKLY_ANSWER_STATS';
+
+interface TodayCorrectStat {
+  date: string;   // YYYY-MM-DD
+  count: number;
+}
+
+interface WeeklyAnswerStat {
+  answered: number;
+  correct: number;
+}
+
+function isoDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** 指定日の ISO 週キー（例: 2026-W32）を返す */
+function weekKeyOf(date: Date): string {
+  return `${date.getFullYear()}-W${getWeekNumber(date)}`;
+}
+
+/** 今日の正解数を読み込む（日付が変わっていれば 0） */
+export async function loadTodayCorrect(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(TODAY_CORRECT_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as TodayCorrectStat;
+    if (parsed.date !== isoDateKey(new Date())) return 0;
+    return typeof parsed.count === 'number' ? parsed.count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export interface WeeklyProgress {
+  thisWeek: number;     // 今週の回答数
+  lastWeek: number;     // 先週の回答数
+  changePercent: number; // 前週比（%）
+}
+
+/** 今週／先週の回答数とその変化率を読み込む */
+export async function loadWeeklyProgress(): Promise<WeeklyProgress> {
+  try {
+    const raw = await AsyncStorage.getItem(WEEKLY_ANSWERS_KEY);
+    const all: Record<string, WeeklyAnswerStat> = raw ? JSON.parse(raw) : {};
+    const now = new Date();
+    const thisWeek = all[weekKeyOf(now)]?.answered ?? 0;
+    const lastWeekDate = new Date(now);
+    lastWeekDate.setDate(now.getDate() - 7);
+    const lastWeek = all[weekKeyOf(lastWeekDate)]?.answered ?? 0;
+    const changePercent = lastWeek === 0
+      ? (thisWeek > 0 ? 100 : 0)
+      : Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
+    return { thisWeek, lastWeek, changePercent };
+  } catch {
+    return { thisWeek: 0, lastWeek: 0, changePercent: 0 };
+  }
+}
+
+/** クイズ結果を日別・週別の学習統計に記録する */
+export async function recordQuizStat(correct: number, answered: number): Promise<void> {
+  if (correct <= 0 && answered <= 0) return;
+  const now = new Date();
+  const today = isoDateKey(now);
+  try {
+    // 今日の正解数
+    const todayRaw = await AsyncStorage.getItem(TODAY_CORRECT_KEY);
+    const todayParsed = todayRaw ? (JSON.parse(todayRaw) as TodayCorrectStat) : null;
+    const todayCount = (todayParsed && todayParsed.date === today && typeof todayParsed.count === 'number' ? todayParsed.count : 0) + correct;
+    await AsyncStorage.setItem(TODAY_CORRECT_KEY, JSON.stringify({ date: today, count: todayCount }));
+
+    // 週別の回答数・正解数
+    const weekKey = weekKeyOf(now);
+    const weekRaw = await AsyncStorage.getItem(WEEKLY_ANSWERS_KEY);
+    const all: Record<string, WeeklyAnswerStat> = weekRaw ? JSON.parse(weekRaw) : {};
+    const current: WeeklyAnswerStat = all[weekKey] || { answered: 0, correct: 0 };
+    current.answered += answered;
+    current.correct += correct;
+        all[weekKey] = current;
+    await AsyncStorage.setItem(WEEKLY_ANSWERS_KEY, JSON.stringify(all));
+  } catch {
+    // 記録失敗は致命的ではないため握りつぶす
+  }
+}
+
+// ─────────────────────────────────────────────
+// クイックアクション用：ホーム → クイズの即時開始問題数
+// モジュールスコープのキャッシュ。SPA 内のルーティング遷移で即座に反映され、
+// ハードリフレッシュ時は null になる（フォールバック：通常の設定画面）。
+// ─────────────────────────────────────────────
+export let quickQuizCountCache: number | null = null;
+export const setQuickQuizCountCache = (n: number | null) => {
+  quickQuizCountCache = n;
+};
+export const consumeQuickQuizCountCache = (): number | null => {
+  const n = quickQuizCountCache;
+  quickQuizCountCache = null;
+  return typeof n === 'number' && n > 0 ? n : null;
+};
+

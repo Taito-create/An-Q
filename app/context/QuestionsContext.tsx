@@ -25,7 +25,8 @@ interface QuestionsContextType {
   questions: Question[];
   folders: Folder[];
   tagMasterList: string[];
-  isMigrating: boolean;
+    isMigrating: boolean;
+  loading: boolean;
   loadQuestions: () => Promise<void>;
   saveQuestions: (questions: Question[]) => Promise<void>;
   saveFolders: (folders: Folder[]) => Promise<void>;
@@ -53,7 +54,8 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [questions, setQuestions] = useState<Question[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tagMasterList, setTagMasterList] = useState<string[]>([]);
-  const [isMigrating, setIsMigrating] = useState(false);
+    const [isMigrating, setIsMigrating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   // Firestoreから問題を読み込み
@@ -288,19 +290,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const loadQuestions = useCallback(async () => {
     console.log(' loadQuestions called, user:', user?.uid);
     
-    // 未ログイン時はローカルのみ
+    // 未ログイン時は loading を true のまま維持し、認証完了まで待つ
     if (!user) {
-      console.log(' No user, loading from AsyncStorage only');
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_QUESTIONS);
-      const allQuestions: Question[] = safeParseArray(data, []);
-      const filteredQuestions = allQuestions.filter((q: any) => q.answerType);
-      console.log(' Loaded from AsyncStorage:', filteredQuestions.length, 'questions');
-      setQuestions(filteredQuestions);
-      
-      const folderData = await AsyncStorage.getItem(STORAGE_KEYS.QUESTION_FOLDERS);
-      const folders: Folder[] = safeParseArray(folderData, []);
-      setFolders(folders);
-      
+      console.log('No user, keeping loading=true and waiting');
+      // setLoading(false) はここでは行わない（ちらつき防止のため認証完了まで待つ）
+      // AsyncStorage からは読み込まない（ログイン後に Firestore から読み込む）
       return;
     }
 
@@ -971,12 +965,21 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return removedCount;
   }, [folders, questions, applyFoldersChange]);
 
-  // 初回読み込み
+    // 初回読み込み
   useEffect(() => {
-    loadQuestions();
+    loadQuestions()
+      .catch((e) => console.error('loadQuestions failed:', e))
+      .finally(() => {
+        // 未ログイン時は loading を true のまま維持（認証完了まで「問題がありません」のちらつきを防ぐ）
+        if (user) {
+          setLoading(false);
+        } else {
+          console.log('No user, keeping loading=true and waiting');
+        }
+      });
     // タグマスターリストをローカルから読み込み
     loadTagMasterList().then(setTagMasterList);
-  }, [loadQuestions]);
+  }, [loadQuestions, user]);
 
   // Debug: Log actual state values after updates
   useEffect(() => {
@@ -985,10 +988,11 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // ContextValueの作成
   const value: QuestionsContextType = {
-    questions,
+        questions,
     folders,
     tagMasterList,
     isMigrating,
+    loading,
     loadQuestions,
     saveQuestions,
     applyQuestionsChange,

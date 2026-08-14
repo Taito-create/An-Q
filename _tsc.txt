@@ -1,0 +1,8 @@
+app/quiz.tsx(1263,13): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: TouchableOpacityProps): TouchableOpacity', gave the following error.
+    Type '(overrideCount?: number) => Promise<void>' is not assignable to type '(event: GestureResponderEvent) => void'.
+      Types of parameters 'overrideCount' and 'event' are incompatible.
+        Type 'GestureResponderEvent' is not assignable to type 'number'.
+  Overload 2 of 2, '(props: TouchableOpacityProps, context: any): TouchableOpacity', gave the following error.
+    Type '(overrideCount?: number) => Promise<void>' is not assignable to type '(event: GestureResponderEvent) => void'.
+EXITCODE=2

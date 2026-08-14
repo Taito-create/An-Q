@@ -12,6 +12,8 @@ import { useLocale } from './hooks/useLocale';
 import { loadStats, UserStats } from './missions';
 import { BarChart3 } from 'lucide-react';
 import { safeParse, safeParseArray } from './utils/storageUtils';
+import LottieView from 'lottie-react-native';
+import congratulation from '../src/assets/animations/congratulation.json';
 
 // Type definitions
 interface QuizResult {
@@ -41,6 +43,7 @@ export default function ResultsScreen() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -55,7 +58,14 @@ export default function ResultsScreen() {
       } finally {
         // 一瞬表示防止
         setTimeout(() => {
-          if (isMounted) setIsLoading(false);
+          if (isMounted) {
+            setIsLoading(false);
+            // Show celebration animation when results are loaded
+            if (location.state?.results && location.state.results.length > 0) {
+              setShowCelebration(true);
+              setTimeout(() => setShowCelebration(false), 3000);
+            }
+          }
         }, 100);
       }
     };
@@ -180,7 +190,21 @@ export default function ResultsScreen() {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+    <>
+      {/* Celebration Animation Overlay */}
+      {showCelebration && (
+        <View style={styles.celebrationOverlay}>
+          <LottieView
+            source={congratulation}
+            autoPlay
+            loop={false}
+            style={styles.celebrationAnimation}
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       <Text style={[styles.headerTitle, { color: colors.text }]}>{t.quizResults}</Text>
 
       {/* Score Card */}
@@ -270,12 +294,28 @@ export default function ResultsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 32, gap: 16 },
+  celebrationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  celebrationAnimation: {
+    width: 300,
+    height: 300,
+  },
   headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, letterSpacing: 0.2 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 },
   emptyEmoji: { fontSize: 60, marginBottom: 20 },
@@ -289,13 +329,7 @@ const styles = StyleSheet.create({
     marginBottom: 6, 
     alignItems: 'center', 
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
     elevation: 5, 
   },
   bigScore: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 },

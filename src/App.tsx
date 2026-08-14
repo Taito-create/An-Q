@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { View, Text, TouchableOpacity } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
@@ -10,6 +10,7 @@ import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { syncLoginStreak } from './utils/userProgress';
 import { Sparkles } from 'lucide-react';
+import BottomNavBar from '../app/BottomNavBar';
 
 // キャッシュ不整合によるChunkLoadErrorを自動検知してリロードする安全なlazy loading
 const safeLazy = (importFn: () => Promise<any>) => {
@@ -47,12 +48,25 @@ const ReorderConfirmScreen = safeLazy(() => import('../app/reorderConfirm'));
 const ResultsScreen = safeLazy(() => import('../app/results'));
 const SettingsScreen = safeLazy(() => import('../app/settings'));
 const ShopScreen = safeLazy(() => import('../app/shop'));
+const AchievementsScreen = safeLazy(() => import('../app/achievements'));
 const TitleScreen = safeLazy(() => import('../app/title'));
 const TitleListScreen = safeLazy(() => import('../app/titleScreen'));
 const AppSettingsScreen = safeLazy(() => import('../app/appSettings'));
 const GachaScreen = safeLazy(() => import('../app/gacha'));
 
 const Loading = () => <LoadingScreen />;
+
+// Suspense フォールバックを即座に出さないことで、キャッシュ済み/高速な遷移のちらつきを防止する
+// （遅延表示＝React.lazy のチャンク取得が完了すればタイマー破棄→ローダーは一切表示されない）
+const SUSPENSE_FALLBACK_DELAY = 300;
+const SuspenseFallback = () => {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), SUSPENSE_FALLBACK_DELAY);
+    return () => clearTimeout(t);
+  }, []);
+  return show ? <Loading /> : null;
+};
 
 export default function App() {
   const [showUpdatePrompt, setShowUpdatePrompt] = React.useState(false);
@@ -124,7 +138,7 @@ export default function App() {
 
   return (
     <RootLayout>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<SuspenseFallback />}>
         <Routes>
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/credits" element={<CreditsScreen />} />
@@ -241,8 +255,14 @@ export default function App() {
               <GachaScreen />
             </ProtectedRoute>
           } />
+          <Route path="/achievements" element={
+            <ProtectedRoute>
+              <AchievementsScreen />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <BottomNavBar />
       </Suspense>
 
       {/* 更新通知モーダル */}

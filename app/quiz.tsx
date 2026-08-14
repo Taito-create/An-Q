@@ -11,10 +11,9 @@ import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
-import { incrementStat, recordQuizAnswers } from './missions';
+import { incrementStat, recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
-import { useQuestions } from './hooks/useQuestions';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
@@ -69,15 +68,15 @@ export default function QuizScreen() {
   const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions: allQuestionsFromHook, loadQuestions } = useQuestions();
-  const { folders } = useQuestionsContext();
+    const { questions: allQuestionsFromHook, folders, loading: questionsLoading } = useQuestionsContext();
   const { user } = useAuth();
   const screenWidth = Dimensions.get('window').width;
 
   // クイズ全体の状態
   const [quizStarted, setQuizStarted] = useState(false);
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>([]);
+    // ルートで既にロード済みの問題を初期値として使う（ナビゲーション直後の「読み込み中」フラッシュ防止）
+  const [allQuestions, setAllQuestions] = useState<Question[]>(() => allQuestionsFromHook.filter(q => q.enabled !== false));
+  const [enabledQuestions, setEnabledQuestions] = useState<Question[]>(() => allQuestionsFromHook.filter(q => q.enabled !== false));
   const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -88,7 +87,7 @@ export default function QuizScreen() {
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showReview, setShowReview] = useState(false);
   const [mistakeCount, setMistakeCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(() => questionsLoading || allQuestionsFromHook.length === 0);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
   const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);
   const [feedbackMessage, setFeedbackMessage] = useState('');
@@ -146,9 +145,11 @@ export default function QuizScreen() {
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // プレ設定用 state
-  const [showPreSettings, setShowPreSettings] = useState(true);
-  const [preQuestionCount, setPreQuestionCount] = useState<number>(0);
+    // プレ設定用 state
+  // クイックアクション（ホーム → クイズ）からの即時開始カウントを一度だけ消費
+  const [quickStartCount, setQuickStartCount] = useState<number | null>(() => consumeQuickQuizCountCache());
+  const [showPreSettings, setShowPreSettings] = useState(() => quickStartCount == null);
+  const [preQuestionCount, setPreQuestionCount] = useState<number>(() => quickStartCount ?? 0);
   const [isReverseMode, setIsReverseMode] = useState(false);
 
   // ゲーム機能用 state
@@ -467,16 +468,31 @@ export default function QuizScreen() {
     };
   }, [autoPlayMode, quizStarted, speechEnabled, lastInteraction]);
 
-  // useQuestions フックのデータをローカル state に反映
+    // コンテキストのデータをローカル state に反映（初回は lazy init で済む）
   useEffect(() => {
-    if (allQuestionsFromHook.length === 0) return;
+    if (allQuestionsFromHook.length === 0) {
+      // ロード完了後に空で確定していればローディング解除（0 問のときの stuck を防ぐ）
+      if (!questionsLoading) setIsLoading(false);
+      return;
+    }
     const enabled = allQuestionsFromHook.filter(q => q.enabled !== false);
     setAllQuestions(enabled);
     setEnabledQuestions(enabled);
 
     setPreQuestionCount(enabled.length);
     setIsLoading(false);
-  }, [allQuestionsFromHook]);
+  }, [allQuestionsFromHook, questionsLoading]);
+
+  // クイックアクション（ホーム → クイズ）からの即時開始：
+  // 設定画面をスキップして指定問題数で直ちにクイズを開始する
+  const quickStartAppliedRef = useRef(false);
+  useEffect(() => {
+    if (quickStartCount == null) return;
+    if (quickStartAppliedRef.current) return;
+    if (allQuestions.length === 0) return;
+    quickStartAppliedRef.current = true;
+    startQuiz(quickStartCount);
+  }, [allQuestions.length, quickStartCount]);
 
   const loadTimerPresets = async () => {
     try {
@@ -604,7 +620,7 @@ export default function QuizScreen() {
   // ──────────────────────────────────────────────
   // クイズ開始
   // ──────────────────────────────────────────────
-  const startQuiz = async () => {
+  const startQuiz = async (overrideCount?: number) => {
     console.log('[AutoPlay] startQuiz called, quizStarted will be true');
     let filtered = getFilteredQuestions();
 
@@ -639,9 +655,11 @@ export default function QuizScreen() {
       await AsyncStorage.removeItem('quiz_active_timer');
     }
 
-    let shuffled = [...filtered].sort(() => Math.random() - 0.5);
+                let shuffled = [...filtered].sort(() => Math.random() - 0.5);
+    // クイックアクションから指定された問題数を優先（未指定時はスライダー値）
+    const quizCount = Math.max(1, Math.min(overrideCount ?? preQuestionCount, filtered.length));
     if (!suddenDeathMode) {
-      shuffled = shuffled.slice(0, preQuestionCount);
+      shuffled = shuffled.slice(0, quizCount);
     } else {
       setPreQuestionCount(filtered.length);
       shuffled = [...filtered].sort(() => Math.random() - 0.5);
@@ -873,6 +891,8 @@ export default function QuizScreen() {
         tags: shuffledQuestions.find(q => q.id === r.questionId)?.tags ?? [],
       }));
       await recordQuizAnswers(answers);
+      // 日別・週別の学習統計に記録（ホーム画面の統計カード用）
+      await recordQuizStat(finalScore, totalQuestions);
       
       const baseXP = finalScore * 20;
       const baseCoins = finalScore * 10;
@@ -1243,7 +1263,7 @@ export default function QuizScreen() {
 
           <TouchableOpacity
             style={[styles.startButton, { backgroundColor: colors.primary }]}
-            onPress={startQuiz}
+            onPress={() => startQuiz()}
           >
             <Text style={[styles.startButtonText, { color: onPrimary }]}>
               {locale === 'ja' ? 'クイズを開始' : 'Start Quiz'}
@@ -1465,7 +1485,8 @@ export default function QuizScreen() {
               bottom: 8,
               right: 8,
               zIndex: 99,
-            }} pointerEvents="none">
+              pointerEvents: 'none',
+            }}>
               <LottieView
                 source={successJson}
                 autoPlay
@@ -1482,7 +1503,8 @@ export default function QuizScreen() {
               bottom: 8,
               right: 8,
               zIndex: 99,
-            }} pointerEvents="none">
+              pointerEvents: 'none',
+            }}>
               <LottieView
                 source={errorJson}
                 autoPlay
@@ -1991,10 +2013,7 @@ const styles = StyleSheet.create({
     padding: 32,
     borderRadius: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.3)',
     elevation: 5,
   },
   fullScreenIcon: {

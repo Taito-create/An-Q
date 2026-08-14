@@ -28,9 +28,34 @@ const PATTERN_SIZES: Record<PatternType, number> = {
   diamonds: 22,
 };
 
+// children を安全にレンダリングするヘルパー
+// View の直接の子に生テキストがあると
+// 「Unexpected text node: A text node cannot be a child of a <View>」になるため、Text でラップする。
+const renderSafeChildren = (children: React.ReactNode): React.ReactNode => {
+  if (children == null) return null;
+
+  if (typeof children === 'string') {
+    return <Text>{children}</Text>;
+  }
+
+  if (Array.isArray(children)) {
+    return children.map((child, index) => {
+      if (typeof child === 'string') {
+        return <Text key={index}>{child}</Text>;
+      }
+      if (Array.isArray(child)) {
+        return renderSafeChildren(child);
+      }
+      return child;
+    });
+  }
+
+  return children;
+};
+
 export default function PatternBackground({ pattern, color, children, style }: Props) {
   if (pattern === 'none') {
-    return <View style={[styles.container, style, { backgroundColor: 'transparent' }]}>{children}</View>;
+    return <View style={[styles.container, style, { backgroundColor: 'transparent' }]}>{renderSafeChildren(children)}</View>;
   }
 
   const char = PATTERN_CHARS[pattern];
@@ -41,7 +66,7 @@ export default function PatternBackground({ pattern, color, children, style }: P
   return (
     <View style={[styles.container, style, { backgroundColor: 'transparent' }]}>
       {/* Pattern overlay */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
         <View style={styles.patternWrap}>
           {tiles.map((_, i) => (
             <Text
@@ -60,7 +85,7 @@ export default function PatternBackground({ pattern, color, children, style }: P
           ))}
         </View>
       </View>
-      {children}
+      {renderSafeChildren(children)}
     </View>
   );
 }

@@ -8,6 +8,7 @@ import { useBGM } from './bgmContext';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import { safeRender } from './utils/renderHelpers';
 import {
   VoicePreset,
   voicePresetLabels,
@@ -86,7 +87,7 @@ export default function AppSettingsScreen() {
   const Row = ({ label, right }: { label: string; right: React.ReactNode }) => (
     <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Text style={[styles.rowLabel, { color: colors.text, fontSize: fs(15) }]}>{label}</Text>
-      <View style={styles.rowRight}>{right}</View>
+      <View style={styles.rowRight}>{safeRender(right)}</View>
     </View>
   );
 

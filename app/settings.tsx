@@ -7,6 +7,8 @@ import { useTheme, ThemeName, FontSize } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { AnimationLevel, animationConfigs } from './animations';
 import { Check } from 'lucide-react';
+import { STORAGE_KEYS } from './constants/storageKeys';
+import { translations } from './translations';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string }[] = [
   { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue' },
@@ -26,13 +28,18 @@ export default function SettingsScreen() {
   const navigate = useNavigate();
   const { colors, currentTheme, setTheme, setCustomColor, customColor, fontSize, setFontSize, scale, pattern, setPattern, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
+  const t = translations[locale];
   const ja = locale === 'ja';
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
+  const [dailyGoal, setDailyGoal] = useState(10);
+  const [goalInput, setGoalInput] = useState('10');
+  const [goalSaved, setGoalSaved] = useState(false);
 
   useEffect(() => {
     loadAnimationSetting();
+    loadDailyGoal();
   }, []);
 
   const loadAnimationSetting = async () => {
@@ -43,6 +50,35 @@ export default function SettingsScreen() {
       }
     } catch (e) {
       console.error('Failed to load animation setting:', e);
+    }
+  };
+
+  const loadDailyGoal = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_GOAL);
+      const goal = saved ? parseInt(saved, 10) : 10;
+      const clampedGoal = Math.max(5, Math.min(30, goal));
+      setDailyGoal(clampedGoal);
+      setGoalInput(clampedGoal.toString());
+    } catch (e) {
+      console.error('Failed to load daily goal:', e);
+    }
+  };
+
+  const saveDailyGoal = async () => {
+    const goal = parseInt(goalInput, 10);
+    if (isNaN(goal) || goal < 5 || goal > 30) {
+      return;
+    }
+    
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.DAILY_GOAL, goal.toString());
+      setDailyGoal(goal);
+      setGoalSaved(true);
+      SoundManager.play('decide');
+      setTimeout(() => setGoalSaved(false), 2000);
+    } catch (e) {
+      console.error('Failed to save daily goal:', e);
     }
   };
 
@@ -275,6 +311,103 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
+
+      {/* Daily Goal Setting */}
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+          {t.dailyGoalSetting}
+        </Text>
+        <Text style={[styles.sectionDesc, { color: colors.textSecondary, fontSize: Math.round(13 * scale) }]}>
+          {t.dailyGoalDesc}
+        </Text>
+
+        {/* Progress Preview */}
+        <View style={[styles.goalPreview, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={[styles.goalPreviewLabel, { color: colors.textSecondary }]}>
+              {t.currentGoal}
+            </Text>
+            <Text style={[styles.goalPreviewValue, { color: colors.primary }]}>
+              {dailyGoal} {locale === 'ja' ? '問' : 'questions'}
+            </Text>
+          </View>
+          <View style={[styles.goalProgressBar, { backgroundColor: colors.border }]}>
+            <View
+              style={[
+                styles.goalProgressFill,
+                {
+                  width: `${Math.min(100, (dailyGoal / 30) * 100)}%`,
+                  backgroundColor: colors.success,
+                }
+              ]}
+            />
+          </View>
+          <Text style={[styles.goalPreviewHint, { color: colors.textSecondary }]}>
+            {locale === 'ja' ? '1日あたりの目標正解数' : 'Daily correct answer target'}
+          </Text>
+        </View>
+
+        {/* Slider */}
+        <View style={{ marginTop: 20 }}>
+          <Text style={[styles.sliderLabel, { color: colors.text, fontSize: Math.round(14 * scale) }]}>
+            {locale === 'ja' ? 'スライダーで調整' : 'Adjust with slider'}
+          </Text>
+          <input
+            type="range"
+            min={5}
+            max={30}
+            step={1}
+            value={dailyGoal}
+            onChange={(e) => {
+              setGoalInput(e.target.value);
+              setGoalSaved(false);
+            }}
+            style={{ width: '100%', height: 40, accentColor: colors.primary }}
+          />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: -10 }}>
+            <Text style={[styles.sliderLimit, { color: colors.textSecondary }]}>5</Text>
+            <Text style={[styles.sliderLimit, { color: colors.textSecondary }]}>30</Text>
+          </View>
+        </View>
+
+        {/* Number Input */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+          <TextInput
+            style={[styles.goalInput, {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.background,
+              fontSize: Math.round(16 * scale),
+            }]}
+            value={goalInput}
+            onChangeText={(text) => {
+              setGoalInput(text);
+              setGoalSaved(false);
+            }}
+            keyboardType="numeric"
+            maxLength={2}
+            placeholder="5-30"
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TouchableOpacity
+            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+            onPress={saveDailyGoal}
+          >
+            <Text style={[styles.saveButtonText, { color: onPrimary }]}>
+              {t.saveGoal}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Success Message */}
+        {goalSaved && (
+          <View style={[styles.successMessage, { backgroundColor: colors.success + '20', borderColor: colors.success }]}>
+            <Text style={[styles.successText, { color: colors.success }]}>
+              {t.goalSaved}
+            </Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -327,5 +460,70 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  goalPreview: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  goalPreviewLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  goalPreviewValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  goalPreviewHint: {
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  goalProgressBar: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  goalProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  sliderLabel: {
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  sliderLimit: {
+    fontSize: 12,
+  },
+  goalInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    textAlign: 'center',
+  },
+  saveButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  successMessage: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  successText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

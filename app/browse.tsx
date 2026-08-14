@@ -694,7 +694,7 @@ export default function BrowseQuestionsScreen() {
                 key={item.id}
                 style={[
                   styles.card,
-                  { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.primary },
+                  { backgroundColor: colors.card, borderColor: colors.border, boxShadow: `0px 4px 12px ${colors.primary}0F` },
                   isCompactMode && styles.cardCompact,
                   isSelectionMode && styles.batchCompactCard,
                 ]}
@@ -950,7 +950,7 @@ export default function BrowseQuestionsScreen() {
                             { 
                               backgroundColor: colors.card,
                               borderColor: colors.border,
-                              shadowColor: colors.primary
+                              boxShadow: `0px 2px 8px ${colors.primary}1A`
                             },
                             isSelected && { backgroundColor: colors.error + '10' }
                           ]}
@@ -1710,9 +1710,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     elevation: 2,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -1786,9 +1783,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     elevation: 2,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
   folderCardCheckbox: { position: 'absolute', top: 8, right: 8 },
   folderCardIcon: { fontSize: 32, marginBottom: 4 },

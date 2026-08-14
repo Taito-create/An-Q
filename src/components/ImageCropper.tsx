@@ -192,10 +192,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     position: 'relative',
     marginVertical: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 0,
+    boxShadow: '0px 0px 0px rgba(0,0,0,0.5)',
     elevation: 0,
   },
   sliderWrap: {
