@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     StyleSheet, Text, View, TouchableOpacity,
   ScrollView, StatusBar, Alert, Animated, ActivityIndicator
@@ -211,8 +211,8 @@ const HomeScreen = React.memo(() => {
   };
 
   // カード・ボタンサイズ
-  const cpR: number | undefined = isCyberpunk ? 0 : undefined;
-  const cpB: number | undefined = isCyberpunk ? 2 : undefined;
+  const cpR: number | undefined = undefined;
+  const cpB: number | undefined = undefined;
 
   const cardPadding = {
     mobile: { padding: 12 },
@@ -656,7 +656,7 @@ const HomeScreen = React.memo(() => {
     desktop: { flex: 1, minWidth: 0 },
   };
 
-  const primaryTextColor = isCyberpunk ? '#1A1A1A' : onPrimary;
+  const primaryTextColor = onPrimary;
 
   // デイリークエスト読み込み
   useEffect(() => {
@@ -1103,7 +1103,7 @@ const HomeScreen = React.memo(() => {
             style={[styles.iconButton, { 
               width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
               height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-              borderRadius: isCyberpunk ? 0 : (screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18),
+              borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
               borderColor: colors.primary,
               borderWidth: cpB ?? 1,
             }]} 
@@ -1187,7 +1187,7 @@ const HomeScreen = React.memo(() => {
                 style={styles.dropdownItem}
                 onPress={() => {
                   SoundManager.play('decide');
-                  navigateWithAnimation('/appSettings');
+                  navigateWithAnimation('/sub');
                   setShowMenu(false);
                 }}
               >

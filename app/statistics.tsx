@@ -193,8 +193,8 @@ export default function StatisticsScreen() {
            {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
         </Text>
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
         >
           <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>

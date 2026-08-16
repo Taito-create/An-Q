@@ -15,7 +15,7 @@ interface CustomTimer {
   minutes: number;
 }
 
-export default function ManageScreen() {
+export default function TimerSettingsScreen() {
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -160,11 +160,11 @@ export default function ManageScreen() {
       {/* ヘッダー */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          <Timer size={20} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'タイマー設定' : 'Timer Settings'}
+          <Timer size={20} color={colors.primary} style={{ marginRight: 8 }} />{t.timerSettings}
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
         >
           <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}

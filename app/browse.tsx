@@ -589,7 +589,7 @@ export default function BrowseQuestionsScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { 
               SoundManager.play('decide'); 
               if (selectedFolder) {
@@ -597,8 +597,8 @@ export default function BrowseQuestionsScreen() {
                 setSelectedFolder(null);
                 setFolderQuestions([]);
               } else {
-                // ホーム画面に戻る
-                navigate('/'); 
+                // 作成ハブに戻る
+                navigate('/create'); 
               }
             }}
           >

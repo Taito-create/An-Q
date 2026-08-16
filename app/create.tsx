@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -22,18 +22,21 @@ import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
-import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText, ClipboardList } from 'lucide-react';
+import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText, ClipboardList, ChevronLeft } from 'lucide-react';
 import './create.css';
 
 export default function CreateQuestionScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // /create/ocr ルートでは OCR（画像から一括生成）モードで表示する
+  const isOcrRoute = location.pathname.startsWith('/create/ocr');
   const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions, saveQuestions, applyQuestionsChange, removeTagFromAllQuestions, tagMasterList, addTag, removeTag } = useQuestionsContext();
   const { user } = useAuth();
-  const cpR: number | undefined = isCyberpunk ? 0 : undefined;
-  const cpB: number | undefined = isCyberpunk ? 2 : undefined;
+  const cpR: number | undefined = undefined;
+  const cpB: number | undefined = undefined;
 
   useEffect(() => {
     SoundManager.initialize();
@@ -818,7 +821,27 @@ export default function CreateQuestionScreen() {
 
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
 
+      {/* OCRルート用バナー：画像からの一括生成を開始（ファイル選択はユーザー操作で発火） */}
+      {isOcrRoute && (
+        <TouchableOpacity
+          style={{ marginBottom: 16, padding: 14, backgroundColor: colors.primary + '18', borderColor: colors.primary, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          onPress={() => handleOcrExtract({ type: 'question' })}
+        >
+          <ScanText size={22} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
+            {locale === 'ja' ? '画像から問題を一括生成（OCR）' : 'Generate questions from image (OCR)'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0 }]}>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 4 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+        >
+          <ChevronLeft size={20} color={colors.text} />
+          <Text style={{ color: colors.text, fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? '問題作成' : 'Create Question'}
         </Text>
@@ -869,9 +892,6 @@ export default function CreateQuestionScreen() {
             <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>
               {locale === 'ja' ? '管理' : 'Manage'}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }} onPress={() => { SoundManager.play('decide'); navigate('/'); }}>
-            <Text style={{ color: isCyberpunk ? '#000000' : onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -971,7 +991,7 @@ export default function CreateQuestionScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
 
         {/* 読み仮名入力（任意） */}
         <View style={{ marginTop: 8, marginBottom: 12 }}>
@@ -1185,7 +1205,7 @@ export default function CreateQuestionScreen() {
             </View>
             {!trueFalseAnswer && (
               <TextInput
-                style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
                 value={explanation}
                 onChangeText={setExplanation}
                 placeholder={locale === 'ja' ? '備考（どこが違うのか・解説）' : 'Note (explanation)'}
@@ -1200,7 +1220,7 @@ export default function CreateQuestionScreen() {
             {multipleChoice.options.map((option, index) => (
               <TextInput
                 key={index}
-                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5 }]}
+                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5 }]}
                 value={option}
                 onChangeText={(text) => {
                   const newOptions = [...multipleChoice.options];
@@ -1238,7 +1258,7 @@ export default function CreateQuestionScreen() {
             </View>
             
             <TextInput
-              style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: isCyberpunk ? '#E0E0E0' : colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
               value={explanation}
               onChangeText={setExplanation}
               placeholder={locale === 'ja' ? '備考・解説（任意）' : 'Note / Explanation (optional)'}
@@ -1252,14 +1272,13 @@ export default function CreateQuestionScreen() {
             backgroundColor: isCreating ? colors.textSecondary : colors.primary,
             borderRadius: cpR ?? 25,
             borderWidth: cpB,
-            borderColor: isCyberpunk ? colors.primary : undefined,
             marginTop: 8,
             opacity: isCreating ? 0.6 : 1,
           }]}
           onPress={handleManualCreate}
           disabled={isCreating}
         >
-          <Text style={[styles.buttonText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#ffffff' }]}>
+          <Text style={[styles.buttonText, { color: onPrimary }]}>
             {isCreating ? locale === 'ja' ? '作成中...' : 'Creating...' : t.createQuestion}
           </Text>
         </TouchableOpacity>

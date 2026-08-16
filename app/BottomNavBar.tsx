@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -29,6 +29,13 @@ const GLOW_RADIUS = 16;       // 12 → 16
 // （Web で useNativeDriver:true にすると警告が出るため）
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
+// 各タブに属する詳細画面（タブ直下パスだけでなく、これらの画面でも対応タブをアクティブにする）
+const TABS_SCREENS: Record<string, string[]> = {
+  '/create': ['/browse', '/timer'],
+  '/multi': ['/inbox'],
+  '/sub': ['/settings', '/music', '/appSettings', '/profile', '/missions', '/statistics', '/credits', '/shop', '/gacha', '/achievements', '/calendar'],
+};
+
 const BottomNavBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,12 +65,18 @@ const BottomNavBar = () => {
     { id: 'home', icon: Home, label: 'ホーム', path: '/' },
     { id: 'create', icon: PenSquare, label: '作成', path: '/create' },
     { id: 'multi', icon: Share2, label: 'マルチ', path: '/multi' },
-    { id: 'sub', icon: Package, label: 'サブ', path: '/appSettings' },
+    { id: 'sub', icon: Package, label: 'サブ', path: '/sub' },
   ];
 
   // アクティブ判定
-  const isActive = (path: string) =>
-    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    // タブ直下パス（/create /create/manual /multi /sub など）は前方一致で判定
+    if (location.pathname.startsWith(path)) return true;
+    // 詳細画面（例: /browse, /inbox, /settings など）は所属タブをアクティブにする
+    const siblings = TABS_SCREENS[path] || [];
+    return siblings.some((p) => location.pathname === p || location.pathname.startsWith(p + '/'));
+  };
 
   // アクティブインデックス
   const getActiveIndex = () => {

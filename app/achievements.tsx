@@ -162,7 +162,7 @@ export default function AchievementsScreen() {
           style={styles.backButton}
           onPress={() => {
             SoundManager.play('decide');
-            navigate('/');
+            navigate('/sub');
           }}
         >
           <Text style={[styles.backButtonText, { color: colors.primary }]}>

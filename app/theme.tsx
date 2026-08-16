@@ -6,6 +6,7 @@ const themePresets = {
   blue: {
     name: 'Blue',
     primary: '#2563EB',
+    onPrimary: '#FFFFFF',
     secondary: '#60A5FA',
     background: '#F8FAFC',
     card: '#FFFFFF',
@@ -19,6 +20,7 @@ const themePresets = {
   green: {
     name: 'Green',
     primary: '#16A34A',
+    onPrimary: '#FFFFFF',
     secondary: '#86EFAC',
     background: '#F7FAF7',
     card: '#FFFFFF',
@@ -32,6 +34,7 @@ const themePresets = {
   orange: {
     name: 'Orange',
     primary: '#EA580C',
+    onPrimary: '#FFFFFF',
     secondary: '#FDBA74',
     background: '#FFFAF5',
     card: '#FFFFFF',
@@ -45,6 +48,7 @@ const themePresets = {
   pink: {
     name: 'Pink',
     primary: '#DB2777',
+    onPrimary: '#FFFFFF',
     secondary: '#F9A8D4',
     background: '#FFF7FB',
     card: '#FFFFFF',
@@ -58,6 +62,7 @@ const themePresets = {
   sakura: {
     name: 'Sakura',
     primary: '#E11D48',
+    onPrimary: '#FFFFFF',
     secondary: '#FDA4AF',
     background: '#FFF7F8',
     card: '#FFFFFF',
@@ -71,6 +76,7 @@ const themePresets = {
   purple: {
     name: 'Purple',
     primary: '#7C3AED',
+    onPrimary: '#FFFFFF',
     secondary: '#C084FC',
     background: '#FAF7FF',
     card: '#FFFFFF',
@@ -84,6 +90,7 @@ const themePresets = {
   red: {
     name: 'Red',
     primary: '#DC2626',
+    onPrimary: '#FFFFFF',
     secondary: '#F87171',
     background: '#FFF7F7',
     card: '#FFFFFF',
@@ -97,6 +104,7 @@ const themePresets = {
   dark: {
     name: 'Dark',
     primary: '#60A5FA',
+    onPrimary: '#0F172A',
     secondary: '#93C5FD',
     background: '#0F172A',
     card: '#111827',
@@ -110,6 +118,7 @@ const themePresets = {
   cyberpunk: {
     name: 'Cyberpunk',
     primary: '#00F0FF',
+    onPrimary: '#000000',
     secondary: '#FF00FF',
     background: '#0A0E1A',
     card: '#111827',
@@ -119,6 +128,62 @@ const themePresets = {
     success: '#00FF88',
     warning: '#FFB800',
     error: '#FF0055',
+  },
+  retro: {
+    name: 'Retro',
+    primary: '#E86F2C',
+    onPrimary: '#FFFFFF',
+    secondary: '#F4A261',
+    background: '#FFF4EC',
+    card: '#FFFFFF',
+    text: '#1A1A1A',
+    textSecondary: '#6B7280',
+    border: '#E8D5C4',
+    success: '#4CAF50',
+    warning: '#F59E0B',
+    error: '#DC2626',
+  },
+  sunset: {
+    name: 'Sunset',
+    primary: '#F97316',
+    onPrimary: '#FFFFFF',
+    secondary: '#FDBA74',
+    background: '#FFF7ED',
+    card: '#FFFFFF',
+    text: '#1A1A1A',
+    textSecondary: '#78716C',
+    border: '#FED7AA',
+    success: '#4CAF50',
+    warning: '#F59E0B',
+    error: '#DC2626',
+  },
+  mint: {
+    name: 'Mint',
+    primary: '#0D9488',
+    onPrimary: '#FFFFFF',
+    secondary: '#5EEAD4',
+    background: '#F0FDFA',
+    card: '#FFFFFF',
+    text: '#1A1A1A',
+    textSecondary: '#5F6B6A',
+    border: '#CCFBF1',
+    success: '#4CAF50',
+    warning: '#F59E0B',
+    error: '#DC2626',
+  },
+  lavender: {
+    name: 'Lavender',
+    primary: '#8B5CF6',
+    onPrimary: '#FFFFFF',
+    secondary: '#C4B5FD',
+    background: '#F8F6FF',
+    card: '#FFFFFF',
+    text: '#1A1A1A',
+    textSecondary: '#6D6A7A',
+    border: '#E4E0F5',
+    success: '#4CAF50',
+    warning: '#F59E0B',
+    error: '#DC2626',
   },
 };
 
@@ -157,9 +222,10 @@ export const useTheme = () => {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   const fs = (base: number) => Math.round(base * context.scale);
-  // プライマリカラーの上に乗せるテキスト色（明るい色→黒、暗い色→白）
+  // プライマリカラーの上に乗せるテキスト色
+  // 各プリセットに定義した onPrimary を優先する。定義が無い場合は明度でフォールバック。
   const lum = getLuminance(context.colors.primary);
-  const onPrimary = lum > 150 ? '#1A1A1A' : '#FFFFFF';
+  const onPrimary = context.colors.onPrimary || (lum > 150 ? '#1A1A1A' : '#FFFFFF');
   const isCyberpunk = context.currentTheme === 'cyberpunk';
   return { ...context, fs, onPrimary, isCyberpunk };
 };
@@ -188,6 +254,7 @@ function buildCustomTheme(hex: string): ThemeColors {
   return {
     name: 'Custom',
     primary: hex,
+    onPrimary: lum > 150 ? '#1A1A1A' : '#FFFFFF',
     secondary: hex + 'AA',
     background,
     card,

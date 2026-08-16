@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { View, Text, TouchableOpacity } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
@@ -30,15 +30,18 @@ const HomeScreen = safeLazy(() => import('../app/index'));
 const BrowseQuestionsScreen = safeLazy(() => import('../app/browse'));
 const CalendarScreen = safeLazy(() => import('../app/calendar'));
 const CreateQuestionScreen = safeLazy(() => import('../app/create'));
+const CreateHubScreen = safeLazy(() => import('../app/createHub'));
 const CreditsScreen = safeLazy(() => import('../app/credits'));
 const InboxScreen = safeLazy(() => import('../app/inbox'));
 const DevModeScreen = safeLazy(() => import('../app/devmode'));
 const FeedbackScreen = safeLazy(() => import('../app/feedback'));
-const ManageTimerScreen = safeLazy(() => import('../app/manage'));
+const TimerSettingsScreen = safeLazy(() => import('../app/timer'));
 const MissionScreen = safeLazy(() => import('../app/mission'));
 const MissionDetailScreen = safeLazy(() => import('../app/missionScreen'));
 const MissionsScreen = safeLazy(() => import('../app/mission'));
 const MultiScreen = safeLazy(() => import('../app/multi'));
+const MultiHubScreen = safeLazy(() => import('../app/multiHub'));
+const PublicQuestionsScreen = safeLazy(() => import('../app/publicQuestions'));
 const MusicScreen = safeLazy(() => import('../app/music'));
 const ProfileScreen = safeLazy(() => import('../app/profile'));
 const StatisticsScreen = safeLazy(() => import('../app/statistics'));
@@ -52,6 +55,7 @@ const AchievementsScreen = safeLazy(() => import('../app/achievements'));
 const TitleScreen = safeLazy(() => import('../app/title'));
 const TitleListScreen = safeLazy(() => import('../app/titleScreen'));
 const AppSettingsScreen = safeLazy(() => import('../app/appSettings'));
+const SubHubScreen = safeLazy(() => import('../app/subHub'));
 const GachaScreen = safeLazy(() => import('../app/gacha'));
 
 const Loading = () => <LoadingScreen />;
@@ -162,6 +166,16 @@ export default function App() {
           } />
           <Route path="/create" element={
             <ProtectedRoute>
+              <CreateHubScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/create/manual" element={
+            <ProtectedRoute>
+              <CreateQuestionScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/create/ocr" element={
+            <ProtectedRoute>
               <CreateQuestionScreen />
             </ProtectedRoute>
           } />
@@ -180,9 +194,9 @@ export default function App() {
               <InboxScreen />
             </ProtectedRoute>
           } />
-          <Route path="/manage" element={
+          <Route path="/timer" element={
             <ProtectedRoute>
-              <ManageTimerScreen />
+              <TimerSettingsScreen />
             </ProtectedRoute>
           } />
           <Route path="/mission" element={
@@ -202,7 +216,17 @@ export default function App() {
           } />
           <Route path="/multi" element={
             <ProtectedRoute>
+              <MultiHubScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/multi/share" element={
+            <ProtectedRoute>
               <MultiScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/multi/public" element={
+            <ProtectedRoute>
+              <PublicQuestionsScreen />
             </ProtectedRoute>
           } />
           <Route path="/music" element={
@@ -243,6 +267,11 @@ export default function App() {
           <Route path="/shop" element={
             <ProtectedRoute>
               <ShopScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/sub" element={
+            <ProtectedRoute>
+              <SubHubScreen />
             </ProtectedRoute>
           } />
           <Route path="/appSettings" element={

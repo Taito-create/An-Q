@@ -19,7 +19,7 @@ import {
   logAvailableVoices,
   initSpeechVoices,
 } from './utils/speechUtils';
-import { Settings, Mic, Volume2 } from 'lucide-react';
+import { Settings, Mic, Volume2, ChevronLeft } from 'lucide-react';
 
 const APP_VERSION = '1.0.0';
 
@@ -99,25 +99,16 @@ export default function AppSettingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 4 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
+        >
+          <ChevronLeft size={20} color={colors.text} />
+          <Text style={{ color: colors.text, fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
           <Settings size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.appSettings}
         </Text>
-        <TouchableOpacity
-          style={{
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            backgroundColor: colors.primary,
-            borderRadius: isCyberpunk ? 0 : 10,
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 70,
-          }}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-        >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.list}>

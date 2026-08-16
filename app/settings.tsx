@@ -118,12 +118,12 @@ export default function SettingsScreen() {
             paddingVertical: 10,
             paddingHorizontal: 14,
             backgroundColor: colors.primary,
-            borderRadius: isCyberpunk ? 0 : 10,
+            borderRadius: 10,
             alignItems: 'center',
             justifyContent: 'center',
             minWidth: 70,
           }}
-          onPress={() => { SoundManager.play('decide'); navigate('/'); }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
         >
           <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
