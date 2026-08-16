@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { SoundManager } from './sound';
-import { PenSquare, Image as ImageIcon, FolderOpen, Clock } from 'lucide-react';
+import { PenSquare, ScanText, FolderOpen, Clock } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -35,11 +35,13 @@ export default function CreateHubScreen() {
   const t = translations[locale];
   const screenType = useResponsive();
 
+  const [showCreateOptions, setShowCreateOptions] = useState(false);
+
   // カードの列数を決定
   const getColumns = () => {
     switch (screenType) {
       case 'desktop':
-        return 3;
+        return 2;
       case 'tablet':
         return 2;
       case 'mobile':
@@ -50,28 +52,21 @@ export default function CreateHubScreen() {
   const menuItems = [
     {
       id: 'create',
-      icon: <PenSquare size={32} color={colors.primary} />,
-      title: locale === 'ja' ? 'ゼロから問題を作成' : 'Create from Scratch',
-      description: locale === 'ja' ? '1問ずつ手動で作成' : 'Create questions manually',
-      onPress: () => navigate('/create/manual'),
-    },
-    {
-      id: 'import',
-      icon: <ImageIcon size={32} color={colors.primary} />,
-      title: locale === 'ja' ? '画像から一括生成' : 'Generate from Image',
-      description: locale === 'ja' ? 'OCRで画像から問題を生成' : 'Generate questions via OCR',
-      onPress: () => navigate('/create/ocr'),
+      icon: <PenSquare size={24} color={colors.primary} />,
+      title: locale === 'ja' ? '問題を作成' : 'Create Question',
+      description: locale === 'ja' ? '手動またはOCRで作成' : 'Create manually or via OCR',
+      onPress: () => setShowCreateOptions(true),
     },
     {
       id: 'manage',
-      icon: <FolderOpen size={32} color={colors.primary} />,
+      icon: <FolderOpen size={24} color={colors.primary} />,
       title: locale === 'ja' ? '問題を管理・編集' : 'Manage Questions',
       description: locale === 'ja' ? '既存の問題を閲覧・編集' : 'View and edit questions',
       onPress: () => navigate('/browse'),
     },
     {
       id: 'timer',
-      icon: <Clock size={32} color={colors.primary} />,
+      icon: <Clock size={24} color={colors.primary} />,
       title: locale === 'ja' ? 'タイマー設定' : 'Timer Settings',
       description: locale === 'ja' ? 'クイズの制限時間を設定' : 'Set quiz time limit',
       onPress: () => navigate('/timer'),
@@ -86,7 +81,7 @@ export default function CreateHubScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 100 }]}>
         <View style={[styles.grid, { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }]}>
           {menuItems.map((item) => (
             <TouchableOpacity
@@ -100,8 +95,8 @@ export default function CreateHubScreen() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 20,
-                  minHeight: 140,
+                  padding: 16,
+                  minHeight: 120,
                 },
               ]}
               onPress={() => { SoundManager.play('decide'); item.onPress(); }}
@@ -116,6 +111,51 @@ export default function CreateHubScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* 作成方法選択モーダル */}
+      <Modal
+        visible={showCreateOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCreateOptions(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {locale === 'ja' ? '作成方法を選択' : 'Select creation method'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalOption, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => { SoundManager.play('decide'); setShowCreateOptions(false); navigate('/create/manual'); }}
+              activeOpacity={0.7}
+            >
+              <PenSquare size={20} color={colors.primary} />
+              <Text style={[styles.modalOptionText, { color: colors.text }]}>
+                {locale === 'ja' ? 'ゼロから手動で作成' : 'Create manually'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalOption, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => { SoundManager.play('decide'); setShowCreateOptions(false); navigate('/create/ocr'); }}
+              activeOpacity={0.7}
+            >
+              <ScanText size={20} color={colors.primary} />
+              <Text style={[styles.modalOptionText, { color: colors.text }]}>
+                {locale === 'ja' ? '画像から一括生成（OCR）' : 'Generate from image (OCR)'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+              onPress={() => { SoundManager.play('decide'); setShowCreateOptions(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                {locale === 'ja' ? 'キャンセル' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -134,8 +174,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    minHeight: 140,
+    padding: 16,
+    minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -155,5 +195,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalCancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  modalCancelText: {
+    fontSize: 15,
   },
 });

@@ -7,7 +7,7 @@ import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { safeParseArray } from './utils/storageUtils';
-import { Timer, Trash2, RefreshCw, Plus } from 'lucide-react';
+import { Timer, Trash2 } from 'lucide-react';
 
 interface CustomTimer {
   id: string;

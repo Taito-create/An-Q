@@ -48,7 +48,7 @@ export default function SubHubScreen() {
   const getColumns = () => {
     switch (screenType) {
       case 'desktop':
-        return 3;
+        return 2;
       case 'tablet':
         return 2;
       case 'mobile':
@@ -59,49 +59,49 @@ export default function SubHubScreen() {
   const menuItems = [
     {
       id: 'theme',
-      icon: <Settings size={32} color={colors.primary} />,
+      icon: <Settings size={24} color={colors.primary} />,
       title: locale === 'ja' ? 'テーマ・外観' : 'Theme & Appearance',
       description: locale === 'ja' ? 'テーマやフォントサイズを変更' : 'Change theme and font size',
       onPress: () => navigate('/settings'),
     },
     {
       id: 'sound',
-      icon: <Volume2 size={32} color={colors.primary} />,
+      icon: <Volume2 size={24} color={colors.primary} />,
       title: locale === 'ja' ? '音楽・サウンド' : 'Music & Sound',
       description: locale === 'ja' ? 'BGMや効果音を設定' : 'Configure BGM and sound effects',
       onPress: () => navigate('/music'),
     },
     {
       id: 'appSettings',
-      icon: <Settings size={32} color={colors.primary} />,
+      icon: <Settings size={24} color={colors.primary} />,
       title: locale === 'ja' ? 'アプリ設定' : 'App Settings',
       description: locale === 'ja' ? 'サウンド・言語・ボイス' : 'Sound, Language, Voice',
       onPress: () => navigate('/appSettings'),
     },
     {
       id: 'shop',
-      icon: <ShoppingBag size={32} color="#10B981" />,
+      icon: <ShoppingBag size={24} color="#10B981" />,
       title: locale === 'ja' ? 'ショップ' : 'Shop',
       description: locale === 'ja' ? 'アイテムでスキンを購入' : 'Buy items and skins',
       onPress: () => navigate('/shop'),
     },
     {
       id: 'gacha',
-      icon: <Gift size={32} color="#FFD700" />,
+      icon: <Gift size={24} color="#FFD700" />,
       title: locale === 'ja' ? 'ガチャ' : 'Gacha',
       description: locale === 'ja' ? 'レアアイテムをゲット' : 'Get rare items',
       onPress: () => navigate('/gacha'),
     },
     {
       id: 'achievements',
-      icon: <Trophy size={32} color="#F59E0B" />,
+      icon: <Trophy size={24} color="#F59E0B" />,
       title: locale === 'ja' ? '実績' : 'Achievements',
       description: locale === 'ja' ? '実績を解除して称号をゲット' : 'Unlock achievements and titles',
       onPress: () => navigate('/achievements'),
     },
     {
       id: 'calendar',
-      icon: <Calendar size={32} color="#3B82F6" />,
+      icon: <Calendar size={24} color="#3B82F6" />,
       title: locale === 'ja' ? 'カレンダー' : 'Calendar',
       description: locale === 'ja' ? '学習記録を確認' : 'Check your study records',
       onPress: () => navigate('/calendar'),
@@ -116,7 +116,7 @@ export default function SubHubScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 100 }]}>
         <View style={[styles.grid, { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }]}>
           {menuItems.map((item) => {
             const isSpecialCard = !!specialCardStyles[item.id];
@@ -132,8 +132,8 @@ export default function SubHubScreen() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: 20,
-                    minHeight: 140,
+                    padding: 16,
+                    minHeight: 120,
                   },
                   isSpecialCard ? specialCardStyles[item.id] : null,
                   isSpecialCard ? styles.specialCard : null,
@@ -174,8 +174,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    minHeight: 140,
+    padding: 16,
+    minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
   },

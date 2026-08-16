@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -11,7 +11,7 @@ import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
-import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Upload, Tag, Loader2, X } from 'lucide-react';
+import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
@@ -23,6 +23,7 @@ export default function BrowseQuestionsScreen() {
   const { 
     questions, 
     folders, 
+    loading,
     deleteQuestion, 
     updateQuestion, 
     updateFolder,
@@ -39,8 +40,6 @@ export default function BrowseQuestionsScreen() {
   } = useQuestionsContext();
   
   // Debug: Log questions when component renders
-  console.log('Browse render - questions:', questions.length, 'items');
-  console.log('First question (if any):', questions.length > 0 ? questions[0] : 'none');
 
   // Determine checkbox text color based on theme luminance
   const getCheckboxTextColor = (): string => {
@@ -217,7 +216,6 @@ export default function BrowseQuestionsScreen() {
   };
 
   const batchDeleteQuestions = async () => {
-    console.log('batchDeleteQuestions called, selected:', selectedQuestionIds);
     
     if (selectedQuestionIds.length === 0) {
       window.alert(locale === 'ja' ? 'エラー\n削除する問題を選択してください' : 'Error\nPlease select questions to delete');
@@ -230,18 +228,14 @@ export default function BrowseQuestionsScreen() {
   };
 
   const confirmBatchDelete = async () => {
-    console.log('confirmBatchDelete called');
     setShowBatchDeleteModal(false);
     
     try {
-      console.log('Starting batch delete for:', selectedQuestionIds);
       
       // Delete each question
       let currentQuestions = questions;
       for (const id of selectedQuestionIds) {
-        console.log(`Deleting question ${id}`);
         currentQuestions = await deleteQuestion(id);
-        console.log(`After delete, ${currentQuestions.length} questions remaining`);
       }
 
       // Clear selection
@@ -366,7 +360,6 @@ export default function BrowseQuestionsScreen() {
   };
 
   const startEditQuestion = (question: Question) => {
-    console.log('startEditQuestion called:', question);
     
     setEditingQuestionFull(question);
     setEditQuestionText(question.question || '');
@@ -399,7 +392,6 @@ export default function BrowseQuestionsScreen() {
         groups = [['']];
       }
       
-      console.log(' Set editAnswerGroups:', groups);
       setEditAnswerGroups(groups);
     } else {
       // Reset for non-descriptive questions
@@ -449,11 +441,8 @@ export default function BrowseQuestionsScreen() {
   };
 
   const handleDeleteFolder = async () => {
-    console.log('=== handleDeleteFolder 開始 ===');
-    console.log('selectedFolder:', selectedFolder);
     
     if (!selectedFolder) {
-      console.log('handleDeleteFolder: selectedFolderがnullのため終了');
       return;
     }
     
@@ -466,16 +455,13 @@ export default function BrowseQuestionsScreen() {
     if (!selectedFolder) return;
     
     try {
-      console.log('deleteFolder 呼び出し:', selectedFolder.id);
       const updatedFolders = await deleteFolder(selectedFolder.id);
-      console.log('deleteFolder 成功');
       
       // 先にモーダルを閉じて状態をリセット（window.alert は使わない）
       setShowDeleteConfirmModal(false);
       setSelectedFolder(null);
       setFolderQuestions([]);
       
-      console.log('完了音を再生');
       SoundManager.play('complete');
     } catch (error) {
       console.error('deleteFolder エラー:', error);
@@ -510,34 +496,23 @@ export default function BrowseQuestionsScreen() {
   };
 
   const handleAddQuestionsToFolder = async () => {
-    console.log('=== handleAddQuestionsToFolder 開始 ===');
-    console.log('selectedFolderForAdd:', selectedFolderForAdd);
-    console.log('selectedQuestionIdsForAdd:', selectedQuestionIdsForAdd);
     
     if (!selectedFolderForAdd) {
-      console.log('ガード: selectedFolderForAddがnull');
       return;
     }
     
     if (selectedQuestionIdsForAdd.length === 0) {
-      console.log('ガード: selectedQuestionIdsForAddが空');
       return;
     }
     
     try {
-      console.log('addQuestionsToFolder 呼び出し:');
-      console.log('  folderId:', selectedFolderForAdd.id);
-      console.log('  questionIds:', selectedQuestionIdsForAdd);
       
       await addQuestionsToFolder(selectedFolderForAdd.id, selectedQuestionIdsForAdd);
       
-      console.log('addQuestionsToFolder 成功');
-      console.log('UI状態をリセット');
       
       setSelectedQuestionIdsForAdd([]);
       setShowAddToFolderModal(false);
       
-      console.log('完了音を再生');
       SoundManager.play('complete');
     } catch (error) {
       console.error('addQuestionsToFolder エラー:', error);
@@ -674,7 +649,6 @@ export default function BrowseQuestionsScreen() {
           <TouchableOpacity 
             style={[styles.batchTagBar, { backgroundColor: colors.error, flex: 1 }]} 
             onPress={() => {
-              console.log(' Delete button pressed, selected:', selectedQuestionIds.length);
               batchDeleteQuestions();
             }}
           >
@@ -813,7 +787,13 @@ export default function BrowseQuestionsScreen() {
                 )}
               </View>
             ))}
-            {questions.length === 0 && <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>}
+            {loading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : questions.length === 0 ? (
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.noQuestions}</Text>
+            ) : null}
           </>
         ) : (
           <>
@@ -831,8 +811,6 @@ export default function BrowseQuestionsScreen() {
                     <TouchableOpacity
                       style={[styles.addQuestionsBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
-                        console.log('物理クリック発火: 問題追加ボタン');
-                        console.log('selectedFolder:', selectedFolder);
                         setSelectedFolderForAdd(selectedFolder);
                         setAvailableQuestionsForAdd(questions);
                         setSelectedQuestionIdsForAdd([]);
@@ -847,7 +825,6 @@ export default function BrowseQuestionsScreen() {
                     <TouchableOpacity
                       style={[styles.deleteFolderBtn, { backgroundColor: colors.error }]}
                       onPress={() => {
-                        console.log('物理クリック発火: 削除ボタン');
                         handleDeleteFolder();
                       }}
                     >
@@ -860,7 +837,7 @@ export default function BrowseQuestionsScreen() {
                 </View>
                 
                 <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>この問題集の問題</Text>
-                {folderQuestions.length === 0 ? (
+                {!loading && folderQuestions.length === 0 ? (
                   <Text style={[styles.emptyText, { color: colors.textSecondary, padding: 16 }]}>{t.noQuestionsInFolder}</Text>
                 ) : (
                   folderQuestions.map(question => (
@@ -1565,9 +1542,6 @@ export default function BrowseQuestionsScreen() {
               <TouchableOpacity 
                 style={[styles.addToFolderBar, { backgroundColor: colors.primary, zIndex: 999 }]} 
                 onPress={() => {
-                  console.log('物理クリック発火: 追加確定ボタン');
-                  console.log('ガード節判定直前 - selectedFolderForAdd:', selectedFolderForAdd);
-                  console.log('ガード節判定直前 - selectedQuestionIdsForAdd:', selectedQuestionIdsForAdd);
                   handleAddQuestionsToFolder();
                 }}
               >

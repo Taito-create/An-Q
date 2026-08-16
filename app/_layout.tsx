@@ -20,7 +20,6 @@ function RootLayoutInner() {
         await SoundManager.initialize();
         await SoundManager.initializeBGM();
         setBgmReady(true);
-        console.log('SoundManager initialized');
       } catch (error) {
         console.error('SoundManager initialization failed:', error);
         setBgmReady(true);

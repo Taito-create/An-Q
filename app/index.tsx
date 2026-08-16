@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     StyleSheet, Text, View, TouchableOpacity,
   ScrollView, StatusBar, Alert, Animated, ActivityIndicator
@@ -28,8 +28,6 @@ import {
   Share2,
   Package,
   RefreshCw,
-  Palette,
-  Music,
   Upload,
   Coins,
   AlertTriangle,
@@ -330,7 +328,7 @@ const HomeScreen = React.memo(() => {
       
       if (cachedLevel) setUserLevel(parseInt(cachedLevel, 10));
       if (cachedCoins) setUserCoins(parseInt(cachedCoins, 10));
-      if (cachedProfile) setProfile(safeParse(cachedProfile, null));
+      if (cachedProfile) { const p: any = safeParse(cachedProfile, null); setProfile(p); if (p && p.nextLevelXP) setXpProgress(Math.min((p.currentXP || 0) / p.nextLevelXP * 100, 100)); }
 
       // 2. その後、裏で Firestore から最新データを取得し、差分があればアップデート！
       if (user?.uid) {
@@ -755,11 +753,9 @@ const HomeScreen = React.memo(() => {
           ))}
         </View>
 
-        {/* 週間進捗（クリックで統計画面へ） */}
-        <TouchableOpacity
+        {/* 週間進捗（サマリー表示 - 統計画面への導線は「すべての統計を見る」に統一） */}
+        <View
           style={[styles.weeklyRow, { backgroundColor: colors.primary + '0D', borderColor: colors.border }]}
-          onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/statistics'); }}
-          activeOpacity={0.7}
         >
           <Calendar size={16} color={colors.primary} />
           <View style={styles.weeklyRowText}>
@@ -767,7 +763,7 @@ const HomeScreen = React.memo(() => {
             <Text style={[styles.weeklyRowDesc, { color: colors.textSecondary, fontSize: fontSize.small }]} numberOfLines={1}>{weeklyChangeText}</Text>
           </View>
           <TrendingUp size={16} color={isWeeklyUp ? colors.success : colors.error} />
-        </TouchableOpacity>
+        </View>
 
         {/* ストリークマイルストーン */}
         {streak >= 3 && (
@@ -925,8 +921,6 @@ const HomeScreen = React.memo(() => {
             navigateWithAnimation('/quiz');
           }}
         >
-          {/* 上部のグロスハイライト（光沢感） */}
-          <View style={[styles.playButtonHighlight, { pointerEvents: 'none' }]} />
           <Play size={32} color="#fff" strokeWidth={2} />
           <Text style={styles.mainPlayText}>
             {locale === 'ja' ? '問題を解く' : 'Start Quiz'}
@@ -1019,6 +1013,18 @@ const HomeScreen = React.memo(() => {
   // ヘッダー（ゲーム風UI）
   const renderHeader = () => {
     const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '見習い暗記人';
+
+    // プロフィール未取得の間はヘッダーにローディングを表示（未初期値・デフォルト名の一瞬表示＝フラッシュ防止）
+    if (!profile) {
+      return (
+        <View style={[styles.header, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 8 }}>
+            {locale === 'ja' ? '読み込み中...' : 'Loading...'}
+          </Text>
+        </View>
+      );
+    }
     
     return (
     <View style={[
@@ -1099,27 +1105,26 @@ const HomeScreen = React.memo(() => {
       {/* 右側：設定ボタン + ドロップダウンメニュー */}
       <View style={[styles.topButtons, { zIndex: 1001 }, screenType === 'desktop' && { gap: 12 }]}>
         <View style={{ position: 'relative' }}>
-          <TooltipButton 
-            style={[styles.iconButton, { 
+          <TooltipButton
+            style={[styles.iconButton, {
               width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
               height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
               borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
               borderColor: colors.primary,
               borderWidth: cpB ?? 1,
-            }]} 
-            onPress={() => { 
-              SoundManager.play('decide'); 
-              setShowMenu(!showMenu); 
-            }} 
+            }]}
+            onPress={() => {
+              SoundManager.play('decide');
+              setShowMenu(!showMenu);
+            }}
             label={t.appSettings}
           >
             <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
           </TooltipButton>
-
           {/* ドロップダウンメニュー */}
           {showMenu && (
             <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
@@ -1135,39 +1140,7 @@ const HomeScreen = React.memo(() => {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  SoundManager.play('decide');
-                  navigateWithAnimation('/settings');
-                  setShowMenu(false);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Palette size={16} color={colors.text} />
-                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                    {locale === 'ja' ? 'テーマ設定' : 'Theme Settings'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  SoundManager.play('decide');
-                  navigateWithAnimation('/music');
-                  setShowMenu(false);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Music size={16} color={colors.text} />
-                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                    {locale === 'ja' ? '音楽設定' : 'Music Settings'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
                   SoundManager.play('decide');
@@ -1183,7 +1156,7 @@ const HomeScreen = React.memo(() => {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.dropdownItem}
                 onPress={() => {
                   SoundManager.play('decide');
@@ -1715,27 +1688,17 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     paddingVertical: 28,
     paddingHorizontal: 24,
-    // 3D効果：厚みのある下辺＋シャドウ
+    // 3D効果：フラット3D（光沢なし）
     borderBottomWidth: 6,
-    borderBottomColor: 'rgba(0,0,0,0.15)',
-    boxShadow: '0px 6px 20px rgba(0,0,0,0.25)',
-    elevation: 10,
+    borderBottomColor: 'rgba(0,0,0,0.2)',
+    boxShadow: '0px 8px 24px rgba(0,0,0,0.2)',
+    elevation: 8,
   },
   mainPlayText: {
     color: '#fff',
     fontWeight: '800',
     fontSize: 24,
     letterSpacing: 0.5,
-  },
-  playButtonHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   questCard: {
     padding: 16,

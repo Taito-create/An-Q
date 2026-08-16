@@ -28,7 +28,6 @@ export const SEProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       const enabled = saved === 'true';
       setSeEnabled(enabled);
       await SoundManager.setSEEnabled(enabled);
-      console.log('SE refreshed:', enabled);
     } catch (error) {
       console.error('Failed to refresh SE:', error);
     }
@@ -44,7 +43,6 @@ export const SEProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         const enabled = e.newValue === 'true';
         setSeEnabled(enabled);
         SoundManager.setSEEnabled(enabled);
-        console.log('SE changed via storage:', enabled);
       }
     };
 
@@ -53,7 +51,6 @@ export const SEProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       const { enabled } = e.detail;
       setSeEnabled(enabled);
       SoundManager.setSEEnabled(enabled);
-      console.log('SE changed via event:', enabled);
     };
 
     if (typeof window !== 'undefined') {
@@ -70,7 +67,6 @@ export const SEProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   const toggleSE = async (enabled: boolean) => {
-    console.log('toggleSE called:', enabled);
     setSeEnabled(enabled);
     await SoundManager.setSEEnabled(enabled);
     await AsyncStorage.setItem('se_enabled', enabled ? 'true' : 'false');

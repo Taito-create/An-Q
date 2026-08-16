@@ -16,7 +16,6 @@ import {
   getStoredVoicePreset,
   setStoredVoicePreset,
   speakText,
-  logAvailableVoices,
   initSpeechVoices,
 } from './utils/speechUtils';
 import { Settings, Mic, Volume2, ChevronLeft } from 'lucide-react';
@@ -44,13 +43,11 @@ export default function AppSettingsScreen() {
     getStoredVoicePreset().then(p => setVoicePreset(p));
     AsyncStorage.getItem(STORAGE_KEYS.USE_SERVER_VOICE).then(v => setUseServerVoice(v !== 'false'));
 
-    // 音声エンジンを初期化し、デバッグ用にボイス一覧を出力
+    // 音声エンジンを初期化
     initSpeechVoices();
-    logAvailableVoices();
   }, []);
 
   const toggleServerVoice = async (value: boolean) => {
-    console.log(' Toggling server voice to:', value);
     setUseServerVoice(value);
     await AsyncStorage.setItem(STORAGE_KEYS.USE_SERVER_VOICE, String(value));
     SoundManager.play('decide');

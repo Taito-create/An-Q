@@ -1,10 +1,10 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
-import { Share2, Inbox, Globe } from 'lucide-react';
+import { Share2, Inbox, Globe, Upload } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -34,11 +34,13 @@ export default function MultiHubScreen() {
   const ja = locale === 'ja';
   const screenType = useResponsive();
 
+  const [showShareOptions, setShowShareOptions] = useState(false);
+
   // カードの列数を決定
   const getColumns = () => {
     switch (screenType) {
       case 'desktop':
-        return 3;
+        return 2;
       case 'tablet':
         return 2;
       case 'mobile':
@@ -49,21 +51,14 @@ export default function MultiHubScreen() {
   const menuItems = [
     {
       id: 'share',
-      icon: <Share2 size={32} color={colors.primary} />,
-      title: ja ? 'コードで共有' : 'Share via Code',
-      description: ja ? '問題をコードで送信・受信' : 'Send and receive questions via code',
-      onPress: () => navigate('/multi/share'),
-    },
-    {
-      id: 'inbox',
-      icon: <Inbox size={32} color={colors.primary} />,
-      title: ja ? '受信ボックス' : 'Inbox',
-      description: ja ? '受け取った問題を確認' : 'Check received questions',
-      onPress: () => navigate('/inbox'),
+      icon: <Share2 size={24} color={colors.primary} />,
+      title: ja ? 'コード共有' : 'Share via Code',
+      description: ja ? 'コードで送信または受信' : 'Send or receive via code',
+      onPress: () => setShowShareOptions(true),
     },
     {
       id: 'public',
-      icon: <Globe size={32} color={colors.primary} />,
+      icon: <Globe size={24} color={colors.primary} />,
       title: ja ? '公開問題' : 'Public Questions',
       description: ja ? '公開中の問題を閲覧' : 'Browse shared public questions',
       onPress: () => navigate('/multi/public'),
@@ -78,7 +73,7 @@ export default function MultiHubScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 100 }]}>
         <View style={[styles.grid, { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }]}>
           {menuItems.map((item) => (
             <TouchableOpacity
@@ -92,8 +87,8 @@ export default function MultiHubScreen() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 20,
-                  minHeight: 140,
+                  padding: 16,
+                  minHeight: 120,
                 },
               ]}
               onPress={() => { SoundManager.play('decide'); item.onPress(); }}
@@ -108,6 +103,51 @@ export default function MultiHubScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* 共有方法選択モーダル */}
+      <Modal
+        visible={showShareOptions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowShareOptions(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {ja ? '共有方法を選択' : 'Select share method'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalOption, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => { SoundManager.play('decide'); setShowShareOptions(false); navigate('/multi/share'); }}
+              activeOpacity={0.7}
+            >
+              <Upload size={20} color={colors.primary} />
+              <Text style={[styles.modalOptionText, { color: colors.text }]}>
+                {ja ? 'コードを生成して送信' : 'Generate code to send'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalOption, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => { SoundManager.play('decide'); setShowShareOptions(false); navigate('/inbox'); }}
+              activeOpacity={0.7}
+            >
+              <Inbox size={20} color={colors.primary} />
+              <Text style={[styles.modalOptionText, { color: colors.text }]}>
+                {ja ? 'コードで受信' : 'Receive via code'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+              onPress={() => { SoundManager.play('decide'); setShowShareOptions(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                {ja ? 'キャンセル' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -126,8 +166,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    minHeight: 140,
+    padding: 16,
+    minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -147,5 +187,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalCancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  modalCancelText: {
+    fontSize: 15,
   },
 });

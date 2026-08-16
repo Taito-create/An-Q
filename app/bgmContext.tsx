@@ -29,7 +29,6 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const saved = await AsyncStorage.getItem('bgm_enabled');
       const enabled = saved === 'true';
       setBgmEnabled(enabled);
-      console.log('BGM refreshed:', enabled);
     } catch (error) {
       console.error('Failed to refresh BGM:', error);
     }
@@ -44,7 +43,6 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (e.key === 'bgm_enabled') {
         const enabled = e.newValue === 'true';
         setBgmEnabled(enabled);
-        console.log('BGM changed via storage:', enabled);
       }
     };
 
@@ -52,7 +50,6 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleCustomEvent = (e: CustomEvent) => {
       const { enabled } = e.detail;
       setBgmEnabled(enabled);
-      console.log('BGM changed via event:', enabled);
     };
 
     if (typeof window !== 'undefined') {
@@ -69,7 +66,6 @@ export const BGMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const toggleBGM = async (enabled: boolean) => {
-    console.log('toggleBGM called:', enabled);
     setBgmEnabled(enabled);
     
     // BGMのON/OFFを実際に切り替える
