@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, Alert, Dimensions, Modal } from 'react-native';
+import PressableButton from './components/PressableButton';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -49,7 +50,7 @@ interface ScheduledEvent {
 
 export default function CalendarScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, isCyberpunk } = useTheme();
+  const { colors, onPrimary, isCyberpunk, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const screenType = useResponsive();
@@ -702,21 +703,19 @@ export default function CalendarScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.scrollContent}
     >
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
-          $ SCHEDULED TRANSFERS
-        </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
+      <View style={[styles.header, { borderBottomColor: colors.border, justifyContent: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <PressableButton
+          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/sub');
           }}
         >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </PressableButton>
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+          $ SCHEDULED TRANSFERS
+        </Text>
       </View>
 
       {/* PC時：2カラムレイアウト */}

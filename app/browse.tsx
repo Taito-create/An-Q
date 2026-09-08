@@ -18,7 +18,7 @@ import './browse.css';
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors, onPrimary, isCyberpunk } = useTheme();
+  const { colors, onPrimary, isCyberpunk, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { 
@@ -522,8 +522,22 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2 }]} numberOfLines={1}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}> 
+        <PressableButton
+          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
+          onPress={() => {
+            SoundManager.play('decide');
+            if (selectedFolder) {
+              setSelectedFolder(null);
+              setFolderQuestions([]);
+            } else {
+              navigate('/create');
+            }
+          }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </PressableButton>
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           $ MANAGE NODES
         </Text>
         <View style={styles.headerActions}>

@@ -20,7 +20,7 @@ import { loadStats, incrementStat } from './missions';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
-import { awardQuestionCreation } from '../src/utils/userProgress';
+import { awardQuestionCreation, incrementXP } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
 import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText } from 'lucide-react';
@@ -722,6 +722,14 @@ export default function CreateQuestionScreen() {
     const success = await saveQuestion(dataToSave);
     if (success) {
       SoundManager.play('complete');
+      // 問題作成時に+10 XPを付与（Firestore＋ローカルキャッシュ更新）
+      if (user?.uid) {
+        try {
+          await incrementXP(user.uid, 10);
+        } catch (e) {
+          console.warn('incrementXP failed:', e);
+        }
+      }
       // Show toast notification instead of Alert
       setToastMessage(' 問題を作成しました！');
       setShowToast(true);
@@ -835,8 +843,14 @@ export default function CreateQuestionScreen() {
         </PressableButton>
       )}
 
-      <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <PressableButton
+          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
+          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </PressableButton>
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />$ ENCODE MEMORY DATA
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -879,14 +893,6 @@ export default function CreateQuestionScreen() {
             </Text>
           </PressableButton>
         </View>
-        <PressableButton
-          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </PressableButton>
       </View>
 
       {/* タグセクション - 横スクロール表示 */}
@@ -1479,7 +1485,8 @@ const styles = StyleSheet.create({
   },
   tagChip: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 10,
+    minHeight: 40,
     borderRadius: 20,
     borderWidth: 2,
     marginRight: 8,

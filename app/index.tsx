@@ -12,6 +12,7 @@ import TerminalLog, { TerminalLogHandle } from './components/TerminalLog';
 import PatternBackground from './patternBackground';
 import { IMAGES } from './constants/images';
 import { Platform } from 'react-native';
+import { Svg, Circle } from 'react-native-svg';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
@@ -415,6 +416,29 @@ const HomeScreen = React.memo(() => {
       console.error('Failed to load user progress:', error);
     }
   };
+
+  // XP獲得後にHome画面のリングを更新するためのリフレッシュ関数
+  const refreshProfile = useCallback(() => {
+    loadUserProgress();
+  }, [loadUserProgress]);
+
+  // ページにフォーカスが戻ったとき（クイズ完了・問題作成後にHomeへ戻ったとき）にプロフィールを再読み込み
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshProfile();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshProfile();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshProfile]);
 
   const loadQuickReviewQuestions = async () => {
     try {
@@ -1202,9 +1226,28 @@ const HomeScreen = React.memo(() => {
     );
   };
 
-  // ヘッダー（ゲーム風UI）
+  // ヘッダー（プロフィール画像＋XPリング）
   const renderHeader = () => {
     const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '見習い暗記人';
+    const profileImage = (profile as any)?.profileImage || null;
+
+    // リングの設定
+    const ringSize = screenType === 'desktop' ? 64 : 56;
+    const ringRadius = screenType === 'desktop' ? 28 : 24;
+    const strokeWidth = 5;
+    const circumference = 2 * Math.PI * ringRadius;
+    const progress = Math.min(xpProgress, 100);
+    const strokeDashoffset = circumference * (1 - progress / 100);
+    const imageSize = ringSize - strokeWidth * 4;
+
+    // レベルバッジの設定
+    const badgeHeight = 20;
+    const badgeWidth = 48;
+
+    // 長押しで表示する次のレベルまでのXP
+    const nextLevelXP = profile?.nextLevelXP || 100;
+    const currentXP = profile?.currentXP || 0;
+    const remainingXP = Math.max(0, nextLevelXP - currentXP);
 
     // プロフィール未取得の間はヘッダーにローディングを表示（未初期値・デフォルト名の一瞬表示＝フラッシュ防止）
     if (!profile) {
@@ -1217,69 +1260,122 @@ const HomeScreen = React.memo(() => {
         </View>
       );
     }
-    
+
     return (
     <View style={[
       styles.header,
-      { 
+      {
         zIndex: 1000,
         position: 'relative',
       },
-      screenType === 'desktop' && { 
+      screenType === 'desktop' && {
         paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       }
     ]}>
       <View style={{ flex: 1 }}>
-        {/* 1段目：称号 + コイン・本 */}
-        <View style={[styles.headerRow, { justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }]}>
-          <View style={[styles.titleBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-            <Text style={[styles.titleText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 16 : 14) }]}>
-              {titleDisplay}
+        {/* メイン行：画像＋称号＋ユーザー名＋コイン/本 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          {/* 左：プロフィール画像＋XPリング＋レベルバッジ（モンスト風） */}
+          <View style={{ position: 'relative', width: ringSize, height: ringSize + badgeHeight, marginRight: 12, justifyContent: 'center', alignItems: 'center' }}>
+            <PressableButton
+              style={{ width: ringSize, height: ringSize, justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/profile'); }}
+              onLongPress={() => {
+                SoundManager.play('decide');
+                const msg = locale === 'ja'
+                  ? `現在のXP: ${currentXP}\n次のレベルまであと ${remainingXP} XP です`
+                  : `Current XP: ${currentXP}\n${remainingXP} XP until next level`;
+                Alert.alert(locale === 'ja' ? 'レベル情報' : 'Level Info', msg);
+              }}
+            >
+              <Svg width={ringSize} height={ringSize} style={{ position: 'absolute' }}>
+                {/* 背景の薄いリング（ベース） */}
+                <Circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={ringRadius}
+                  stroke={colors.textSecondary}
+                  strokeWidth={strokeWidth}
+                  fill="none"
+                />
+                {/* 進捗リング（実線） */}
+                <Circle
+                  cx={ringSize / 2}
+                  cy={ringSize / 2}
+                  r={ringRadius}
+                  stroke={colors.primary}
+                  strokeWidth={strokeWidth}
+                  fill="none"
+                  strokeDasharray={`${circumference}`}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  rotation="-90"
+                  originX={ringSize / 2}
+                  originY={ringSize / 2}
+                />
+              </Svg>
+              {/* プロフィール画像 */}
+              <View style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2, overflow: 'hidden', backgroundColor: colors.border }}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={{ width: imageSize, height: imageSize }} resizeMode="cover" />
+                ) : (
+                  <View style={{ width: imageSize, height: imageSize, backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={imageSize * 0.4} color={colors.primary} />
+                  </View>
+                )}
+              </View>
+            </PressableButton>
+            {/* レベルバッジ（円の下端に接する） */}
+            <View style={{
+              position: 'absolute',
+              bottom: 0,
+              left: (ringSize - badgeWidth) / 2,
+              backgroundColor: colors.primary,
+              borderRadius: br,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              minWidth: badgeWidth,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text style={{ color: onPrimary, fontSize: 10, fontWeight: '700', fontFamily: 'monospace' }}>
+                Lv. {userLevel}
+              </Text>
+            </View>
+          </View>
+
+          {/* 中央：称号＋ユーザー名（横並び） */}
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <View style={[styles.titleBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+              <Text style={[styles.titleText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 16 : 14) }]} numberOfLines={1}>
+                {titleDisplay}
+              </Text>
+            </View>
+            <Text style={[styles.usernameText, { color: colors.text, fontSize: fs(screenType === 'desktop' ? 18 : 16), flexShrink: 1 }]} numberOfLines={1}>
+              {profile?.username || 'An-Q Learner'}
             </Text>
           </View>
-          <View style={[styles.currencyContainer, { gap: 8 }]}>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '30', borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Image source={IMAGES.coin} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
-              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
+
+          {/* 右：コイン・本 */}
+          <View style={[styles.currencyContainer, { gap: 8, marginLeft: 8 }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '10', borderBottomWidth: 3, borderBottomColor: '#66FFD9' }]}>
+              <Image source={IMAGES.coin} style={{ width: 36, height: 36, resizeMode: 'contain' }} />
+              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 18 : 16) }]}>
                 {userCoins}
               </Text>
             </View>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '30', borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Image source={IMAGES.book} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
-              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '10', borderBottomWidth: 3, borderBottomColor: '#66FFD9' }]}>
+              <Image source={IMAGES.book} style={{ width: 36, height: 36, resizeMode: 'contain' }} />
+              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 18 : 16) }]}>
                 {profile?.totalBooks || 0}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* 2段目：ユーザー名 */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <User size={20} color={colors.text} />
-          <Text style={[styles.usernameText, { color: colors.text, fontSize: fs(screenType === 'desktop' ? 18 : 16) }]}>
-            {profile?.username || 'An-Q Learner'}
-          </Text>
-        </View>
-
-        {/* 3段目：レベル + プログレスバー */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Text style={[styles.levelText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
-            Lv. {userLevel}
-          </Text>
-          <View style={[styles.xpBarContainer, { backgroundColor: colors.border, flex: 1 }]}>
-            <View style={[styles.xpBarFill, { 
-              width: `${xpProgress}%`, 
-              backgroundColor: colors.primary 
-            }]} />
-          </View>
-          <Text style={[styles.xpText, { color: colors.textSecondary, fontSize: fs(screenType === 'desktop' ? 11 : 10) }]} numberOfLines={1}>
-            {nextRankText || 'RANK: MAX'}
-          </Text>
-        </View>
-
-        {/* デイリーゴール進捗 */}
+        {/* 2行目：DAILY TARGET */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
           <Target size={14} color={colors.primary} />
           <Text style={[styles.dailyGoalLabel, { color: colors.text, fontSize: fontSize.small }]}>
@@ -1293,7 +1389,7 @@ const HomeScreen = React.memo(() => {
           </View>
         </View>
 
-        {/* 最終転送からの経過時間（30秒ごとにライブ更新：P2-7） */}
+        {/* 3行目：SINCE LAST TRANSFER（30秒ごとにライブ更新：P2-7） */}
         <Text
           style={{
             color: colors.textSecondary,
@@ -1480,12 +1576,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   currencyBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    // ネオンシアンのグロー（iOS/Web。Android は boxShadow 非対応のため無視される）
-    boxShadow: '0px 0px 12px rgba(0,255,200,0.3)',
+    // 下線デザイン（枠・背景・角丸・グローは廃止）
+    // borderBottomColor / 薄い背景色はテーマ依存のため JSX のインラインスタイルで指定
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 3,
   },
   currencyText: {
     fontWeight: '700',
@@ -1902,6 +1997,7 @@ const styles = StyleSheet.create({
   questItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     paddingVertical: 6,
   },
   questTitleCol: {
@@ -1909,20 +2005,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1.5,
     fontFamily: 'monospace',
-    marginRight: 6,
   },
   questRewardCol: {
     fontSize: 13,
     fontWeight: '600',
     flex: 2,
     fontFamily: 'monospace',
-    marginRight: 6,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   questStatusCol: {
     fontSize: 12,
     fontWeight: '500',
-    width: 80,
+    width: 90,
     fontFamily: 'monospace',
     textAlign: 'right',
     flexShrink: 0,

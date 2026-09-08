@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView, Image } from 'react-native';
+import PressableButton from './components/PressableButton';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
@@ -47,7 +48,7 @@ const drawTen = (): GachaItem[] => {
 
 export default function GachaScreen() {
   const navigate = useNavigate();
-  const { colors } = useTheme();
+  const { colors, br } = useTheme();
   const locale = useLocale();
   const [coins, setCoins] = useState(0);
   const [books, setBooks] = useState(0);
@@ -129,10 +130,16 @@ useEffect(() => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ヘッダー */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <PressableButton
+          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </PressableButton>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexShrink: 1 }}>
           <Image source={IMAGES.coin} style={{ width: 22, height: 22, resizeMode: 'contain' }} />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {locale === 'ja' ? 'ガチャ' : 'Gacha'}
           </Text>
         </View>
@@ -145,14 +152,6 @@ useEffect(() => {
               <Image source={IMAGES.book} style={{ width: 18, height: 18, resizeMode: 'contain' }} /> {books}
             </Text>
           </View>
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14 }}
-            onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 

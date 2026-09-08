@@ -39,6 +39,9 @@ export interface ProgressRewardResult {
   document: UserProgressDocument;
   leveledUp: number;
   levelUpCoins: number;
+  newLevel?: number;
+  currentXP?: number;
+  nextLevelXP?: number;
 }
 
 export interface QuizRewardInput {
@@ -257,6 +260,9 @@ function applyLevelUps(document: UserProgressDocument): ProgressRewardResult {
 }
 
 async function syncLocalStorage(document: UserProgressDocument) {
+  // user_profile_cache を更新して、Home画面の loadUserProgress が
+  // 最新の currentXP / nextLevelXP を即時読み込めるようにする
+  const profileCache = JSON.stringify(document);
   await AsyncStorage.multiSet([
     [STORAGE_KEYS.username, document.username],
     [STORAGE_KEYS.bio, document.bio],
@@ -271,6 +277,7 @@ async function syncLocalStorage(document: UserProgressDocument) {
     [STORAGE_KEYS.lastStudyDate, new Date(document.lastLoginDate).toDateString()],
     [STORAGE_KEYS.joinDate, String(document.joinDate)],
     [STORAGE_KEYS.lastLoginDate, String(document.lastLoginDate)],
+    ['user_profile_cache', profileCache],
   ]);
 }
 
@@ -528,4 +535,21 @@ export async function awardQuizCompletion(userId: string, input: QuizRewardInput
       correctRate: totalQuestionsAnswered > 0 ? Math.round((totalCorrectAnswers / totalQuestionsAnswered) * 100) : 0,
     };
   });
+}
+
+/**
+ * XPを加算する（問題作成時など+10 XP用の軽量関数）
+ * Firestore とローカルストレージ（AsyncStorage）の両方を更新し、レベルアップを適用する。
+ * @returns レベルアップしたレベル数と新しいXP情報を含むProgressRewardResult
+ */
+export async function incrementXP(userId: string, amount: number): Promise<ProgressRewardResult> {
+  const safeAmount = Math.max(0, Math.floor(amount));
+  if (safeAmount === 0) {
+    const doc = await readUserProfileDocument(userId);
+    return { document: doc || ({} as any), leveledUp: 0, levelUpCoins: 0, newLevel: doc?.level || 1, currentXP: doc?.currentXP || 0, nextLevelXP: doc?.nextLevelXP || 100 };
+  }
+  return updateProgressDocument(userId, (current) => ({
+    ...current,
+    currentXP: current.currentXP + safeAmount,
+  }));
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Alert, Image } from 'react-native';
+import PressableButton from './components/PressableButton';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
@@ -16,7 +17,7 @@ import { SHOP_ITEMS as GENERAL_SHOP_ITEMS, ShopItem as GeneralShopItem, loadPurc
 
 export default function ShopScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, scale, isCyberpunk } = useTheme();
+  const { colors, onPrimary, scale, isCyberpunk, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const fs = (n: number) => Math.round(n * scale);
@@ -128,8 +129,14 @@ export default function ShopScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <PressableButton
+          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
+        </PressableButton>
+        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20), flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           {t.shopTitle}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -147,12 +154,6 @@ export default function ShopScreen() {
               </Text>
             </View>
           )}
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-            onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
