@@ -117,17 +117,17 @@ const themePresets = {
   },
   cyberpunk: {
     name: 'Cyberpunk',
-    primary: '#00F0FF',
-    onPrimary: '#000000',
-    secondary: '#FF00FF',
-    background: '#0A0E1A',
-    card: '#111827',
-    text: '#E0E0E0',
-    textSecondary: '#94A3B8',
-    border: '#243042',
-    success: '#00FF88',
-    warning: '#FFB800',
-    error: '#FF0055',
+    primary: '#00FFC8',      // サイバーシアン（メインCTA）
+    onPrimary: '#000000',    // シアン上のテキストは黒
+    secondary: '#58A6FF',    // 補助アクセント
+    background: '#0B0E14',   // 漆黒に近い濃紺
+    card: '#161B22',         // カード背景
+    text: '#E6EDF3',         // メインテキスト（ほぼ白）
+    textSecondary: '#8B949E',// サブテキスト
+    border: '#30363D',       // 境界線
+    success: '#3FB950',
+    warning: '#D29922',
+    error: '#FF7B72',
   },
   retro: {
     name: 'Retro',
@@ -193,6 +193,31 @@ export type ThemeColors = typeof themePresets.blue;
 export type FontSize = 'small' | 'medium' | 'large';
 export type PatternType = 'none' | 'dots' | 'stripes' | 'grid' | 'waves' | 'diamonds';
 
+// ─────────────────────────────────────────────
+// 全画面共通デザイントークン（世界観統一）
+// ─────────────────────────────────────────────
+export const globalTokens = {
+  background: '#0B0E14',
+  card: '#161B22',
+  border: '#30363D',
+  text: '#E6EDF3',
+  textSecondary: '#8B949E',
+  primary: '#00FFC8',
+  onPrimary: '#000000',
+  success: '#3FB950',
+  warning: '#D29922',
+  error: '#FF7B72',
+  /** 全画面共通の角丸（鋭角化：Terminal/サイバー風） */
+  borderRadius: 4,
+  /** Typography スケール（P2：全画面共通のフォントサイズ段階） */
+  typography: {
+    heading: 20,     // 画面ヘッダー・大見出し
+    subheading: 16,  // カードタイトル・セクション見出し
+    body: 14,        // 本文
+    caption: 12,     // 補足・キャプション
+  },
+} as const;
+
 export const fontSizeScale: Record<FontSize, number> = {
   small: 0.85,
   medium: 1.0,
@@ -227,7 +252,10 @@ export const useTheme = () => {
   const lum = getLuminance(context.colors.primary);
   const onPrimary = context.colors.onPrimary || (lum > 150 ? '#1A1A1A' : '#FFFFFF');
   const isCyberpunk = context.currentTheme === 'cyberpunk';
-  return { ...context, fs, onPrimary, isCyberpunk };
+  // 全画面共通のボーダー半径（鋭角4px）
+  const br = globalTokens.borderRadius;
+  const typography = globalTokens.typography;
+  return { ...context, fs, onPrimary, isCyberpunk, br, typography };
 };
 
 // HEXから明度を計算（0=暗い, 255=明るい）
@@ -268,7 +296,7 @@ function buildCustomTheme(hex: string): ThemeColors {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTheme, setCurrentTheme] = useState<ThemeName>('blue');
+  const [currentTheme, setCurrentTheme] = useState<ThemeName>('cyberpunk');
   const [customColor, setCustomColorState] = useState<string | null>(null);
   const [fontSize, setFontSizeState] = useState<FontSize>('medium');
   const [pattern, setPatternState] = useState<PatternType>('none');

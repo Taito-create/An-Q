@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    StyleSheet, Text, View, TouchableOpacity,
+    StyleSheet, Text, View, TouchableOpacity, Image,
   ScrollView, StatusBar, Alert, Animated, ActivityIndicator
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import TooltipButton from './tooltipButton';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
+import PressableButton from './components/PressableButton';
+import TerminalLog, { TerminalLogHandle } from './components/TerminalLog';
 import PatternBackground from './patternBackground';
+import { IMAGES } from './constants/images';
 import { Platform } from 'react-native';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -19,7 +21,6 @@ import {
   ClipboardList,
   Home,
   User,
-  Settings,
   TrendingUp,
   Target,
   BookOpen,
@@ -27,8 +28,6 @@ import {
   PenSquare,
   Share2,
   Package,
-  RefreshCw,
-  Upload,
   Coins,
   AlertTriangle,
   Lightbulb,
@@ -87,17 +86,21 @@ const badgeIconMap: Record<string, React.ComponentType<any>> = {
   calendar: Calendar,
 };
 
+// 疑似ターミナルログは app/components/TerminalLog.tsx に分離（ref で addLog 公開）
+const TERMINAL_LOG_HEAD = [
+  'INITIALIZING SYSTEM...',
+  'AWAITING USER INPUT...',
+  'STATUS: ONLINE',
+];
+
 const HomeScreen = React.memo(() => {
   const navigate = useNavigate();
 
-  // ナビゲーションを遅らせてフリッカー防止
+  // 遷移は即時実行（遅延なし＝INITIATE押下時のラグ・カクつき解消：P1-6）
   const navigateWithAnimation = useCallback((path: string) => {
-    // Small delay to prevent flash
-    setTimeout(() => {
-      requestAnimationFrame(() => navigate(path));
-    }, 50);
+    requestAnimationFrame(() => navigate(path));
   }, [navigate]);
-  const { colors, fs, pattern, onPrimary, isCyberpunk } = useTheme();
+  const { colors, fs, pattern, onPrimary, isCyberpunk, br } = useTheme();
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
@@ -107,15 +110,13 @@ const HomeScreen = React.memo(() => {
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
   const [xpProgress, setXpProgress] = useState(0);
-  const [showMenu, setShowMenu] = useState(false);
   const fireAnimationRef = useRef<LottieView>(null);
 
   // データロード完了フラグ（初回遷移時のフリッカー防止）
   const [isDataReady, setIsDataReady] = useState(false);
 
-  // メインプレイボタンのパルス／押下アニメーション
+  // メインプレイボタンのパルスアニメーション（押下スケールは PressableButton が担当）
   const playButtonPulse = useRef(new Animated.Value(1)).current;
-  const playButtonPress = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // 初回マウント時のフリッカー防止のため、少し遅らせてパルス開始
@@ -208,9 +209,7 @@ const HomeScreen = React.memo(() => {
     },
   };
 
-  // カード・ボタンサイズ
-  const cpR: number | undefined = undefined;
-  const cpB: number | undefined = undefined;
+  // カード・ボタンサイズ（角丸は theme の共通トークン br=4 に統一：P2-9）
 
   const cardPadding = {
     mobile: { padding: 12 },
@@ -250,6 +249,20 @@ const HomeScreen = React.memo(() => {
   const [weakQuestionCount, setWeakQuestionCount] = useState(0);
   const [dailyQuests, setDailyQuests] = useState<Mission[]>([]);
   const [questProgress, setQuestProgress] = useState<{ current: number; completed: boolean }[]>([]);
+  // 転送モード選択（RAPID / DAILY / DEEP）
+  const [selectedMode, setSelectedMode] = useState<'rapid' | 'daily' | 'deep'>('rapid');
+  // 最終アクション時刻（STATUS: STANDBY (nH nM SINCE LAST TRANSFER) 用）
+  const [lastActionAt, setLastActionAt] = useState<number | null>(null);
+  // 30秒ごとの再描画トリガー（SINCE LAST TRANSFER の経過時間をライブ更新：P2-7）
+  const [statusTick, setStatusTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setStatusTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+  // SYSTEM LOG の動的ログ（▶ INITIATE 押下時に追加）
+  // SYSTEM LOG の ref（addLog を外部から呼び出す）
+  const terminalLogRef = useRef<TerminalLogHandle>(null);
   const [motivationalMessage, setMotivationalMessage] = useState('');
   const [examDates, setExamDates] = useState<any[]>([]);
   const [examCountdown, setExamCountdown] = useState<{daysLeft: number, examName: string} | null>(null);
@@ -262,20 +275,71 @@ const HomeScreen = React.memo(() => {
   // デイリーゴール（デフォルト10問）
   const [dailyGoal, setDailyGoal] = useState(10);
 
+  // ─────────────────────────────────────────────
+  // 「今日の1問」：日付シードによる選出（同日は再選出しない）
+  // ※ ログ付き・初回「よろしく/やっほー」のようなテストデータ確認用
+  // ─────────────────────────────────────────────
+  const TODAY_QUESTION_DATE_KEY = 'today_question_last_date';
+
+  const pickTodayQuestion = useCallback(async (questions: any[]) => {
+    if (!questions || questions.length === 0) return null;
+    const today = new Date();
+    const dateKey = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+    let lastDate: string | null = null;
+    try {
+      lastDate = await AsyncStorage.getItem(TODAY_QUESTION_DATE_KEY);
+    } catch { /* noop */ }
+
+    // 同じ日にすでに選出済みなら再選出しない（日が変わったときだけ更新）
+    if (lastDate === dateKey) {
+      console.log('[今日の1問] 同日のため再選出をスキップ (date=' + dateKey + ')');
+      return null;
+    }
+
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const idx = seed % questions.length;
+    const picked = questions[idx];
+    setTodayQuestion(picked);
+    try {
+      await AsyncStorage.setItem(TODAY_QUESTION_DATE_KEY, dateKey);
+    } catch { /* noop */ }
+
+    const createdAtInfo = picked?.createdAt
+      ? new Date(picked.createdAt).toISOString()
+      : '(none)';
+    console.log(
+      '[今日の1問] seed=' + seed +
+      ', index=' + idx +
+      ', date=' + dateKey +
+      ', id=' + (picked?.id ?? '(none)') +
+      ', createdAt=' + (picked?.createdAt ?? '(none)') + ' (' + createdAtInfo + ')' +
+      ', question="' + (picked?.question ?? '') + '"'
+    );
+    return picked;
+  }, [setTodayQuestion]);
+
   // questionsFromHookが更新されたら問題数を反映
   useEffect(() => {
     if (questionsFromHook.length > 0) {
       setTotalQuestions(questionsFromHook.length);
-      // 今日の問題も更新
-      const today = new Date();
-      const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-      const idx = seed % questionsFromHook.length;
-      setTodayQuestion(questionsFromHook[idx]);
+      // 今日の問題も更新（日付シード＋同日再選出防止）
+      pickTodayQuestion(questionsFromHook);
       // 苦手問題も更新
       const weak = questionsFromHook.filter((q: any) => (q.mistakeCount ?? 0) > 0);
       setWeakQuestionCount(weak.length);
     }
-  }, [questionsFromHook]);
+  }, [questionsFromHook, pickTodayQuestion]);
+
+  // 最終アクション時刻を読み込み（STATUS: STANDBY 表示用）
+  useEffect(() => {
+    const loadLastAction = async () => {
+      try {
+        const raw = await AsyncStorage.getItem('last_action_timestamp');
+        if (raw) setLastActionAt(Number(raw) || null);
+      } catch { /* noop */ }
+    };
+    loadLastAction();
+  }, []);
 
   useEffect(() => {
     // 非同期処理をバックグラウンドで実行（ノンブロッキング）
@@ -556,10 +620,8 @@ const HomeScreen = React.memo(() => {
           const questions = safeParseArray(savedQuestions, []);
           setTotalQuestions(questions.length);
           if (questions.length > 0) {
-            const today = new Date();
-            const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-            const idx = seed % questions.length;
-            setTodayQuestion(questions[idx]);
+            // 今日の問題も更新（日付シード＋同日再選出防止）
+            await pickTodayQuestion(questions);
           }
           const weak = questions.filter((q: any) => (q.mistakeCount ?? 0) > 0);
           setWeakQuestionCount(weak.length);
@@ -737,11 +799,11 @@ const HomeScreen = React.memo(() => {
             />
           )}
         </View>, value: streak, label: t.streakLabel },
-      { key: 'accuracy', icon: <Target size={18} color={colors.secondary} />, value: `${accuracy}%`, label: t.accuracyLabel },
+      { key: 'accuracy', icon: <Target size={18} color={colors.secondary} />, value: accuracy > 0 ? `${accuracy}%` : '--', label: t.accuracyLabel },
     ];
 
     return (
-      <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: cpR ?? 12 }]}>
+      <View style={[styles.statsContainer, cardPadding[screenType], { backgroundColor: colors.card, borderRadius: br }]}>
         {/* 2×2 グリッド：問題数・今日の正解・連続学習・正答率 */}
         <View style={styles.statsGrid}>
           {statItems.map(item => (
@@ -776,27 +838,65 @@ const HomeScreen = React.memo(() => {
         )}
 
         {/* すべての統計を見る */}
-        <TouchableOpacity
+        <PressableButton
           style={styles.seeAllRow}
           onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/statistics'); }}
-          activeOpacity={0.7}
         >
           <Text style={[styles.seeAllText, { color: colors.primary, fontSize: fontSize.small }]}>{t.seeAllStats}</Text>
           <ChevronRight size={16} color={colors.primary} />
-        </TouchableOpacity>
+        </PressableButton>
       </View>
     );
   };
 
+  // 統計データが空のときのオンボーディング表示（「ゼロの祭壇」撲滅）
+  // カード自体をタップ可能なCTAに格上げ（押すと問題作成へ）＝solid 枠＋薄いシアン背景
+  const renderEmptyStats = () => (
+    <PressableButton
+      style={[styles.statsContainer, cardPadding[screenType], {
+        backgroundColor: colors.primary + '08',
+        borderRadius: br,
+        alignItems: 'center',
+        paddingVertical: 28,
+        borderWidth: 1,
+        borderColor: colors.primary,
+        borderStyle: 'solid',
+      }]}
+      onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/create'); }}
+    >
+      <View style={[styles.emptyStatsIcon, { borderColor: colors.primary + '55' }]}>
+        <Zap size={22} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyStatsTitle, { color: colors.primary }]}>
+        ▸ {locale === 'ja' ? '最初の記憶をインストール' : 'INSTALL FIRST MEMORY'}
+      </Text>
+      <Text style={[styles.emptyStatsDesc, { color: colors.textSecondary }]}>
+        {locale === 'ja' ? 'タップして最初の1問を作成 正解で統計モジュール起動' : 'TAP TO CREATE — ANSWER YOUR FIRST QUESTION TO BOOT THE STATS MODULE'}
+      </Text>
+      {/* オンボーディングの具体的ステップ（P1：ゼロ状態UX改善） */}
+      <View style={{ marginTop: 14, gap: 5, alignSelf: 'stretch' }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '① CREATE  —  最初の問題を作成' : '① CREATE  —  Make your first question'}
+        </Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '② TRANSFER  —  クイズに挑戦して正解' : '② TRANSFER  —  Answer it correctly'}
+        </Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '③ BOOT  —  統計モジュールが起動' : '③ BOOT  —  Stats module boots up'}
+        </Text>
+      </View>
+    </PressableButton>
+  );
+
   const renderTodayQuestion = () => {
     if (!todayQuestion) return null;
     return (
-      <TouchableOpacity
-        style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
+      <PressableButton
+        style={[styles.todayCard, cardPadding[screenType], { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderRadius: br, borderWidth: 1 }]}
         onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/quiz'); }}
       >
         <View style={styles.todayHeader}>
-        <BookOpen size={16} color={colors.primary} />
+        <Image source={IMAGES.book} style={{ width: 18, height: 18, resizeMode: 'contain' }} />
         <Text style={[styles.todayLabel, { color: colors.primary, fontSize: fontSize.body }]}>
           {t.todayQuestion}
         </Text>
@@ -804,15 +904,15 @@ const HomeScreen = React.memo(() => {
         <Text style={[styles.todayQuestion, { color: colors.text, fontSize: fontSize.body }]} numberOfLines={2}>
           {todayQuestion.question}
         </Text>
-      </TouchableOpacity>
+      </PressableButton>
     );
   };
 
   const renderWeakCard = () => {
     if (weakQuestionCount <= 0) return null;
     return (
-      <TouchableOpacity
-        style={[styles.weakCard, cardPadding[screenType], { backgroundColor: colors.error + '15', borderColor: colors.error, borderRadius: cpR ?? 12, borderWidth: cpB ?? 1 }]}
+      <PressableButton
+        style={[styles.weakCard, cardPadding[screenType], { backgroundColor: colors.error + '15', borderColor: colors.error, borderRadius: br, borderWidth: 1 }]}
         onPress={async () => {
           SoundManager.play('decide');
           await AsyncStorage.setItem('quiz_mode', 'weak');
@@ -829,51 +929,160 @@ const HomeScreen = React.memo(() => {
           </Text>
         </View>
         <ChevronRight size={16} color={colors.error} />
-      </TouchableOpacity>
+      </PressableButton>
     );
   };
 
-  // クイックアクション（クイッククイズ／デイリーチャレンジ）
-  const renderQuickActions = () => (
-    <View style={[styles.actionGrid, { marginHorizontal: 4 }]}>
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-        activeOpacity={0.7}
-        onPress={() => {
-          SoundManager.play('decide');
-          if (questionsFromHook.length === 0) {
-            Alert.alert(
-              locale === 'ja' ? '問題がありません' : 'No Questions',
-              locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
-            );
-            return;
-          }
-          setQuickQuizCountCache(10);
-          navigateWithAnimation('/quiz');
-        }}
-      >
-        <Zap size={20} color={colors.primary} />
-        <Text style={[styles.actionLabel, { color: colors.primary }]}>{t.quickQuiz}</Text>
-      </TouchableOpacity>
+  // ─────────────────────────────────────────────
+  // 転送モード選択カード（RAPID / DAILY / DEEP）
+  // ─────────────────────────────────────────────
+  const questMetaById: Record<string, { code: string; rewardJp: string; rewardEn: string }> = {
+    d1: { code: 'QUIZ', rewardJp: '+50 XP', rewardEn: '+50 XP' },
+    d2: { code: 'AUTHOR', rewardJp: 'UNLOCK: 称号「設計者」', rewardEn: 'UNLOCK: TITLE ARCHITECT' },
+    d3: { code: 'PERFECT', rewardJp: 'ACTIVATE: PULSE MODE', rewardEn: 'ACTIVATE: PULSE MODE' },
+  };
 
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: colors.warning + '15', borderColor: colors.warning }]}
-        activeOpacity={0.7}
-        onPress={() => {
-          SoundManager.play('decide');
-          if (questionsFromHook.length === 0) {
-            Alert.alert(
-              locale === 'ja' ? '問題がありません' : 'No Questions',
-              locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
-            );
-            return;
-          }
-          navigateWithAnimation('/missions');
-        }}
-      >
-        <Award size={20} color={colors.warning} />
-        <Text style={[styles.actionLabel, { color: colors.warning }]}>{t.dailyChallenge}</Text>
-      </TouchableOpacity>
+  // STATUS 行（SYSTEM LOG 先頭に表示。ヘッダーからは撤去）
+  const statusText = (() => {
+    void statusTick; // 30秒ごとのライブ更新トリガー
+    if (lastActionAt) {
+      const diffMin = Math.floor((Date.now() - lastActionAt) / 60000);
+      let elapsed: string;
+      if (diffMin < 1) elapsed = 'JUST NOW';
+      else if (diffMin < 60) elapsed = `${diffMin}M`;
+      else elapsed = `${Math.floor(diffMin / 60)}H ${diffMin % 60}M`;
+      return `STATUS: STANDBY (${elapsed} SINCE LAST TRANSFER)`;
+    }
+    return 'STATUS: STANDBY (AWAITING FIRST TRANSFER)';
+  })();
+
+  // NEXT RANK 進行情報（ヘッダー表示用：次の未取得称号と現在値）
+  const RANK_THRESHOLDS: Record<string, { get: (s: UserStats) => number; target: number }> = {
+    beginner: { get: (s) => s.quizPlayed, target: 1 },
+    studious: { get: (s) => s.quizPlayed, target: 10 },
+    scholar: { get: (s) => s.quizPlayed, target: 50 },
+    master: { get: (s) => s.quizPlayed, target: 100 },
+    creator: { get: (s) => s.questionsCreated, target: 10 },
+    architect: { get: (s) => s.questionsCreated, target: 50 },
+    perfecter: { get: (s) => s.perfectQuiz, target: 5 },
+    streak7: { get: (s) => s.maxStreak, target: 7 },
+    streak30: { get: (s) => s.maxStreak, target: 30 },
+    centurion: { get: (s) => s.correctAnswers, target: 100 },
+    millionaire: { get: (s) => s.totalBooks, target: 100 },
+    planner: { get: (s) => s.calendarEvents, target: 5 },
+  };
+  const nextRankText = (() => {
+    if (!userStats) return '';
+    const unlocked = Array.isArray(userStats.unlockedTitles) ? userStats.unlockedTitles : [];
+    const next = TITLE_BADGES.find((b) => !unlocked.includes(b.id));
+    if (!next) return 'RANK: MAX';
+    const meta = RANK_THRESHOLDS[next.id];
+    const name = locale === 'ja' ? next.titleJa : next.titleEn;
+    if (!meta) return `NEXT: ${name}`;
+    const cur = Math.min(meta.get(userStats), meta.target);
+    return `NEXT: ${name} (${cur}/${meta.target})`;
+  })();
+
+  // ヘッダー用：最終転送からの経過時間（30秒ごとにライブ更新：P2-7）
+  const lastTransferElapsed = (() => {
+    void statusTick;
+    if (!lastActionAt) return locale === 'ja' ? '---（まだ転送なし）' : '--- (NO TRANSFER)';
+    const diffMin = Math.floor((Date.now() - lastActionAt) / 60000);
+    if (diffMin < 1) return 'JUST NOW';
+    if (diffMin < 60) return `${diffMin}M`;
+    return `${Math.floor(diffMin / 60)}H ${diffMin % 60}M`;
+  })();
+
+  const transferModes = [
+    { key: 'rapid' as const, label: 'RAPID', caption: '短時間（5分）' },
+    { key: 'daily' as const, label: 'DAILY', caption: '日課（20問）' },
+    { key: 'deep' as const, label: 'DEEP', caption: '深掘り（全問）' },
+  ];
+
+  // MEMORY CORE 表示（TerminalLog 用：初回正解まで HIDDEN）
+  const accuracyRate = userStats && userStats.quizPlayed > 0
+    ? (userStats.correctAnswers / userStats.quizPlayed) * 100
+    : 0;
+  const memoryCoreText = todayCorrect === 0 || accuracyRate === 0
+    ? 'MEMORY CORE: HIDDEN — AWAITING FIRST TRANSFER'
+    : `MEMORY CORE: ${accuracyRate.toFixed(1)}%`;
+
+  const handleInitiateTransfer = () => {
+    SoundManager.play('decide');
+    // 最終アクション時刻を記録（STATUS: STANDBY の経過表示用）
+    const now = Date.now();
+    try {
+      AsyncStorage.setItem('last_action_timestamp', String(now));
+      setLastActionAt(now);
+    } catch { /* noop */ }
+    // SYSTEM LOG に転送開始ログを追加（ref 経由でコンポーネントへ）
+    terminalLogRef.current?.addLog(`READY FOR TRANSFER (${selectedMode.toUpperCase()})`);
+    if (questionsFromHook.length === 0) {
+      Alert.alert(
+        locale === 'ja' ? '問題がありません' : 'No Questions',
+        locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
+      );
+      return;
+    }
+    if (selectedMode === 'rapid') {
+      setQuickQuizCountCache(10);
+      navigateWithAnimation('/quiz');
+    } else if (selectedMode === 'daily') {
+      navigateWithAnimation('/missions');
+    } else {
+      // DEEP：全問モード
+      setQuickQuizCountCache(questionsFromHook.length);
+      navigateWithAnimation('/quiz');
+    }
+  };
+
+  const renderTransferSelector = () => (
+    <View style={[styles.transferCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.transferHeader, { color: colors.textSecondary }]}>
+        $ SELECT TRANSFER MODE
+      </Text>
+      <View style={styles.transferTabs}>
+        {transferModes.map((mode) => {
+          const active = selectedMode === mode.key;
+          return (
+            <PressableButton
+              key={mode.key}
+              style={[styles.transferTab, active
+                ? { backgroundColor: 'transparent', borderColor: colors.primary, borderWidth: 2 }
+                : { backgroundColor: 'transparent', borderColor: colors.border, borderWidth: 1 }]}
+              onPress={() => {
+                SoundManager.play('select');
+                setSelectedMode(mode.key);
+                const configLog =
+                  mode.key === 'rapid'
+                    ? 'TRANSFER TYPE = RAPID (5MIN)'
+                    : mode.key === 'daily'
+                      ? 'TRANSFER TYPE = DAILY (20 QUESTIONS)'
+                      : 'TRANSFER TYPE = DEEP (FULL SET)';
+                terminalLogRef.current?.addLog(`[CONFIG] ${configLog}`);
+              }}
+            >
+              <Text style={[styles.transferTabText, { color: active ? colors.primary : colors.textSecondary }]} numberOfLines={1}>
+                {active ? '▸ ' : ''}{mode.label}
+              </Text>
+              <Text style={[styles.transferTabCaption, { color: colors.textSecondary }]} numberOfLines={1}>
+                {mode.caption}
+              </Text>
+            </PressableButton>
+          );
+        })}
+      </View>
+      <Animated.View style={{ width: '100%', alignItems: 'center' }}>
+        <PressableButton
+          style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
+          onPress={handleInitiateTransfer}
+        >
+          <Play size={28} color={onPrimary} strokeWidth={2} />
+          <Text numberOfLines={1} style={[styles.mainPlayText, { color: onPrimary }]}>
+            ▶ INITIATE
+          </Text>
+        </PressableButton>
+      </Animated.View>
     </View>
   );
 
@@ -883,52 +1092,19 @@ const HomeScreen = React.memo(() => {
       <ClipboardList size={48} color={colors.primary} style={styles.emptyStateIcon} />
       <Text style={[styles.emptyStateTitle, { color: colors.text }]}>{t.emptyStateTitle}</Text>
       <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>{t.emptyStateDesc}</Text>
-      <TouchableOpacity
+      <PressableButton
         style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
-        activeOpacity={0.8}
         onPress={() => {
           SoundManager.play('decide');
           navigateWithAnimation('/create');
         }}
       >
-        <Text style={styles.emptyStateButtonText}>{t.goCreate}</Text>
-      </TouchableOpacity>
+        <Text style={[styles.emptyStateButtonText, { color: onPrimary }]}>{t.goCreate}</Text>
+      </PressableButton>
     </View>
   );
 
-  const renderMainActions = () => (
-    <View style={{ marginHorizontal: 4, marginBottom: 20 }}>
-      <Animated.View style={{ transform: [{ scale: Animated.multiply(playButtonPulse, playButtonPress) }] }}>
-        <TouchableOpacity
-          style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
-          activeOpacity={0.85}
-          onPressIn={() =>
-            Animated.spring(playButtonPress, { toValue: 0.96, friction: 5, tension: 300, useNativeDriver: Platform.OS !== 'web' }).start()
-          }
-          onPressOut={() =>
-            Animated.spring(playButtonPress, { toValue: 1, friction: 5, tension: 300, useNativeDriver: Platform.OS !== 'web' }).start()
-          }
-          onPress={() => {
-            SoundManager.play('decide');
-            if (questionsFromHook.length === 0) {
-              Alert.alert(
-                locale === 'ja' ? '問題がありません' : 'No Questions',
-                locale === 'ja' ? 'まずは「作成」タブから問題を作りましょう！' : 'Create some questions in the "Create" tab first!'
-              );
-              return;
-            }
-            // ナビゲーションを1フレーム遅らせてフリッカー防止
-            navigateWithAnimation('/quiz');
-          }}
-        >
-          <Play size={32} color="#fff" strokeWidth={2} />
-          <Text style={styles.mainPlayText}>
-            {locale === 'ja' ? '問題を解く' : 'Start Quiz'}
-          </Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  );
+  // renderMainActions / renderQuickActions は renderTransferSelector に統合・置き換え済み
 
   // デイリークエストカード
   const renderDailyQuests = () => {
@@ -942,29 +1118,45 @@ const HomeScreen = React.memo(() => {
           </Text>
         </View>
         {dailyQuests.map((mission, index) => {
-          const done = questProgress[index]?.completed;
+          const prog = questProgress[index];
+          const current = prog?.current ?? 0;
+          const done = !!prog?.completed;
+          const meta = questMetaById[mission.id] ?? {
+            code: locale === 'ja' ? mission.titleJa : mission.titleEn,
+            rewardJp: `+${mission.reward} XP`,
+            rewardEn: `+${mission.reward} XP`,
+          };
+          const rewardText = locale === 'ja' ? meta.rewardJp : meta.rewardEn;
+          const progressText = done
+            ? '[DONE]'
+            : current > 0
+              ? `[${current}/${mission.goal}]`
+              : '[LOCKED]';
           return (
             <View key={mission.id} style={styles.questItem}>
               {done
-                ? <CheckCircle2 size={18} color={colors.success} style={{ marginRight: 10 }} />
-                : <Square size={18} color={colors.textSecondary} style={{ marginRight: 10 }} />}
-              <Text style={[styles.questText, { color: colors.text }]}>
-                {locale === 'ja' ? mission.titleJa : mission.titleEn}
+                ? <CheckCircle2 size={16} color={colors.success} style={{ marginRight: 8 }} />
+                : <Square size={16} color={colors.border} style={{ marginRight: 8 }} />}
+              <Text style={[styles.questTitleCol, { color: colors.text }]} numberOfLines={2}>
+                $ {meta.code}
               </Text>
-              <Text style={[styles.questCount, { color: colors.textSecondary }]}>
-                {questProgress[index]?.current ?? 0}/{mission.goal}
+              <Text style={[styles.questRewardCol, { color: colors.primary }]} numberOfLines={2}>
+                {rewardText}
+              </Text>
+              <Text style={[styles.questStatusCol, { color: done ? colors.success : colors.textSecondary }]}>
+                {progressText}
               </Text>
             </View>
           );
         })}
-        <TouchableOpacity
+        <PressableButton
           style={[styles.questMoreBtn, { borderColor: colors.border }]}
           onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/missions'); }}
         >
           <Text style={[styles.questMoreText, { color: colors.primary }]}>
             {locale === 'ja' ? 'すべてのミッションを見る →' : 'View all missions →'}
           </Text>
-        </TouchableOpacity>
+        </PressableButton>
       </View>
     );
   };
@@ -980,13 +1172,13 @@ const HomeScreen = React.memo(() => {
           <Text style={[styles.achievementHeaderTitle, { color: colors.textSecondary, fontSize: fontSize.small }]}>
             {t.achievements}
           </Text>
-          <TouchableOpacity
+          <PressableButton
             style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
             onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/achievements'); }}
           >
             <Text style={[styles.achievementMoreText, { color: colors.primary, fontSize: fontSize.small }]}>{t.viewAllAchievements}</Text>
             <ChevronRight size={14} color={colors.primary} />
-          </TouchableOpacity>
+          </PressableButton>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }} style={{ width: '100%' }}>
           {badges.map((badge, index) => {
@@ -1048,15 +1240,15 @@ const HomeScreen = React.memo(() => {
             </Text>
           </View>
           <View style={[styles.currencyContainer, { gap: 8 }]}>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.warning + '20', borderColor: colors.warning, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <Coins size={14} color={colors.warning} />
-              <Text style={[styles.currencyText, { color: colors.warning, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '30', borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+              <Image source={IMAGES.coin} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
+              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
                 {userCoins}
               </Text>
             </View>
-            <View style={[styles.currencyBadge, { backgroundColor: colors.success + '20', borderColor: colors.success, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <BookOpen size={14} color={colors.success} />
-              <Text style={[styles.currencyText, { color: colors.success, fontSize: fs(screenType === 'desktop' ? 13 : 11) }]}>
+            <View style={[styles.currencyBadge, { backgroundColor: colors.primary + '30', borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+              <Image source={IMAGES.book} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
+              <Text style={[styles.currencyText, { color: colors.primary, fontSize: fs(screenType === 'desktop' ? 15 : 13) }]}>
                 {profile?.totalBooks || 0}
               </Text>
             </View>
@@ -1082,8 +1274,8 @@ const HomeScreen = React.memo(() => {
               backgroundColor: colors.primary 
             }]} />
           </View>
-          <Text style={[styles.xpText, { color: colors.textSecondary, fontSize: fs(screenType === 'desktop' ? 11 : 10) }]}>
-            {profile?.currentXP || 0} / {profile?.nextLevelXP || 100} XP
+          <Text style={[styles.xpText, { color: colors.textSecondary, fontSize: fs(screenType === 'desktop' ? 11 : 10) }]} numberOfLines={1}>
+            {nextRankText || 'RANK: MAX'}
           </Text>
         </View>
 
@@ -1100,81 +1292,22 @@ const HomeScreen = React.memo(() => {
             }]} />
           </View>
         </View>
+
+        {/* 最終転送からの経過時間（30秒ごとにライブ更新：P2-7） */}
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontFamily: 'monospace',
+            fontSize: 10,
+            letterSpacing: 0.5,
+            marginTop: 6,
+          }}
+          numberOfLines={1}
+        >
+          {`> SINCE LAST TRANSFER: ${lastTransferElapsed}`}
+        </Text>
       </View>
 
-      {/* 右側：設定ボタン + ドロップダウンメニュー */}
-      <View style={[styles.topButtons, { zIndex: 1001 }, screenType === 'desktop' && { gap: 12 }]}>
-        <View style={{ position: 'relative' }}>
-          <TooltipButton
-            style={[styles.iconButton, {
-              width: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-              height: screenType === 'desktop' ? 48 : screenType === 'tablet' ? 42 : 36,
-              borderRadius: screenType === 'desktop' ? 24 : screenType === 'tablet' ? 21 : 18,
-              borderColor: colors.primary,
-              borderWidth: cpB ?? 1,
-            }]}
-            onPress={() => {
-              SoundManager.play('decide');
-              setShowMenu(!showMenu);
-            }}
-            label={t.appSettings}
-          >
-            <Settings size={screenType === 'desktop' ? 20 : screenType === 'tablet' ? 18 : 16} color={colors.primary} />
-          </TooltipButton>
-          {/* ドロップダウンメニュー */}
-          {showMenu && (
-            <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  SoundManager.play('decide');
-                  window.location.reload();
-                  setShowMenu(false);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <RefreshCw size={16} color={colors.text} />
-                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                    {locale === 'ja' ? '更新' : 'Reload'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  SoundManager.play('decide');
-                  navigateWithAnimation('/multi');
-                  setShowMenu(false);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Upload size={16} color={colors.text} />
-                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                    {locale === 'ja' ? 'マルチ共有' : 'Multi Share'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  SoundManager.play('decide');
-                  navigateWithAnimation('/sub');
-                  setShowMenu(false);
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Settings size={16} color={colors.text} />
-                  <Text style={[styles.dropdownItemText, { color: colors.text }]}>
-                    {locale === 'ja' ? '全般' : 'General'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
     </View>
   );
 };
@@ -1210,8 +1343,7 @@ const HomeScreen = React.memo(() => {
           
           {/* 試験カウントダウン */}
           {examCountdown && (
-            <TouchableOpacity
-              activeOpacity={0.7}
+            <PressableButton
               style={[styles.examCard, { 
                 backgroundColor: examCountdown.daysLeft <= 7 ? '#FFEBEE' : examCountdown.daysLeft <= 30 ? '#FFF3E0' : colors.primary + '15',
                 borderColor: colors.border,
@@ -1249,7 +1381,7 @@ const HomeScreen = React.memo(() => {
                 </Text>
               </View>
 
-            </TouchableOpacity>
+            </PressableButton>
           )}
 
           {/* Header */}
@@ -1276,13 +1408,13 @@ const HomeScreen = React.memo(() => {
             /* デスクトップ：2カラムレイアウト */
             <View style={mainContentStyle.desktop}>
               <View style={leftColumnStyle.desktop}>
-                {renderMainActions()}
-                {renderQuickActions()}
-                {renderStatsCard()}
+                {renderTransferSelector()}
+                {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
                 {renderWeakCard()}
               </View>
               <View style={rightColumnStyle.desktop}>
                 {renderDailyQuests()}
+                <TerminalLog ref={terminalLogRef} statusLine={statusText} initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]} />
                 {renderTodayQuestion()}
                 {renderAchievementBadges()}
               </View>
@@ -1290,13 +1422,13 @@ const HomeScreen = React.memo(() => {
           ) : (
             /* モバイル／タブレット：1カラムレイアウト */
             <View style={mainContentStyle[screenType]}>
-              {renderMainActions()}
-              {renderQuickActions()}
-              {renderStatsCard()}
+              {renderTransferSelector()}
+              {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
               {renderTodayQuestion()}
               {renderDailyQuests()}
               {renderWeakCard()}
               {renderAchievementBadges()}
+              <TerminalLog ref={terminalLogRef} statusLine={statusText} initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]} />
             </View>
           )}
 
@@ -1328,12 +1460,6 @@ const styles = StyleSheet.create({
   appSubtitle: {
     marginTop: 4,
   },
-  topButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    alignItems: 'center',
-  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1346,16 +1472,20 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
   },
   currencyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   currencyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
+    // ネオンシアンのグロー（iOS/Web。Android は boxShadow 非対応のため無視される）
+    boxShadow: '0px 0px 12px rgba(0,255,200,0.3)',
   },
   currencyText: {
     fontWeight: '700',
@@ -1376,18 +1506,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     minWidth: 70,
     textAlign: 'right',
-  },
-  iconButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontFamily: 'monospace',
   },
   languageText: {
     fontWeight: 'bold',
   },
   levelText: {
     fontWeight: '600',
+    fontFamily: 'monospace',
   },
   todayCard: {
     borderWidth: 1,
@@ -1483,6 +1609,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontWeight: 'bold',
     color: '#007AFF',
+    fontFamily: 'monospace',
   },
   statLabel: {
     color: '#666',
@@ -1533,6 +1660,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
+    fontFamily: 'monospace',
+    letterSpacing: 1,
   },
   emptyStateText: {
     fontSize: 14,
@@ -1545,10 +1674,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     borderRadius: 12,
   },
+  emptyStatsIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyStatsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  emptyStatsDesc: {
+    fontSize: 13,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+    lineHeight: 18,
+    opacity: 0.85,
+  },
   emptyStateButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontWeight: 'bold',
     fontSize: 15,
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
   },
   primaryButton: {
     borderRadius: 12,
@@ -1587,18 +1741,22 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     minWidth: '22%',
+    height: 40,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 0,
+    paddingHorizontal: 10,
     gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   actionLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
+    fontFamily: 'monospace',
+    letterSpacing: 0.3,
   },
   featureCard: {
     borderRadius: 12,
@@ -1637,27 +1795,6 @@ const styles = StyleSheet.create({
   statBlockLabel: {
     marginTop: 4,
   },
-  dropdownMenu: {
-    position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 8,
-    minWidth: 200,
-    borderRadius: 12,
-    borderWidth: 1,
-    zIndex: 999,
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    elevation: 5,
-  },
-  dropdownItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
   mainActionRow: {
     flexDirection: 'row',
     gap: 12,
@@ -1686,19 +1823,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 14,
     borderRadius: 28,
+    width: '88%',
+    alignSelf: 'center',
+    height: 80,
     paddingVertical: 28,
     paddingHorizontal: 24,
-    // 3D効果：フラット3D（光沢なし）
+    // 3D効果：フラット3D（光沢なし）＋サイバーグロー
     borderBottomWidth: 6,
     borderBottomColor: 'rgba(0,0,0,0.2)',
-    boxShadow: '0px 8px 24px rgba(0,0,0,0.2)',
-    elevation: 8,
+    boxShadow: '0px 10px 40px rgba(0,255,200,0.35)',
+    elevation: 12,
   },
   mainPlayText: {
-    color: '#fff',
+    color: '#000000',
     fontWeight: '800',
     fontSize: 24,
+    letterSpacing: 1,
+    fontFamily: 'monospace',
+  },
+  transferCard: {
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 20,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
+  },
+  transferHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+    marginBottom:  12,
+  },
+  transferTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  transferTab: {
+    flex: 1,
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: 4,
+  },
+  transferTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'monospace',
     letterSpacing: 0.5,
+  },
+  transferTabCaption: {
+    fontSize: 10,
+    fontFamily: 'monospace',
   },
   questCard: {
     padding: 16,
@@ -1723,13 +1904,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
-  questText: {
-    fontSize: 14,
-    flex: 1,
+  questTitleCol: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1.5,
+    fontFamily: 'monospace',
+    marginRight: 6,
   },
-  questCount: {
+  questRewardCol: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 2,
+    fontFamily: 'monospace',
+    marginRight: 6,
+    flexShrink: 1,
+  },
+  questStatusCol: {
     fontSize: 12,
     fontWeight: '500',
+    width: 80,
+    fontFamily: 'monospace',
+    textAlign: 'right',
+    flexShrink: 0,
   },
   questMoreBtn: {
     marginTop: 10,
@@ -1741,9 +1937,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  terminalLog: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    fontFamily: 'monospace',
+  },
+  terminalLogTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  terminalLogLine: {
+    fontSize:  11,
+    fontFamily: 'monospace',
+    lineHeight: 18,
+  },
   dailyGoalLabel: {
     fontWeight: '600',
     minWidth: 90,
+    fontFamily: 'monospace',
   },
   dailyGoalBar: {
     height: 8,

@@ -5,7 +5,7 @@ import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { SoundManager } from './sound';
-import { PenSquare, ScanText, FolderOpen, Clock } from 'lucide-react';
+import { PenSquare, FolderOpen, Clock } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -54,7 +54,7 @@ export default function CreateHubScreen() {
       id: 'create',
       icon: <PenSquare size={24} color={colors.primary} />,
       title: locale === 'ja' ? '問題を作成' : 'Create Question',
-      description: locale === 'ja' ? '手動またはOCRで作成' : 'Create manually or via OCR',
+      description: locale === 'ja' ? '手動で作成' : 'Create manually',
       onPress: () => setShowCreateOptions(true),
     },
     {
@@ -132,16 +132,6 @@ export default function CreateHubScreen() {
               <PenSquare size={20} color={colors.primary} />
               <Text style={[styles.modalOptionText, { color: colors.text }]}>
                 {locale === 'ja' ? 'ゼロから手動で作成' : 'Create manually'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalOption, { borderColor: colors.border, backgroundColor: colors.background }]}
-              onPress={() => { SoundManager.play('decide'); setShowCreateOptions(false); navigate('/create/ocr'); }}
-              activeOpacity={0.7}
-            >
-              <ScanText size={20} color={colors.primary} />
-              <Text style={[styles.modalOptionText, { color: colors.text }]}>
-                {locale === 'ja' ? '画像から一括生成（OCR）' : 'Generate from image (OCR)'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Alert, Image } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
@@ -10,7 +10,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
-import { BookOpen, Music, Coins, Repeat } from 'lucide-react';
+import { Music, Repeat, ShoppingBag, Check, Crown, Palette } from 'lucide-react';
+import { IMAGES } from './constants/images';
+import { SHOP_ITEMS as GENERAL_SHOP_ITEMS, ShopItem as GeneralShopItem, loadPurchasedIds, savePurchasedIds } from './shopItems';
 
 export default function ShopScreen() {
   const navigate = useNavigate();
@@ -22,11 +24,77 @@ export default function ShopScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [message, setMessage] = useState('');
+  /* UI強化: コイン通貨対応の一般ショップ */
+  const [coins, setCoins] = useState(0);
+  const [purchasedIds, setPurchasedIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadStats().then(setStats);
     loadPurchases().then(setPurchases);
+    AsyncStorage.getItem('user_coins').then(v => setCoins(parseInt(v || '0', 10)));
+    loadPurchasedIds().then(setPurchasedIds);
   }, []);
+
+  // 一般アイテム（コイン/本両対応）の購入
+  const purchaseGeneralItem = async (item: GeneralShopItem) => {
+    if (purchasedIds.includes(item.id)) return;
+
+    if (item.currency === 'coins') {
+      if (coins < item.price) {
+        Alert.alert(
+          locale === 'ja' ? 'コイン不足' : 'Insufficient Coins',
+          locale === 'ja' ? `このアイテムには${item.price}コイン必要です` : `This item costs ${item.price} coins`
+        );
+        SoundManager.play('wrong' as any);
+        return;
+      }
+      const newCoins = coins - item.price;
+      await AsyncStorage.setItem('user_coins', newCoins.toString());
+      setCoins(newCoins);
+    } else {
+      const currentBooks = stats?.totalBooks ?? 0;
+      if (currentBooks < item.price) {
+        Alert.alert(
+          locale === 'ja' ? '本不足' : 'Insufficient Books',
+          locale === 'ja' ? `このアイテムには${item.price}冊の本が必要です` : `This item costs ${item.price} books`
+        );
+        SoundManager.play('wrong' as any);
+        return;
+      }
+      const updatedStats = await loadStats();
+      updatedStats.totalBooks = Math.max(0, updatedStats.totalBooks - item.price);
+      await saveStats(updatedStats);
+      setStats(updatedStats);
+    }
+
+    // コインブースター系（type: 'item' かつコイン通貨）はコインを還元
+    let bonusMessage = '';
+    if (item.id === 's3') {
+      const bonus = 50;
+      const boosted = (await AsyncStorage.getItem('user_coins')) || '0';
+      const total = parseInt(boosted, 10) + bonus;
+      await AsyncStorage.setItem('user_coins', total.toString());
+      setCoins(total);
+      bonusMessage = locale === 'ja' ? `（コイン+${bonus}）` : `(coins +${bonus})`;
+    }
+    if (item.id === 's4') {
+      const updatedStats = await loadStats();
+      updatedStats.totalBooks += 1;
+      await saveStats(updatedStats);
+      setStats(updatedStats);
+      bonusMessage = locale === 'ja' ? '（本+1）' : '(books +1)';
+    }
+
+    const nextIds = [...purchasedIds, item.id];
+    await savePurchasedIds(nextIds);
+    setPurchasedIds(nextIds);
+
+    SoundManager.play('complete');
+    Alert.alert(
+      locale === 'ja' ? '購入完了！' : 'Purchase Complete!',
+      `${item.name}${bonusMessage ? ' ' + bonusMessage : ''}`
+    );
+  };
 
   const showMessage = (msg: string) => {
     setMessage(msg);
@@ -65,18 +133,25 @@ export default function ShopScreen() {
           {t.shopTitle}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {coins > 0 && (
+            <View style={[styles.booksBadge, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[styles.booksText, { color: colors.primary, fontSize: fs(15) }]}>
+                <Image source={IMAGES.coin} style={{ width: 18, height: 18, resizeMode: 'contain', marginRight: 4 }} />{coins}
+              </Text>
+            </View>
+          )}
           {stats && (
             <View style={[styles.booksBadge, { backgroundColor: colors.primary + '20' }]}>
               <Text style={[styles.booksText, { color: colors.primary, fontSize: fs(15) }]}>
-                <BookOpen size={18} color={colors.primary} style={{ marginRight: 4 }} />{stats.totalBooks}
+                <Image source={IMAGES.book} style={{ width: 18, height: 18, resizeMode: 'contain', marginRight: 4 }} />{stats.totalBooks}
               </Text>
             </View>
           )}
           <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+            style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
             onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
           >
-            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -89,6 +164,83 @@ export default function ShopScreen() {
       ) : null}
 
       <ScrollView style={styles.list}>
+        {/* ===== 一般アイテム（コイン/本） ===== */}
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: fs(16) }]}>
+          {locale === 'ja' ? 'アイテムショップ' : 'Item Shop'}
+        </Text>
+        {GENERAL_SHOP_ITEMS.map((item) => {
+          const isPurchased = purchasedIds.includes(item.id);
+          const isCoinIcon = item.icon === 'Coins';
+          const isBookIcon = item.icon === 'BookOpen';
+          const IconComp =
+            item.icon === 'Palette' ? Palette :
+            item.icon === 'Crown' ? Crown : ShoppingBag;
+          return (
+            <View key={item.id} style={[styles.generalCard, { backgroundColor: colors.card, borderColor: isPurchased ? colors.success : colors.border }]}>
+              <View style={styles.generalTop}>
+                <View style={[styles.generalIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                  {isCoinIcon ? (
+                    <Image source={IMAGES.coin} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
+                  ) : isBookIcon ? (
+                    <Image source={IMAGES.book} style={{ width: 24, height: 24, resizeMode: 'contain' }} />
+                  ) : (
+                    <IconComp size={24} color={colors.primary} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.itemTitle, { color: colors.text, fontSize: fs(15) }]}>{item.name}</Text>
+                    {isPurchased && (
+                      <View style={[styles.purchasedBadge, { backgroundColor: colors.success }]}>
+                        <Check size={12} color="#fff" />
+                        <Text style={styles.purchasedBadgeText}>
+                          {locale === 'ja' ? '購入済み' : 'Owned'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.itemDesc, { color: colors.textSecondary, fontSize: fs(12) }]}>{item.description}</Text>
+                </View>
+              </View>
+              <View style={styles.generalFooter}>
+                <Text style={[styles.itemPrice, { color: item.currency === 'coins' ? colors.primary : colors.success, fontSize: fs(14), fontWeight: 'bold' }]}>
+                  {item.currency === 'coins' ? (
+                    <>
+                      <Image source={IMAGES.coin} style={{ width: 16, height: 16, resizeMode: 'contain', marginRight: 4 }} />{item.price}
+                    </>
+                  ) : (
+                    <>
+                      <Image source={IMAGES.book} style={{ width: 16, height: 16, resizeMode: 'contain', marginRight: 4 }} />{item.price}{locale === 'ja' ? '冊' : ''}
+                    </>
+                  )}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.buyButton,
+                    {
+                      backgroundColor: isPurchased
+                        ? colors.border
+                        : (coins >= item.price || (stats?.totalBooks ?? 0) >= item.price)
+                          ? colors.primary
+                          : colors.border,
+                    },
+                  ]}
+                  onPress={() => purchaseGeneralItem(item)}
+                  disabled={isPurchased}
+                >
+                  <Text style={[styles.buyButtonText, { color: isPurchased ? colors.textSecondary : onPrimary, fontSize: fs(13) }]}>
+                    {isPurchased ? (locale === 'ja' ? '購入済み' : 'Purchased') : (locale === 'ja' ? '購入' : 'Buy')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+
+        {/* ===== スペシャル（既存: 本専用機能） ===== */}
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: fs(16), marginTop: 20 }]}>
+          {t.shopTitle}
+        </Text>
         {/* Current status */}
         <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.statusTitle, { color: colors.text, fontSize: fs(14) }]}>
@@ -134,7 +286,7 @@ export default function ShopScreen() {
                 </View>
                 <View style={[styles.costBadge, { backgroundColor: colors.primary + '15' }]}>
                   <Text style={[styles.costText, { color: colors.primary, fontSize: fs(14) }]}>
-                    <BookOpen size={16} color={colors.primary} style={{ marginRight: 4 }} />{item.cost}
+                    <Image source={IMAGES.book} style={{ width: 16, height: 16, resizeMode: 'contain', marginRight: 4 }} />{item.cost}
                   </Text>
                 </View>
               </View>
@@ -186,7 +338,7 @@ export default function ShopScreen() {
           <View style={[styles.exchangeRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.statusTitle, { color: colors.text, fontSize: fs(14) }]}>
-                <BookOpen size={16} color={colors.text} style={{ marginRight: 4 }} />{locale === 'ja' ? '本1冊' : '1 Book'}
+                <Image source={IMAGES.book} style={{ width: 16, height: 16, resizeMode: 'contain', marginRight: 4 }} />{locale === 'ja' ? '本1冊' : '1 Book'}
               </Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary, fontSize: fs(12) }]}>
                 {locale === 'ja' ? '問題スロット +5問' : '+5 Question Slots'}
@@ -194,7 +346,7 @@ export default function ShopScreen() {
             </View>
             <View style={[styles.costBadge, { backgroundColor: colors.primary + '15', marginRight: 12 }]}>
               <Text style={[styles.costText, { color: colors.primary, fontSize: fs(14) }]}>
-                <Coins size={16} color={colors.primary} style={{ marginRight: 4 }} />1,000 {locale === 'ja' ? 'コイン' : 'Coins'}
+                <Image source={IMAGES.coin} style={{ width: 16, height: 16, resizeMode: 'contain', marginRight: 4 }} />1,000 {locale === 'ja' ? 'コイン' : 'Coins'}
               </Text>
             </View>
             <TouchableOpacity
@@ -349,5 +501,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  /* === UI強化: 一般アイテムショップ === */
+  sectionTitle: { fontWeight: 'bold', marginBottom: 12 },
+  generalCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+  },
+  generalTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  generalIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  purchasedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  purchasedBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  itemPrice: {},
+  generalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
   },
 });

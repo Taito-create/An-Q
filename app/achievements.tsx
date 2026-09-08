@@ -155,24 +155,23 @@ export default function AchievementsScreen() {
           {
             backgroundColor: colors.card,
             borderBottomColor: colors.border,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           },
         ]}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            SoundManager.play('decide');
-            navigate('/sub');
-          }}
-        >
-          <Text style={[styles.backButtonText, { color: colors.primary }]}>
-            {t.back}
-          </Text>
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {t.achievements}
         </Text>
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Progress Summary */}

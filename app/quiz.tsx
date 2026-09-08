@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
+import PressableButton from './components/PressableButton';
 import { incrementStat, recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -65,7 +66,7 @@ const getAnswerModalFontSize = (answer: string, screenWidth: number) => {
 // ──────────────────────────────────────────────
 export default function QuizScreen() {
   const navigate = useNavigate();
-  const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
+  const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
     const { questions: allQuestionsFromHook, folders, loading: questionsLoading } = useQuestionsContext();
@@ -87,6 +88,8 @@ export default function QuizScreen() {
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showReview, setShowReview] = useState(false);
   const [mistakeCount, setMistakeCount] = useState(0);
+  /* UI強化: 選択肢カードの正誤ハイライト用に、ユーザーが選んだ選択肢を追跡する */
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(() => questionsLoading || allQuestionsFromHook.length === 0);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
   const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);
@@ -141,6 +144,11 @@ export default function QuizScreen() {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
+  // UI強化: 問題が切り替わったら選択状態をリセット（選択肢の正誤ハイライト用）
+  useEffect(() => {
+    setSelectedOptionIndex(null);
+  }, [currentIndex]);
+
   // 長押し用 ref
   const stepIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -180,6 +188,9 @@ export default function QuizScreen() {
   // フィードバックアニメ
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // UI強化: 問題切り替え時のトランジションアニメーション
+  const questionFadeAnim = useRef(new Animated.Value(1)).current;
+
   // ○×ボタンのバネアニメーション
   const trueBtnAnim = useRef(new Animated.Value(0)).current;
   const falseBtnAnim = useRef(new Animated.Value(0)).current;
@@ -192,6 +203,16 @@ export default function QuizScreen() {
       useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
+
+  // UI強化: 問題が切り替わったらフェード＋スライドのトランジションを再生
+  useEffect(() => {
+    questionFadeAnim.setValue(0);
+    Animated.timing(questionFadeAnim, {
+      toValue: 1,
+      duration: 320,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [currentIndex, questionFadeAnim]);
 
   // ──────────────────────────────────────────────
   // 初期ロード
@@ -1034,24 +1055,24 @@ export default function QuizScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            <ClipboardList size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'クイズ設定' : 'Quiz Settings'}
+          <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+            <ClipboardList size={24} color={colors.primary} style={{ marginRight: 8 }} />$ SELECT QUIZ CONFIG
           </Text>
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          <PressableButton
+            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: br, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
             onPress={() => { SoundManager.play('decide'); navigate('/'); }}
           >
             <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-          </TouchableOpacity>
+          </PressableButton>
         </View>
 
         <ScrollView contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
-            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 16 }]}>
-              {locale === 'ja' ? '問題数' : 'Number of Questions'}
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
+            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 16 }]}>
+              TRANSFER COUNT
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
-              <TouchableOpacity
+              <PressableButton
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => setPreQuestionCount(prev => Math.max(1, prev - 1))}
                 onLongPress={() => startLongPress('dec', filtered.length)}
@@ -1059,11 +1080,11 @@ export default function QuizScreen() {
                 delayLongPress={500}
               >
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
-              </TouchableOpacity>
+              </PressableButton>
               <Text style={[{ fontSize: 48, fontWeight: '700', color: colors.primary, minWidth: 80, textAlign: 'center' }]}>
                 {preQuestionCount}
               </Text>
-              <TouchableOpacity
+              <PressableButton
                 style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => {
                   const maxCount = filtered.length;
@@ -1074,7 +1095,7 @@ export default function QuizScreen() {
                 delayLongPress={500}
               >
                 <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
-              </TouchableOpacity>
+              </PressableButton>
             </View>
             <View style={{ marginBottom: 12 }}>
               <input
@@ -1102,7 +1123,7 @@ export default function QuizScreen() {
           </View>
 
           {folders.length > 0 && (
-            <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+            <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
               <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
                 <Folder size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
               </Text>
@@ -1111,7 +1132,7 @@ export default function QuizScreen() {
                   {folders.map(folder => {
                     const isSelected = selectedFolderIds.includes(folder.id);
                     return (
-                      <TouchableOpacity
+                      <PressableButton
                         key={folder.id}
                         style={[{
                           paddingHorizontal: 14,
@@ -1137,7 +1158,7 @@ export default function QuizScreen() {
                         }]}>
                           {folder.name}
                         </Text>
-                      </TouchableOpacity>
+                      </PressableButton>
                     );
                   })}
                 </View>
@@ -1152,17 +1173,17 @@ export default function QuizScreen() {
             </View>
           )}
 
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: 16 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  <RefreshCw size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? 'リバースモード' : 'Reverse Mode'}
+                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+                  <RefreshCw size={20} color={colors.primary} style={{ marginRight: 6 }} />REVERSE SYNAPSE
                 </Text>
                 <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja' ? '回答を問題文として表示し、問題文を答えます' : 'Show the answer as the question, and answer the original question'}
                 </Text>
               </View>
-              <TouchableOpacity
+              <PressableButton
                 style={[{
                   width: 56, height: 30, borderRadius: 15,
                   backgroundColor: isReverseMode ? colors.primary : colors.border,
@@ -1175,11 +1196,11 @@ export default function QuizScreen() {
                   width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff',
                   alignSelf: isReverseMode ? 'flex-end' : 'flex-start',
                 }]} />
-              </TouchableOpacity>
+              </PressableButton>
             </View>
           </View>
 
-          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 }]}>
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: autoPlayMode ? 16 : 0 }}>
               <View style={{ flex: 1, marginRight: 16 }}>
                 <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
@@ -1191,7 +1212,7 @@ export default function QuizScreen() {
                     : 'Automatically switches between question and answer'}
                 </Text>
               </View>
-              <TouchableOpacity
+              <PressableButton
                 style={[{
                   width: 56, height: 30, borderRadius: 15,
                   backgroundColor: autoPlayMode ? colors.primary : colors.border,
@@ -1204,7 +1225,7 @@ export default function QuizScreen() {
                   width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff',
                   alignSelf: autoPlayMode ? 'flex-end' : 'flex-start',
                 }]} />
-              </TouchableOpacity>
+              </PressableButton>
             </View>
             {autoPlayMode && (
               <View>
@@ -1226,7 +1247,7 @@ export default function QuizScreen() {
                     </Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {(['standard', 'yukkuri', 'slow', 'energetic', 'calm', 'deep'] as VoicePreset[]).map((preset) => (
-                        <TouchableOpacity
+                        <PressableButton
                           key={preset}
                           style={{
                             backgroundColor: voicePreset === preset ? colors.primary : colors.background,
@@ -1245,7 +1266,7 @@ export default function QuizScreen() {
                           }}>
                             {voicePresetLabels[preset]}
                           </Text>
-                        </TouchableOpacity>
+                        </PressableButton>
                       ))}
                     </View>
                   </View>
@@ -1261,14 +1282,14 @@ export default function QuizScreen() {
             </Text>
           )}
 
-          <TouchableOpacity
+          <PressableButton
             style={[styles.startButton, { backgroundColor: colors.primary }]}
             onPress={() => startQuiz()}
           >
-            <Text style={[styles.startButtonText, { color: onPrimary }]}>
-              {locale === 'ja' ? 'クイズを開始' : 'Start Quiz'}
+            <Text style={[styles.startButtonText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]}>
+              ▶ EXECUTE TRANSFER
             </Text>
-          </TouchableOpacity>
+          </PressableButton>
         </ScrollView>
       </View>
     );
@@ -1280,7 +1301,7 @@ export default function QuizScreen() {
       <ScrollView style={[styles.quizContainer, { backgroundColor: colors.background }]} contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
         <View style={styles.reviewHeader}>
           <Text style={styles.reviewTitle}>{t.review}</Text>
-          <TouchableOpacity 
+          <PressableButton 
             style={[styles.backButtonFull, { backgroundColor: colors.primary }]}
             onPress={() => {
               SoundManager.play('decide');
@@ -1288,7 +1309,7 @@ export default function QuizScreen() {
             }}
           >
             <Text style={[styles.backButtonFullText, { color: onPrimary }]}>{t.backToHome}</Text>
-          </TouchableOpacity>
+          </PressableButton>
         </View>
         
         <View style={styles.reviewList}>
@@ -1330,8 +1351,8 @@ export default function QuizScreen() {
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {!autoPlayMode && (
         <View style={styles.topBar}>
-          <Text style={[styles.timer, { color: timerColor }]}>
-            {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
+          <Text style={[styles.timer, { color: timerColor, fontFamily: 'monospace', letterSpacing: 1 }]}>
+            TIMER: {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
           </Text>
           
           <Pressable
@@ -1377,8 +1398,22 @@ export default function QuizScreen() {
         </View>
       )}
 
-      <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-        <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
+      <View style={styles.progressArea}>
+        <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+          <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
+        </View>
+        {!autoPlayMode && (
+          <View style={styles.progressMetaRow}>
+            <Text style={[styles.progressMetaText, { color: colors.textSecondary }]}>
+              {locale === 'ja'
+                ? `残り ${shuffledQuestions.length - currentIndex} 問`
+                : `${shuffledQuestions.length - currentIndex} remaining`}
+            </Text>
+            <Text style={[styles.progressMetaText, { color: colors.textSecondary }]}>
+              {progressPercent}%
+            </Text>
+          </View>
+        )}
       </View>
 
       {autoPlayMode && (
@@ -1430,7 +1465,12 @@ export default function QuizScreen() {
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
       >
-        <View style={[{ backgroundColor: colors.primary + '15', borderColor: colors.border, borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1 }]}>
+        <Animated.View
+          style={[
+            { backgroundColor: colors.primary + '15', borderColor: colors.border, borderRadius: 20, padding: 22, marginBottom: 18, minHeight: 160, justifyContent: 'center', borderWidth: 1 },
+            { opacity: questionFadeAnim, transform: [{ translateY: questionFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] },
+          ]}
+        >
           {(currentQuestion.topic || !autoPlayMode) && (
             <View style={styles.questionHeaderRow}>
               {currentQuestion.topic ? (
@@ -1439,13 +1479,24 @@ export default function QuizScreen() {
               {!autoPlayMode && (
                 <View style={styles.questionCounterBadge}>
                   <Text style={[styles.questionCounterText, { color: colors.primary }]}>
-                    {currentIndex + 1} / {shuffledQuestions.length}
+                    {currentIndex + 1} / {shuffledQuestions.length}{locale === 'ja' ? '問' : ''}
                   </Text>
                 </View>
               )}
             </View>
           )}
-          
+
+          {/* UI強化: タグ・カテゴリのチップ表示 */}
+          {currentQuestion.tags && currentQuestion.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {currentQuestion.tags.slice(0, 5).map((tag, ti) => (
+                <Text key={ti} style={[styles.tagPill, { color: colors.primary, backgroundColor: colors.primary + '18', borderColor: colors.primary + '33' }]}>
+                  {tag}
+                </Text>
+              ))}
+            </View>
+          )}
+
           {currentQuestion.image && (
             <View style={[{ position: 'relative', backgroundColor: '#f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }]}>
               <img
@@ -1514,7 +1565,8 @@ export default function QuizScreen() {
               />
             </View>
           )}
-        </View>
+
+        </Animated.View>
 
         {!autoPlayMode && (
           <View style={styles.answerRow}>
@@ -1569,17 +1621,48 @@ export default function QuizScreen() {
 
             {currentQuestion.answerType === 'multiple' && (
               <View style={styles.multipleContainer}>
-                {currentQuestion.multipleChoice?.options.map((option, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.multipleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={() => handleAnswer(i)}
-                    disabled={answered || isPaused}
-                  >
-                    <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}⃣</Text>
-                    <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
-                  </TouchableOpacity>
-                ))}
+                {(() => {
+                  const correctIndex = currentQuestion.multipleChoice?.correctAnswer ?? 0;
+                  return currentQuestion.multipleChoice?.options.map((option, i) => {
+                    const isSelected = selectedOptionIndex === i;
+                    const isCorrectOption = answered && i === correctIndex;
+                    const isWrongSelection = answered && isSelected && i !== correctIndex;
+                    return (
+                      <PressableButton
+                        key={i}
+                        style={[
+                          styles.multipleBtn,
+                          {
+                            backgroundColor: answered
+                              ? (isCorrectOption
+                                ? colors.success + '22'
+                                : isWrongSelection
+                                  ? colors.error + '22'
+                                  : colors.card)
+                              : (isSelected ? colors.primary + '18' : colors.card),
+                            borderColor: answered
+                              ? (isCorrectOption
+                                ? colors.success
+                                : isWrongSelection
+                                  ? colors.error
+                                  : colors.border)
+                              : (isSelected ? colors.primary : colors.border),
+                            borderWidth: (isCorrectOption || isWrongSelection || isSelected) ? 2 : 1,
+                            transform: [{ scale: isSelected && !answered ? 0.98 : 1 }],
+                          },
+                        ]}
+                        onPress={() => {
+                          setSelectedOptionIndex(i);
+                          handleAnswer(i);
+                        }}
+                        disabled={answered || isPaused}
+                      >
+                        <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}</Text>
+                        <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
+                      </PressableButton>
+                    );
+                  });
+                })()}
               </View>
             )}
 
@@ -1619,7 +1702,7 @@ export default function QuizScreen() {
                         returnKeyType={index === correctKeywords.length - 1 ? 'go' : 'next'}
                       />
                     ))}
-                    <TouchableOpacity
+                    <PressableButton
                       style={[styles.descriptiveBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
                       onPress={() => {
                         const fullAnswer = userDescriptiveAnswers.join(' ');
@@ -1630,7 +1713,7 @@ export default function QuizScreen() {
                       <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>
                         {userDescriptiveAnswers.some(a => a && a.trim()) ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableButton>
                   </View>
                 ) : (
                   <View style={{ width: '100%' }}>
@@ -1654,13 +1737,13 @@ export default function QuizScreen() {
                       blurOnSubmit={true}
                       returnKeyType="done"
                     />
-                      <TouchableOpacity
+                      <PressableButton
                         style={[styles.descriptiveBtn, { backgroundColor: colors.primary }]}
                         onPress={() => handleAnswer(userDescriptiveAnswer)}
                         disabled={answered || isPaused}
                       >
                         <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>{userDescriptiveAnswer.trim() ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}</Text>
-                      </TouchableOpacity>
+                      </PressableButton>
                   </View>
                 )}
               </View>
@@ -1670,7 +1753,7 @@ export default function QuizScreen() {
 
         {autoPlayMode && (
           <View style={{ alignItems: 'center', marginTop: 32 }}>
-            <TouchableOpacity
+            <PressableButton
               style={[{ backgroundColor: colors.error, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 30 }]}
               onPress={() => {
                 stopAutoPlay();
@@ -1680,7 +1763,7 @@ export default function QuizScreen() {
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
                 {locale === 'ja' ? '自動再生を終了' : 'Stop Auto Play'}
               </Text>
-            </TouchableOpacity>
+            </PressableButton>
           </View>
         )}
 
@@ -1695,7 +1778,7 @@ export default function QuizScreen() {
             <Text style={styles.pausedSubText}>
               {locale === 'ja' ? '再開ボタンを押して続ける' : 'Press resume to continue'}
             </Text>
-            <TouchableOpacity
+            <PressableButton
               style={[styles.pauseBtn, { backgroundColor: colors.primary, marginTop: 24, paddingHorizontal: 32, paddingVertical: 14 }]}
               onPress={() => {
                 SoundManager.play('decide');
@@ -1706,7 +1789,7 @@ export default function QuizScreen() {
               <Text style={[styles.pauseBtnText, { color: '#fff', fontWeight: 'bold', fontSize: 16 }]}>
                 {locale === 'ja' ? '再開' : 'Resume'}
               </Text>
-            </TouchableOpacity>
+            </PressableButton>
           </View>
         </View>
       </Modal>
@@ -1723,7 +1806,7 @@ export default function QuizScreen() {
                 : 'Your progress will be lost. Are you sure?'}
             </Text>
             <View style={styles.confirmModalButtons}>
-              <TouchableOpacity 
+              <PressableButton 
                 style={[styles.confirmModalCancel, { borderColor: colors.border }]}
                 onPress={() => {
                   setShowConfirmModal(false);
@@ -1733,8 +1816,8 @@ export default function QuizScreen() {
                 <Text style={[styles.confirmModalCancelText, { color: colors.textSecondary }]}>
                   {locale === 'ja' ? '続ける' : 'Continue'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
+              </PressableButton>
+              <PressableButton 
                 style={[styles.confirmModalConfirm, { backgroundColor: colors.error }]}
                 onPress={() => {
                   stopAutoPlay();
@@ -1746,7 +1829,7 @@ export default function QuizScreen() {
                 <Text style={styles.confirmModalConfirmText}>
                   {locale === 'ja' ? '中断する' : 'Quit'}
                 </Text>
-              </TouchableOpacity>
+              </PressableButton>
             </View>
           </View>
         </View>
@@ -2175,5 +2258,35 @@ const styles = StyleSheet.create({
   lottieAnimation: {
     width: 300,
     height: 300,
+  },
+  /* === UI強化: 進捗ラベル・タグチップ === */
+  progressArea: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  progressMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  progressMetaText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  tagPill: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
   },
 });

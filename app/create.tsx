@@ -15,6 +15,7 @@ import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useTheme } from './theme';
+import PressableButton from './components/PressableButton';
 import { loadStats, incrementStat } from './missions';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
@@ -22,7 +23,7 @@ import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
-import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText, ClipboardList, ChevronLeft } from 'lucide-react';
+import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText } from 'lucide-react';
 import './create.css';
 
 export default function CreateQuestionScreen() {
@@ -30,13 +31,12 @@ export default function CreateQuestionScreen() {
   const location = useLocation();
   // /create/ocr ルートでは OCR（画像から一括生成）モードで表示する
   const isOcrRoute = location.pathname.startsWith('/create/ocr');
-  const { colors, onPrimary, isCyberpunk, currentTheme } = useTheme();
+  const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
   const { questions, saveQuestions, applyQuestionsChange, removeTagFromAllQuestions, tagMasterList, addTag, removeTag } = useQuestionsContext();
   const { user } = useAuth();
-  const cpR: number | undefined = undefined;
-  const cpB: number | undefined = undefined;
+  // 角丸は theme の共通トークン br=4 に統一（P2-9）
 
   useEffect(() => {
     SoundManager.initialize();
@@ -823,30 +823,24 @@ export default function CreateQuestionScreen() {
 
       {/* OCRルート用バナー：画像からの一括生成を開始（ファイル選択はユーザー操作で発火） */}
       {isOcrRoute && (
-        <TouchableOpacity
+        <PressableButton
+          title="画像から文字を抽出"
           style={{ marginBottom: 16, padding: 14, backgroundColor: colors.primary + '18', borderColor: colors.primary, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}
           onPress={() => handleOcrExtract({ type: 'question' })}
         >
           <ScanText size={22} color={colors.primary} />
           <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
-            {locale === 'ja' ? '画像から問題を一括生成（OCR）' : 'Generate questions from image (OCR)'}
+            SCAN NODE
           </Text>
-        </TouchableOpacity>
+        </PressableButton>
       )}
 
-      <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0 }]}>
-        <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 4 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
-        >
-          <ChevronLeft size={20} color={colors.text} />
-          <Text style={{ color: colors.text, fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? '問題作成' : 'Create Question'}
+      <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+          <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />$ ENCODE MEMORY DATA
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
+          <PressableButton
             style={[styles.addTagHeaderBtn, { 
               backgroundColor: isTagDeleteMode ? colors.error : colors.primary,
               borderRadius: 8, 
@@ -875,30 +869,32 @@ export default function CreateQuestionScreen() {
             }]}>
               {isTagDeleteMode ? ' キャンセル' : '− タグ'}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </PressableButton>
+          <PressableButton
             style={[styles.addTagHeaderBtn, { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }]}
             onPress={() => setShowAddTagModal(true)}
           >
             <Text style={[styles.addTagHeaderBtnText, { color: onPrimary, fontWeight: 'bold', fontSize: 13 }]}>
               ＋ タグ
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary + '30', borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-            onPress={() => { SoundManager.play('decide'); navigate('/browse'); }}
-          >
-            <ClipboardList size={16} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>
-              {locale === 'ja' ? '管理' : 'Manage'}
-            </Text>
-          </TouchableOpacity>
+          </PressableButton>
         </View>
+        <PressableButton
+          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
+        </PressableButton>
       </View>
 
       {/* タグセクション - 横スクロール表示 */}
       {tagMasterList.length > 0 && (
         <View style={[styles.tagSection, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 }]}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 6 }} numberOfLines={1}>
+            NODE LABELS:
+          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
               {tagMasterList.map((tag) => {
@@ -906,7 +902,7 @@ export default function CreateQuestionScreen() {
                 const isDeleteMode = isTagDeleteMode;
                 
                 return (
-                  <TouchableOpacity
+                  <PressableButton
                     key={tag}
                     style={[
                       styles.tagChip,
@@ -953,7 +949,7 @@ export default function CreateQuestionScreen() {
                       {!isDeleteMode && tagLockMode[tag] ? ' ' : ''}
                       {isSelected && !isDeleteMode && !tagLockMode[tag] ? ' ' : ''}{tag}
                     </Text>
-                  </TouchableOpacity>
+                  </PressableButton>
                 );
               })}
             </View>
@@ -967,31 +963,31 @@ export default function CreateQuestionScreen() {
       )}
 
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{locale === 'ja' ? '回答形式' : 'Answer Type'}</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>ANSWER TYPE:</Text>
         <View style={styles.answerTypeContainer}>
           {[{ id: 'descriptive', label: t.descriptive }, { id: 'truefalse', label: t.truefalse }, { id: 'multiple', label: t.multiple }].map((type) => (
-            <TouchableOpacity key={type.id} style={[styles.answerTypeButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, answerType === type.id && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('select'); setAnswerType(type.id as any); }}>
+            <PressableButton key={type.id} style={[styles.answerTypeButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, answerType === type.id && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('select'); setAnswerType(type.id as any); }}>
               <Text style={[styles.answerTypeText, { color: colors.textSecondary }, answerType === type.id && { color: onPrimary }]}>{type.label}</Text>
-            </TouchableOpacity>
+            </PressableButton>
           ))}
         </View>
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 15 }]}>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
           {!showCropUI && (
-            <TouchableOpacity
+            <PressableButton
               style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, padding: 10 }]}
               onPress={() => handleOcrExtract({ type: 'question' })}
               disabled={ocrLoading}
             >
               <ScanText size={20} color={onPrimary} />
-            </TouchableOpacity>
+            </PressableButton>
           )}
         </View>
-        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5 }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
 
         {/* 読み仮名入力（任意） */}
         <View style={{ marginTop: 8, marginBottom: 12 }}>
@@ -1018,7 +1014,7 @@ export default function CreateQuestionScreen() {
 
         {/* クロップUI */}
         {showCropUI && selectedImage && (
-          <View style={[styles.cropContainer, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: cpR ?? 12, padding: 16, marginBottom: 16 }]}>
+          <View style={[styles.cropContainer, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br, padding: 16, marginBottom: 16 }]}>
             <Text style={[styles.cropTitle, { color: colors.text, marginBottom: 12 }]}>
               {locale === 'ja' ? '抽出したい範囲をドラッグで選択してください' : 'Drag to select the area to extract'}
             </Text>
@@ -1052,23 +1048,23 @@ export default function CreateQuestionScreen() {
               )}
             </div>
             <View style={[styles.cropButtons, { marginTop: 12 }]}>
-              <TouchableOpacity
-                style={[styles.cropButton, { backgroundColor: colors.primary, borderRadius: cpR ?? 8, marginRight: 8 }]}
+              <PressableButton
+                style={[styles.cropButton, { backgroundColor: colors.primary, borderRadius: br, marginRight: 8 }]}
                 onPress={() => handleOcrExtract(ocrTarget)}
                 disabled={ocrLoading || cropArea.width < 10 || cropArea.height < 10}
               >
                 <Text style={[styles.cropButtonText, { color: onPrimary }]}>
                   {locale === 'ja' ? 'この範囲で文字抽出' : 'Extract Text'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.cropButton, { backgroundColor: colors.error, borderRadius: cpR ?? 8 }]}
+              </PressableButton>
+              <PressableButton
+                style={[styles.cropButton, { backgroundColor: colors.error, borderRadius: br }]}
                 onPress={cancelCrop}
               >
                 <Text style={[styles.cropButtonText, { color: '#fff' }]}>
                   {locale === 'ja' ? 'キャンセル' : 'Cancel'}
                 </Text>
-              </TouchableOpacity>
+              </PressableButton>
             </View>
           </View>
         )}
@@ -1094,16 +1090,16 @@ export default function CreateQuestionScreen() {
                         {locale === 'ja' ? `正解 ${groupIndex + 1}` : `Answer ${groupIndex + 1}`}
                       </Text>
                     </View>
-                    <TouchableOpacity
+                    <PressableButton
                       style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8 }]}
                       onPress={() => handleOcrExtract({ type: 'answer', groupIndex, answerIndex: 0 })}
                       disabled={ocrLoading}
                     >
                       <Camera size={16} color={onPrimary} />
-                    </TouchableOpacity>
+                    </PressableButton>
                   </View>
                   {answerGroups.length > 1 && groupIndex > 0 && (
-                    <TouchableOpacity
+                    <PressableButton
                       style={{ padding: 6, borderRadius: 20, backgroundColor: colors.error + '20' }}
                       onPress={() => {
                         const newGroups = answerGroups.filter((_, i) => i !== groupIndex);
@@ -1111,7 +1107,7 @@ export default function CreateQuestionScreen() {
                       }}
                     >
                       <Text style={{ color: colors.error, fontSize: 14, fontWeight: 'bold' }}> {locale === 'ja' ? '削除' : 'Remove'}</Text>
-                    </TouchableOpacity>
+                    </PressableButton>
                   )}
                 </View>
                 
@@ -1143,7 +1139,7 @@ export default function CreateQuestionScreen() {
                       placeholderTextColor={colors.textSecondary}
                     />
                     {group.length > 1 && answerIndex > 0 && (
-                      <TouchableOpacity
+                      <PressableButton
                         style={{ padding: 6, borderRadius: 16, backgroundColor: colors.error + '20' }}
                         onPress={() => {
                           const newGroups = answerGroups.map(g => [...g]);
@@ -1153,12 +1149,12 @@ export default function CreateQuestionScreen() {
                         }}
                       >
                         <Text style={{ color: colors.error, fontSize: 16, fontWeight: 'bold' }}>×</Text>
-                      </TouchableOpacity>
+                      </PressableButton>
                     )}
                   </View>
                 ))}
                 
-                <TouchableOpacity
+                <PressableButton
                   style={{ alignSelf: 'flex-start', marginTop: 6 }}
                   onPress={() => {
                     const newGroups = answerGroups.map(g => [...g]);
@@ -1169,10 +1165,10 @@ export default function CreateQuestionScreen() {
                   <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
                     ＋ {locale === 'ja' ? '言い換えを追加' : 'Add alternative'}
                   </Text>
-                </TouchableOpacity>
+                </PressableButton>
               </View>
             ))}
-            <TouchableOpacity
+            <PressableButton
               style={[
                 styles.addAnswerSlotBtn,
                 {
@@ -1194,18 +1190,18 @@ export default function CreateQuestionScreen() {
               <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
                 {locale === 'ja' ? '例：「AとB」のような複数回答が必要な問題に' : 'For questions requiring multiple answers like "A and B"'}
               </Text>
-            </TouchableOpacity>
+            </PressableButton>
           </View>
         )}
         {answerType === 'truefalse' && (
           <View>
             <View style={styles.trueFalseContainer}>
-              <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(true); }}><Text style={[styles.trueFalseText, { color: colors.text }, trueFalseAnswer && { color: onPrimary }]}>O</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, !trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(false); }}><Text style={[styles.trueFalseText, { color: colors.text }, !trueFalseAnswer && { color: onPrimary }]}>×</Text></TouchableOpacity>
+              <PressableButton style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(true); }}><Text style={[styles.trueFalseText, { color: colors.text }, trueFalseAnswer && { color: onPrimary }]}>O</Text></PressableButton>
+              <PressableButton style={[styles.trueFalseButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, !trueFalseAnswer && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('decide'); setTrueFalseAnswer(false); }}><Text style={[styles.trueFalseText, { color: colors.text }, !trueFalseAnswer && { color: onPrimary }]}>×</Text></PressableButton>
             </View>
             {!trueFalseAnswer && (
               <TextInput
-                style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br, marginTop: 10 }]}
                 value={explanation}
                 onChangeText={setExplanation}
                 placeholder={locale === 'ja' ? '備考（どこが違うのか・解説）' : 'Note (explanation)'}
@@ -1220,7 +1216,7 @@ export default function CreateQuestionScreen() {
             {multipleChoice.options.map((option, index) => (
               <TextInput
                 key={index}
-                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5 }]}
+                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]}
                 value={option}
                 onChangeText={(text) => {
                   const newOptions = [...multipleChoice.options];
@@ -1237,9 +1233,9 @@ export default function CreateQuestionScreen() {
                 {[0, 1, 2, 3].map((i) => {
                   const isSelected = multipleChoice.correctAnswers.includes(i);
                   return (
-                    <TouchableOpacity
+                    <PressableButton
                       key={i}
-                      style={[styles.correctAnswerButton, { backgroundColor: colors.background, borderRadius: cpR ?? 5, borderWidth: cpB ?? 1, borderColor: colors.border }, isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      style={[styles.correctAnswerButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                       onPress={() => {
                         SoundManager.play('decide');
                         if (isSelected) {
@@ -1251,14 +1247,14 @@ export default function CreateQuestionScreen() {
                       }}
                     >
                       <Text style={[styles.correctAnswerText, { color: colors.text }, isSelected && { color: onPrimary }]}>{i + 1}</Text>
-                    </TouchableOpacity>
+                    </PressableButton>
                   );
                 })}
               </View>
             </View>
             
             <TextInput
-              style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: cpR ?? 5, marginTop: 10 }]}
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br, marginTop: 10 }]}
               value={explanation}
               onChangeText={setExplanation}
               placeholder={locale === 'ja' ? '備考・解説（任意）' : 'Note / Explanation (optional)'}
@@ -1267,21 +1263,21 @@ export default function CreateQuestionScreen() {
             />
           </View>
         )}
-        <TouchableOpacity
+        <PressableButton
           style={[styles.createButton, {
             backgroundColor: isCreating ? colors.textSecondary : colors.primary,
-            borderRadius: cpR ?? 25,
-            borderWidth: cpB,
+            borderRadius: br,
+            borderWidth: 1,
             marginTop: 8,
             opacity: isCreating ? 0.6 : 1,
           }]}
           onPress={handleManualCreate}
           disabled={isCreating}
         >
-          <Text style={[styles.buttonText, { color: onPrimary }]}>
-            {isCreating ? locale === 'ja' ? '作成中...' : 'Creating...' : t.createQuestion}
+          <Text style={[styles.buttonText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]}>
+            {isCreating ? 'STORING...' : '▶ STORE TO MEMORY'}
           </Text>
-        </TouchableOpacity>
+        </PressableButton>
       </View>
 
       {/*  画像添付UIを削除（OCR機能のみ使用） */}
@@ -1303,7 +1299,7 @@ export default function CreateQuestionScreen() {
               autoFocus
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity
+              <PressableButton
                 style={[styles.modalCancelBtn, { borderColor: colors.border }]}
                 onPress={() => {
                   setShowAddTagModal(false);
@@ -1313,15 +1309,15 @@ export default function CreateQuestionScreen() {
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
                   {locale === 'ja' ? 'キャンセル' : 'Cancel'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableButton>
+              <PressableButton
                 style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
                 onPress={handleAddNewTag}
               >
                 <Text style={[styles.modalSaveText, { color: onPrimary }]}>
                   {locale === 'ja' ? '追加' : 'Add'}
                 </Text>
-              </TouchableOpacity>
+              </PressableButton>
             </View>
           </View>
         </View>
@@ -1340,7 +1336,7 @@ export default function CreateQuestionScreen() {
                 : `Delete "${tagToDelete}" from all questions?\nThis action cannot be undone.`}
             </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity
+              <PressableButton
                 style={[styles.modalCancelBtn, { borderColor: colors.border }]}
                 onPress={() => {
                   setShowTagDeleteModal(false);
@@ -1350,8 +1346,8 @@ export default function CreateQuestionScreen() {
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
                   {locale === 'ja' ? 'キャンセル' : 'Cancel'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableButton>
+              <PressableButton
                 style={[styles.modalSaveBtn, { backgroundColor: colors.error }]}
                 onPress={async () => {
                   if (tagToDelete) {
@@ -1372,7 +1368,7 @@ export default function CreateQuestionScreen() {
                 <Text style={[styles.modalSaveText, { color: '#ffffff' }]}>
                   {locale === 'ja' ? '削除する' : 'Delete'}
                 </Text>
-              </TouchableOpacity>
+              </PressableButton>
             </View>
           </View>
         </View>
@@ -1381,15 +1377,14 @@ export default function CreateQuestionScreen() {
       {/* Toast Notification */}
       {showToast && (
         <View style={styles.toastContainer}>
-          <TouchableOpacity 
+          <PressableButton 
             style={[styles.toast, { backgroundColor: colors.success }]}
             onPress={() => setShowToast(false)}
-            activeOpacity={0.8}
           >
             <Text style={[styles.toastText, { color: '#fff' }]}>
               {toastMessage}
             </Text>
-          </TouchableOpacity>
+          </PressableButton>
         </View>
       )}
     </ScrollView>

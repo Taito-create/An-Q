@@ -1,6 +1,7 @@
-import React, { ReactNode, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { ReactNode, useEffect, useRef, useState } from 'react';
+import { View, Animated, Platform } from 'react-native';
 import { ThemeProvider, useTheme } from '../app/theme';
+import BootScreen from '../app/components/BootScreen';
 import { SoundManager } from '../app/sound';
 import { BGMProvider } from '../app/bgmContext';
 import { SEProvider } from '../app/seContext';
@@ -35,6 +36,51 @@ function ThemedRoot({ children }: { children: ReactNode }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background } as any}>
       {children}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ブートゲート（起動演出：P0-3）
+// - 起動中は BootScreen を全面オーバーレイで表示（Home は裏でプリウォーム）
+// - ブート完了後 300ms のクロスフェードで Home へ遷移
+// - BOOTING はこのスプラッシュのみに限定（Home 画面には出さない）
+// ─────────────────────────────────────────────
+function BootGate({ children }: { children: ReactNode }) {
+  const [bootDone, setBootDone] = useState(false);
+  const [overlayGone, setOverlayGone] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
+
+  const handleBootComplete = () => {
+    if (bootDone) return;
+    setBootDone(true);
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => setOverlayGone(true));
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      {children}
+      {!overlayGone && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            opacity: overlayOpacity,
+            zIndex: 9999,
+            elevation: 9999,
+          }}
+          pointerEvents={bootDone ? 'none' : 'auto'}
+        >
+          <BootScreen onComplete={handleBootComplete} />
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -134,8 +180,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
             <AuthProvider>
               <QuestionsProvider>
                 <ThemedRoot>
-                  <MiniPlayer />
-                  {children}
+                  <BootGate>
+                    <MiniPlayer />
+                    {children}
+                  </BootGate>
                 </ThemedRoot>
               </QuestionsProvider>
             </AuthProvider>

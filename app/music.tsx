@@ -129,10 +129,10 @@ export default function MusicScreen() {
           {locale === 'ja' ? '音楽設定' : 'Music Settings'}
         </Text>
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
           onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
       {/* 重複警告バナー */}

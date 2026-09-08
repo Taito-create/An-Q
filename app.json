@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme":"my-new-quiz",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon_cyber.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",

@@ -44,6 +44,8 @@ export default function ResultsScreen() {
   const [showAll, setShowAll] = useState(false);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  // スコア0%時のグリッチ演出（赤フラッシュ300ms）
+  const [showGlitch, setShowGlitch] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -60,10 +62,18 @@ export default function ResultsScreen() {
         setTimeout(() => {
           if (isMounted) {
             setIsLoading(false);
-            // Show celebration animation when results are loaded
-            if (location.state?.results && location.state.results.length > 0) {
-              setShowCelebration(true);
-              setTimeout(() => setShowCelebration(false), 3000);
+            // 演出はスコアで分岐：100% = 紙吹雪 / 0% = グリッチ（赤フラッシュ300ms） / 1-99% = なし
+            const r: QuizResult[] = location.state?.results || [];
+            if (r.length > 0) {
+              const c = r.filter((x) => x.isCorrect).length;
+              const p = Math.round((c / r.length) * 100);
+              if (p === 100) {
+                setShowCelebration(true);
+                setTimeout(() => setShowCelebration(false), 3000);
+              } else if (p === 0) {
+                setShowGlitch(true);
+                setTimeout(() => setShowGlitch(false), 300);
+              }
             }
           }
         }, 100);
@@ -203,19 +213,32 @@ export default function ResultsScreen() {
           />
         </View>
       )}
+
+      {/* グリッチ演出（スコア0%時の赤フラッシュ 300ms） */}
+      {showGlitch && <View style={styles.glitchOverlay} />}
       
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{t.quizResults}</Text>
+      <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2 }]} numberOfLines={1}>
+        $ TRANSFER REPORT
+      </Text>
 
       {/* Score Card */}
-      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'monospace', letterSpacing: 2 }]} numberOfLines={1}>
+          TRANSFER SUMMARY
+        </Text>
         <View style={styles.bigScore}>
           <Text style={styles.bigScoreNum}>{correctCount}</Text>
           <Text style={styles.bigScoreSlash}>/</Text>
           <Text style={styles.bigScoreTotal}>{total}</Text>
         </View>
-        <Text style={styles.pctText}>{pct}% {t.correct}</Text>
+        <Text style={[styles.pctText, { fontFamily: 'monospace' }]} numberOfLines={1}>
+          MEMORY INTEGRITY: {pct}%
+        </Text>
         <Text style={[styles.gradeText, { color: grade.color }]}>{grade.label}</Text>
+        {pct > 0 && pct < 100 && (
+          <Text style={[styles.xpGainText, { color: colors.primary }]}>+{pct} XP</Text>
+        )}
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
@@ -278,8 +301,8 @@ export default function ResultsScreen() {
             navigate('/quiz');
           }}
         >
-          <Text style={[styles.primaryBtnText, { color: onPrimary }]}>
-            {locale === 'ja' ? 'もういちどプレイする' : 'Play Again'}
+          <Text style={[styles.primaryBtnText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]} numberOfLines={1}>
+            ▶ RETRY TRANSFER
           </Text>
         </TouchableOpacity>
         
@@ -290,7 +313,7 @@ export default function ResultsScreen() {
             navigate('/');
           }}
         >
-          <Text style={[styles.secondaryBtnText, { color: onPrimary }]}>{t.backHome}</Text>
+          <Text style={[styles.secondaryBtnText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]} numberOfLines={1}>↺ RETURN TO TERMINAL</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -315,6 +338,26 @@ const styles = StyleSheet.create({
   celebrationAnimation: {
     width: 300,
     height: 300,
+  },
+  glitchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 59, 48, 0.45)',
+    zIndex: 9999,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  xpGainText: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 8,
+    fontFamily: 'monospace',
   },
   headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, letterSpacing: 0.2 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 },

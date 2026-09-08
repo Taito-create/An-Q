@@ -52,14 +52,14 @@ export default function MultiHubScreen() {
     {
       id: 'share',
       icon: <Share2 size={24} color={colors.primary} />,
-      title: ja ? 'コード共有' : 'Share via Code',
+      title: 'CODE UPLINK',
       description: ja ? 'コードで送信または受信' : 'Send or receive via code',
       onPress: () => setShowShareOptions(true),
     },
     {
       id: 'public',
       icon: <Globe size={24} color={colors.primary} />,
-      title: ja ? '公開問題' : 'Public Questions',
+      title: 'PUBLIC NODES',
       description: ja ? '公開中の問題を閲覧' : 'Browse shared public questions',
       onPress: () => navigate('/multi/public'),
     },
@@ -68,8 +68,8 @@ export default function MultiHubScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          <Share2 size={22} color={colors.primary} style={{ marginRight: 8 }} />{ja ? 'マルチ機能' : 'Multi'}
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+          <Share2 size={22} color={colors.primary} style={{ marginRight: 8 }} />$ NETWORK PROTOCOL
         </Text>
       </View>
 

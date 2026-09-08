@@ -31,10 +31,10 @@ const useResponsive = () => {
 // グラデーションは react-native-linear-gradient 未導入のため、
 // ダークテーマ互換の濃色実体 + 金色/緑/アンバー/ブルーのアクセントで表現。
 const specialCardStyles: Record<string, ViewStyle> = {
-  shop:         { backgroundColor: '#065F46', borderColor: '#10B981' },
-  gacha:        { backgroundColor: '#7C3AED', borderColor: '#FFD700' },
-  achievements: { backgroundColor: '#92400E', borderColor: '#F59E0B' },
-  calendar:     { backgroundColor: '#1E3A5F', borderColor: '#3B82F6' },
+  shop:         { backgroundColor: '#0D7C5F', borderColor: '#10B981' },
+  gacha:        { backgroundColor: '#8B5CF6', borderColor: '#FFD700' },
+  achievements: { backgroundColor: '#B45309', borderColor: '#F59E0B' },
+  calendar:     { backgroundColor: '#2563EB', borderColor: '#3B82F6' },
 };
 
 // サブ機能のハブ画面
@@ -60,14 +60,14 @@ export default function SubHubScreen() {
     {
       id: 'theme',
       icon: <Settings size={24} color={colors.primary} />,
-      title: locale === 'ja' ? 'テーマ・外観' : 'Theme & Appearance',
+      title: locale === 'ja' ? 'インターフェース設定' : 'Theme & Appearance',
       description: locale === 'ja' ? 'テーマやフォントサイズを変更' : 'Change theme and font size',
       onPress: () => navigate('/settings'),
     },
     {
       id: 'sound',
       icon: <Volume2 size={24} color={colors.primary} />,
-      title: locale === 'ja' ? '音楽・サウンド' : 'Music & Sound',
+      title: locale === 'ja' ? 'オーディオ・チャンネル' : 'Music & Sound',
       description: locale === 'ja' ? 'BGMや効果音を設定' : 'Configure BGM and sound effects',
       onPress: () => navigate('/music'),
     },
@@ -80,29 +80,29 @@ export default function SubHubScreen() {
     },
     {
       id: 'shop',
-      icon: <ShoppingBag size={24} color="#10B981" />,
-      title: locale === 'ja' ? 'ショップ' : 'Shop',
+      icon: <ShoppingBag size={24} color="#FFFFFF" />,
+      title: locale === 'ja' ? '暗号資産交換' : 'Shop',
       description: locale === 'ja' ? 'アイテムでスキンを購入' : 'Buy items and skins',
       onPress: () => navigate('/shop'),
     },
     {
       id: 'gacha',
-      icon: <Gift size={24} color="#FFD700" />,
-      title: locale === 'ja' ? 'ガチャ' : 'Gacha',
+      icon: <Gift size={24} color="#FFFFFF" />,
+      title: locale === 'ja' ? 'データサルベージ' : 'Gacha',
       description: locale === 'ja' ? 'レアアイテムをゲット' : 'Get rare items',
       onPress: () => navigate('/gacha'),
     },
     {
       id: 'achievements',
-      icon: <Trophy size={24} color="#F59E0B" />,
-      title: locale === 'ja' ? '実績' : 'Achievements',
+      icon: <Trophy size={24} color="#FFFFFF" />,
+      title: locale === 'ja' ? '称号データベース' : 'Achievements',
       description: locale === 'ja' ? '実績を解除して称号をゲット' : 'Unlock achievements and titles',
       onPress: () => navigate('/achievements'),
     },
     {
       id: 'calendar',
-      icon: <Calendar size={24} color="#3B82F6" />,
-      title: locale === 'ja' ? 'カレンダー' : 'Calendar',
+      icon: <Calendar size={24} color="#FFFFFF" />,
+      title: locale === 'ja' ? 'スケジュール・ログ' : 'Calendar',
       description: locale === 'ja' ? '学習記録を確認' : 'Check your study records',
       onPress: () => navigate('/calendar'),
     },
@@ -111,8 +111,8 @@ export default function SubHubScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          <Package size={22} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'サブ機能' : 'Sub'}
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+          <Package size={22} color={colors.primary} style={{ marginRight: 8 }} />$ SYSTEM TOOLS
         </Text>
       </View>
 

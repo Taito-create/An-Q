@@ -1,5 +1,5 @@
 ﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { View, Text, TouchableOpacity } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
 import RootLayout from './RootLayout';
@@ -11,6 +11,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { syncLoginStreak } from './utils/userProgress';
 import { Sparkles } from 'lucide-react';
 import BottomNavBar from '../app/BottomNavBar';
+// 遷移ラグ解消（P1-6）：クイズ設定画面は遅延ロードせずバンドルに含める
+import QuizScreen from '../app/quiz';
 
 // キャッシュ不整合によるChunkLoadErrorを自動検知してリロードする安全なlazy loading
 const safeLazy = (importFn: () => Promise<any>) => {
@@ -32,7 +34,6 @@ const CalendarScreen = safeLazy(() => import('../app/calendar'));
 const CreateQuestionScreen = safeLazy(() => import('../app/create'));
 const CreateHubScreen = safeLazy(() => import('../app/createHub'));
 const CreditsScreen = safeLazy(() => import('../app/credits'));
-const InboxScreen = safeLazy(() => import('../app/inbox'));
 const DevModeScreen = safeLazy(() => import('../app/devmode'));
 const FeedbackScreen = safeLazy(() => import('../app/feedback'));
 const TimerSettingsScreen = safeLazy(() => import('../app/timer'));
@@ -45,7 +46,7 @@ const PublicQuestionsScreen = safeLazy(() => import('../app/publicQuestions'));
 const MusicScreen = safeLazy(() => import('../app/music'));
 const ProfileScreen = safeLazy(() => import('../app/profile'));
 const StatisticsScreen = safeLazy(() => import('../app/statistics'));
-const QuizScreen = safeLazy(() => import('../app/quiz'));
+// QuizScreen は上部で静的 import に変更（遷移ラグ解消：lazy解除）
 const LoginScreen = safeLazy(() => import('../app/auth/loginScreen'));
 const ReorderConfirmScreen = safeLazy(() => import('../app/reorderConfirm'));
 const ResultsScreen = safeLazy(() => import('../app/results'));
@@ -189,11 +190,7 @@ export default function App() {
               <FeedbackScreen />
             </ProtectedRoute>
           } />
-          <Route path="/inbox" element={
-            <ProtectedRoute>
-              <InboxScreen />
-            </ProtectedRoute>
-          } />
+          <Route path="/inbox" element={<Navigate to="/multi/share" replace />} />
           <Route path="/timer" element={
             <ProtectedRoute>
               <TimerSettingsScreen />

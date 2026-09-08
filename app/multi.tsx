@@ -275,7 +275,7 @@ export default function MultiScreen() {
         [
           {
             text: locale === 'ja' ? '受信ボックスを開く' : 'Open Inbox',
-            onPress: () => navigate('/inbox'),
+            onPress: () => navigate('/multi/share'),
           },
           {
             text: locale === 'ja' ? '閉じる' : 'Close',
@@ -305,10 +305,10 @@ export default function MultiScreen() {
           <Share2 size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'マルチ・共有' : 'Multi Share'}
         </Text>
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
           onPress={() => { SoundManager.play('decide'); navigate('/multi'); }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>

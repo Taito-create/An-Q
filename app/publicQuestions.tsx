@@ -29,17 +29,18 @@ export default function PublicQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => { SoundManager.play('decide'); navigate('/multi'); }}
-        >
-          <ChevronLeft size={22} color={colors.text} />
-          <Text style={{ color: colors.text, fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, justifyContent: 'space-between' }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           <Globe size={22} color={colors.primary} style={{ marginRight: 8 }} />{ja ? '公開問題' : 'Public Questions'}
         </Text>
+        <TouchableOpacity
+          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+          onPress={() => { SoundManager.play('decide'); navigate('/multi'); }}
+        >
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
+            {locale === 'ja' ? '戻る' : 'Back'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {sharedQuestions.length === 0 ? (

@@ -37,9 +37,18 @@ const TABS_SCREENS: Record<string, string[]> = {
 };
 
 const BottomNavBar = () => {
+  console.log('BottomNavBar rendered'); // レンダリング確認用ログ
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors } = useTheme();
+  const { colors: themeColors } = useTheme();
+  // useTheme が不正・欠損値を返した場合のフォールバック（透明バー防止のガード）
+  const colors = {
+    card: themeColors?.card || '#161B22',
+    border: themeColors?.border || '#30363D',
+    primary: themeColors?.primary || '#00FFC8',
+    textSecondary: themeColors?.textSecondary || '#8B949E',
+    text: themeColors?.text || '#E6EDF3',
+  };
 
   // ウィンドウ幅（Web でのリサイズに対応するため state で保持）
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -49,8 +58,10 @@ const BottomNavBar = () => {
   const indicatorScale = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const glowScale = useRef(new Animated.Value(0.8)).current;
-  // マウント時フェードイン（ナビバーが一瞬浮き出る・フラッシュするのを防ぐ）
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // 不透明度は初期値 1（フェードインに依存しない即時表示）
+  // ※ 旧実装は初期値 0 でフェードインしており、アニメーションが完了しないと
+  //    opacity: 0 のまま＝「ナビバーが透明で見えない」不具合の原因だった
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // リサイズ検知（Web でウィンドウ幅が変わったら再計算）
   useEffect(() => {
@@ -171,14 +182,7 @@ const BottomNavBar = () => {
     }
   };
 
-  // マウント後にフェードイン表示（レイアウト確定後＝次のフレーム相当で滑らかに表示）
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [fadeAnim]);
+  // ※ フェードイン用の useEffect は削除（初期値 1 の即時表示に変更したため不要）
 
   return (
     <Animated.View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, opacity: fadeAnim }]}>
@@ -233,7 +237,12 @@ const BottomNavBar = () => {
         return (
           <TouchableOpacity
             key={item.id}
-            style={styles.navItem}
+            style={[
+              styles.navItem,
+              Platform.OS === 'web'
+                ? ({ outlineStyle: 'none' } as any)
+                : null,
+            ]}
             onPress={() => handlePress(item.path)}
             activeOpacity={0.7}
           >
@@ -267,6 +276,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
+    // 背景色は固定のダークカード色を指定（テーマ取得失敗時の透明化を回避するフォールバック層。
+    // 実際の表示色はインラインの colors.card が上書きし、テーマ追従も維持される）
+    backgroundColor: '#161B22',
+    borderTopColor: '#30363D',
     paddingVertical: 6,
     paddingBottom: 12,
     borderTopWidth: 1,
@@ -312,7 +325,6 @@ const styles = StyleSheet.create({
     width: INDICATOR_WIDTH,
     height: INDICATOR_HEIGHT,
     borderRadius: INDICATOR_RADIUS,
-    borderWidth: 1,
     backgroundColor: 'rgba(0,122,255,0.08)',
     zIndex: 0,
   },

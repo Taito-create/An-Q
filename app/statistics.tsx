@@ -11,6 +11,7 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { useQuestions } from './hooks/useQuestions';
 import { safeParseArray } from './utils/storageUtils';
 import { loadStats, UserStats } from './missions';
+import LottieView from 'lottie-react-native';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -193,14 +194,29 @@ export default function StatisticsScreen() {
            {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
         </Text>
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
           onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Lottieテスト表示 */}
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {locale === 'ja' ? 'Lottie テスト表示' : 'Lottie Test'}
+          </Text>
+          <View style={{ width: 150, height: 150, justifyContent: 'center', alignItems: 'center' }}>
+            <LottieView
+              source={{ uri: 'https://assets10.lottiefiles.com/packages/lf20_yr6g3xnn.json' }}
+              autoPlay
+              loop
+              style={{ width: 150, height: 150 }}
+            />
+          </View>
+        </View>
+
         {/* Lifetime Summary */}
         {lifetimeStats && (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

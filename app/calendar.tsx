@@ -548,7 +548,7 @@ export default function CalendarScreen() {
         <Text style={[styles.formTitle, { color: colors.text }]}>
           {editingEventId
             ? (locale === 'ja' ? '予定を編集' : 'Edit Event')
-            : (locale === 'ja' ? '予定を登録' : 'Add Event')}
+            : '+ SCHEDULE EVENT'}
         </Text>
         <Text style={[styles.selectedDateText, { color: colors.textSecondary }]}>
           {locale === 'ja' ? '開始日: ' : 'Start Date: '}{selectedDate}
@@ -703,17 +703,17 @@ export default function CalendarScreen() {
       contentContainerStyle={styles.scrollContent}
     >
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {locale === 'ja' ? 'カレンダー' : 'Calendar'}
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+          $ SCHEDULED TRANSFERS
         </Text>
         <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
+          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
           onPress={() => {
             SoundManager.play('decide');
             navigate('/sub');
           }}
         >
-          <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}
           </Text>
         </TouchableOpacity>
@@ -777,7 +777,7 @@ export default function CalendarScreen() {
                   </View>
                 ))
               ) : (
-                <Text style={[styles.noEventsText, { color: colors.textSecondary }]}>{locale === 'ja' ? '登録された予定はありません' : 'No events scheduled'}</Text>
+                <Text style={[styles.noEventsText, { color: colors.textSecondary }]}>[NO_DATA_FOUND] 予定されたインストール・シーケンスはありません</Text>
               )}
             </ScrollView>
           </View>
