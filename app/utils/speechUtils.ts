@@ -309,3 +309,104 @@ export const stopSpeech = (): void => {
 export const isSpeechSupported = (): boolean => {
   return typeof window !== 'undefined' && !!window.speechSynthesis;
 };
+
+// ============================================================
+// VOICEVOX 統合
+// ============================================================
+
+/** VOICEVOX 話者リスト */
+export const VOICEVOX_SPEAKERS: { id: number; name: string; nameJa: string }[] = [
+  { id: 3, name: 'Zundamon', nameJa: 'ずんだもん' },
+  { id: 10, name: 'Shikoku Metan', nameJa: '四国めたん' },
+  { id: 8, name: 'Kasugabe Tsumugi', nameJa: '春日部つむぎ' },
+  { id: 9, name: 'Amahare Hau', nameJa: '雨晴はう' },
+  { id: 2, name: 'Nanami Ritsu', nameJa: '波音リツ' },
+  { id: 1, name: 'Kiritan', nameJa: 'きりたん' },
+];
+
+/**
+ * VOICEVOX で音声を再生する（直接接続版）
+ * @param text 読み上げるテキスト
+ * @param speakerId VOICEVOX 話者 ID
+ *
+ * VOICEVOX Engine の正しい呼び出し方（voice-server/server.js で動作実績あり）:
+ * - `/audio_query` は POST、text/speaker はクエリパラメータで送る（ボディは空）。
+ *   GET で叩くと `405 Method Not Allowed` になる。
+ * - `/synthesis` は POST、query(JSON) をボディ、speaker はクエリパラメータ。
+ * CORS: Engine 起動時に --cors-policy=* が必要（localhost:50021 のデフォルトは別オリジンを拒否）。
+ */
+export async function speakWithVoicevox(text: string, speakerId: number): Promise<void> {
+  const baseUrl = 'http://localhost:50021';
+  try {
+    // 1. audio_query で音声クエリを作成（POST + クエリパラメータ、ボディ空）
+    const queryParams = new URLSearchParams({ text, speaker: String(speakerId) });
+    const queryRes = await fetch(`${baseUrl}/audio_query?${queryParams.toString()}`, {
+      method: 'POST',
+    });
+    if (!queryRes.ok) {
+      const errText = await queryRes.text();
+      throw new Error(`audio_query failed (${queryRes.status}): ${errText}`);
+    }
+    const query = await queryRes.json();
+
+    // 2. synthesis で音声を生成（POST、ボディ=query JSON、speaker=クエリ）
+    const synthParams = new URLSearchParams({ speaker: String(speakerId) });
+    const synthRes = await fetch(`${baseUrl}/synthesis?${synthParams.toString()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(query),
+    });
+    if (!synthRes.ok) {
+      const errText = await synthRes.text();
+      throw new Error(`synthesis failed (${synthRes.status}): ${errText}`);
+    }
+    const audioBlob = await synthRes.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    await audio.play();
+  } catch (error) {
+    console.error('VOICEVOX direct error:', error);
+    if (error instanceof TypeError && String(error.message).includes('fetch')) {
+      // CORS / Engine 未起動の可能性が高い
+      console.warn(
+        '接続できませんでした。以下を確認してください:\n' +
+        '1) VOICEVOX Engine が http://localhost:50021 で起動しているか\n' +
+        '2) Engine 起動時に --cors-policy=* を付けているか（ブラウザからの直接接続には必須）\n' +
+        '3) 駄目な場合は設定画面の接続モードを Proxy に切り替え（voice-server 経由に）'
+      );
+    }
+    // フォールバック：Web Speech API
+    console.warn('VOICEVOX failed, falling back to Web Speech API');
+    speakText(text, 'ja-JP');
+  }
+}
+
+/**
+ * VOICEVOX で音声を再生する（プロキシ経由版）
+ * voice-server (Express) をデプロイして使用する
+ * @param text 読み上げるテキスト
+ * @param speakerId VOICEVOX 話者 ID
+ */
+export async function speakWithVoicevoxProxy(text: string, speakerId: number): Promise<void> {
+  const proxyUrl = import.meta.env.VITE_VOICE_PROXY_URL || 'http://localhost:3001/speak';
+  try {
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, speaker: speakerId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Proxy error: ${response.status}`);
+    }
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    await audio.play();
+  } catch (error) {
+    console.error('VOICEVOX proxy error:', error);
+    console.warn('Falling back to Web Speech API');
+    speakText(text, 'ja-JP');
+  }
+}

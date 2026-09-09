@@ -166,6 +166,11 @@ export default function QuizScreen() {
   const [suddenDeathLives, setSuddenDeathLives] = useState(3);
   const [timeAttackMode, setTimeAttackMode] = useState(false);
   const [timeAttackLimit, setTimeAttackLimit] = useState(5);
+  // ゲームモード選択（排他）
+  const [selectedGameMode, setSelectedGameMode] = useState<'standard' | 'timeAttack' | 'suddenDeath' | 'challenge'>('standard');
+  const [timeLimitSec, setTimeLimitSec] = useState(30); // 30/60/120
+  const [suddenDeathLivesOpt, setSuddenDeathLivesOpt] = useState(3); // 3/5
+  const [challengeBet, setChallengeBet] = useState(50); // 50/100
   const [currentLives, setCurrentLives] = useState(3);
   const [comboCount, setComboCount] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
@@ -654,8 +659,29 @@ export default function QuizScreen() {
     }
     SoundManager.play('decide');
 
+    // ゲームモードのフラグをリセットしてから、選択されたモードを適用
+    setChallengeMode(false);
+    setSuddenDeathMode(false);
+    setTimeAttackMode(false);
+    switch (selectedGameMode) {
+      case 'timeAttack':
+        setTimeAttackMode(true);
+        setTimeAttackLimit(timeLimitSec);
+        break;
+      case 'suddenDeath':
+        setSuddenDeathMode(true);
+        setSuddenDeathLives(suddenDeathLivesOpt);
+        break;
+      case 'challenge':
+        setChallengeMode(true);
+        break;
+      case 'standard':
+      default:
+        break;
+    }
+
     if (challengeMode) {
-      const betAmount = 50;
+      const betAmount = challengeBet;
       const coins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
       if (coins < betAmount) {
         Alert.alert(
@@ -1062,30 +1088,30 @@ export default function QuizScreen() {
             <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
           </PressableButton>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
-            <ClipboardList size={24} color={colors.primary} style={{ marginRight: 8 }} />$ SELECT QUIZ CONFIG
+            <ClipboardList size={20} color={colors.primary} style={{ marginRight: 6 }} />$ SELECT QUIZ CONFIG
           </Text>
         </View>
 
         <ScrollView contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
-          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
-            <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 16 }]}>
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
+            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 10 }]}>
               TRANSFER COUNT
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 10 }}>
               <PressableButton
-                style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
+                style={[{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => setPreQuestionCount(prev => Math.max(1, prev - 1))}
                 onLongPress={() => startLongPress('dec', filtered.length)}
                 onPressOut={stopLongPress}
                 delayLongPress={500}
               >
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>−</Text>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold' }}>−</Text>
               </PressableButton>
-              <Text style={[{ fontSize: 48, fontWeight: '700', color: colors.primary, minWidth: 80, textAlign: 'center' }]}>
+              <Text style={[{ fontSize: 36, fontWeight: '700', color: colors.primary, minWidth: 70, textAlign: 'center' }]}>
                 {preQuestionCount}
               </Text>
               <PressableButton
-                style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
+                style={[{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}
                 onPress={() => {
                   const maxCount = filtered.length;
                   setPreQuestionCount(prev => Math.min(maxCount, prev + 1));
@@ -1094,7 +1120,7 @@ export default function QuizScreen() {
                 onPressOut={stopLongPress}
                 delayLongPress={500}
               >
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>＋</Text>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold' }}>＋</Text>
               </PressableButton>
             </View>
             <View style={{ marginBottom: 12 }}>
@@ -1124,8 +1150,8 @@ export default function QuizScreen() {
 
           {folders.length > 0 && (
             <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
-              <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 }]}>
-                <Folder size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
+              <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+                <Folder size={18} color={colors.primary} style={{ marginRight: 4 }} />{locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1173,13 +1199,13 @@ export default function QuizScreen() {
             </View>
           )}
 
-          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flex: 1, marginRight: 16 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
-                  <RefreshCw size={20} color={colors.primary} style={{ marginRight: 6 }} />REVERSE SYNAPSE
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+                  <RefreshCw size={18} color={colors.primary} style={{ marginRight: 4 }} />REVERSE SYNAPSE
                 </Text>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                <Text style={[{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja' ? '回答を問題文として表示し、問題文を答えます' : 'Show the answer as the question, and answer the original question'}
                 </Text>
               </View>
@@ -1200,13 +1226,128 @@ export default function QuizScreen() {
             </View>
           </View>
 
-          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: autoPlayMode ? 16 : 0 }}>
-              <View style={{ flex: 1, marginRight: 16 }}>
-                <Text style={[{ fontSize: 16, fontWeight: 'bold', color: colors.text }]}>
-                  <Play size={20} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '自動再生モード' : 'Auto Play Mode'}
+          {/* GAME MODE */}
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
+            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 10 }]}>
+              $ GAME MODE
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+              {(['standard', 'timeAttack', 'suddenDeath', 'challenge'] as const).map((mode) => {
+                const labels: Record<typeof mode, string> = {
+                  standard: 'STANDARD',
+                  timeAttack: 'TIME ATTACK',
+                  suddenDeath: 'SUDDEN DEATH',
+                  challenge: 'CHALLENGE',
+                };
+                const active = selectedGameMode === mode;
+                return (
+                  <PressableButton
+                    key={mode}
+                    style={[{
+                      flex: 1,
+                      minWidth: 60,
+                      paddingVertical: 6,
+                      paddingHorizontal: 8,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primary + '20' : 'transparent',
+                      alignItems: 'center',
+                    }]}
+                    onPress={() => {
+                      SoundManager.play('select');
+                      setSelectedGameMode(mode);
+                    }}
+                  >
+                    <Text style={[{
+                      fontSize: 11,
+                      fontWeight: active ? '700' : '500',
+                      color: active ? colors.primary : colors.textSecondary,
+                      fontFamily: 'monospace',
+                      letterSpacing: 0.5,
+                    }]}>
+                      {labels[mode]}
+                    </Text>
+                  </PressableButton>
+                );
+              })}
+            </View>
+
+            {/* サブオプション（選択されたモードに応じて表示） */}
+            {selectedGameMode === 'timeAttack' && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>LIMIT:</Text>
+                {[30, 60, 120].map((sec) => (
+                  <PressableButton
+                    key={sec}
+                    style={[{
+                      paddingVertical: 4,
+                      paddingHorizontal: 12,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: timeLimitSec === sec ? colors.primary : colors.border,
+                      backgroundColor: timeLimitSec === sec ? colors.primary + '20' : 'transparent',
+                    }]}
+                    onPress={() => setTimeLimitSec(sec)}
+                  >
+                    <Text style={{ fontSize: 11, color: timeLimitSec === sec ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>{sec}s</Text>
+                  </PressableButton>
+                ))}
+              </View>
+            )}
+
+            {selectedGameMode === 'suddenDeath' && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>LIVES:</Text>
+                {[3, 5].map((lives) => (
+                  <PressableButton
+                    key={lives}
+                    style={[{
+                      paddingVertical: 4,
+                      paddingHorizontal: 12,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: suddenDeathLivesOpt === lives ? colors.primary : colors.border,
+                      backgroundColor: suddenDeathLivesOpt === lives ? colors.primary + '20' : 'transparent',
+                    }]}
+                    onPress={() => setSuddenDeathLivesOpt(lives)}
+                  >
+                    <Text style={{ fontSize: 11, color: suddenDeathLivesOpt === lives ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>♥ {lives}</Text>
+                  </PressableButton>
+                ))}
+              </View>
+            )}
+
+            {selectedGameMode === 'challenge' && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>BET:</Text>
+                {[50, 100].map((bet) => (
+                  <PressableButton
+                    key={bet}
+                    style={[{
+                      paddingVertical: 4,
+                      paddingHorizontal: 12,
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderColor: challengeBet === bet ? colors.primary : colors.border,
+                      backgroundColor: challengeBet === bet ? colors.primary + '20' : 'transparent',
+                    }]}
+                    onPress={() => setChallengeBet(bet)}
+                  >
+                    <Text style={{ fontSize: 11, color: challengeBet === bet ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>🪙 {bet}</Text>
+                  </PressableButton>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: autoPlayMode ? 12 : 0 }}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text }]}>
+                  <Play size={18} color={colors.primary} style={{ marginRight: 4 }} />{locale === 'ja' ? '自動再生モード' : 'Auto Play Mode'}
                 </Text>
-                <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }]}>
+                <Text style={[{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja'
                     ? '問題→答えを自動で切り替えて表示します'
                     : 'Automatically switches between question and answer'}
@@ -1891,7 +2032,7 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 14, color: '#666' },
   infoValue: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
   divider: { height: 1, backgroundColor: '#EFEFEF' },
-  startButton: { backgroundColor: '#4CAF50', paddingVertical: 16, paddingHorizontal: 50, borderRadius: 14, marginBottom: 12 },
+  startButton: { backgroundColor: '#4CAF50', paddingVertical: 14, paddingHorizontal: 40, borderRadius: 4, marginBottom: 8 },
   startButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   backButtonFull: { width: '100%', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
   backButtonFullText: { fontSize: 16, fontWeight: 'bold' },

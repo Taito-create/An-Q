@@ -44,8 +44,10 @@ app.get('/health', (req, res) => {
 
 // 音声生成エンドポイント
 app.post('/speak', async (req, res) => {
-  const { text } = req.body;
-  console.log(`🎤 音声生成リクエスト: "${text}"`);
+  const { text, speaker } = req.body;
+  // アプリ側の話者選択を反映（未指定時はデフォルト話者）
+  const speakerId = Number.isInteger(speaker) ? speaker : SPEAKER_ID;
+  console.log(`🎤 音声生成リクエスト: "${text}" (speaker=${speakerId})`);
 
   if (!text) {
     console.error('❌ テキストが空です');
@@ -60,7 +62,7 @@ app.post('/speak', async (req, res) => {
       `${VOICEVOX_URL}/audio_query`,
       null,
       {
-        params: { text, speaker: SPEAKER_ID },
+        params: { text, speaker: speakerId },
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000, // 60秒タイムアウト
       }
@@ -73,7 +75,7 @@ app.post('/speak', async (req, res) => {
       `${VOICEVOX_URL}/synthesis`,
       queryResponse.data,
       {
-        params: { speaker: SPEAKER_ID },
+        params: { speaker: speakerId },
         responseType: 'arraybuffer',
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000, // 60秒タイムアウト
@@ -122,7 +124,7 @@ setInterval(async () => {
 app.listen(PORT, () => {
   console.log(`🎙️ Voice Server (VOICEVOX) running on port ${PORT}`);
   console.log(`📡 VOICEVOX Engine URL: ${VOICEVOX_URL}`);
-  console.log(`🗣️  Speaker ID: ${SPEAKER_ID}`);
+  console.log(`🗣️  Default Speaker ID: ${SPEAKER_ID}（リクエストの speaker を優先）`);
 }).on('error', (err) => {
   console.error('❌ Server failed to start:', err);
 });
