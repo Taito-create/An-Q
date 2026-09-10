@@ -1,130 +1,115 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// VOICEVOX Engine のURL
-const VOICEVOX_URL = process.env.VOICEVOX_URL || 'https://voicevox-engine.onrender.com';
-// ずんだもんのスピーカーID
-const SPEAKER_ID = 1;
+// ★修正1: VOICEVOX_URL を localhost に変更（127.0.0.1 から）
+const VOICEVOX_URL = process.env.VOICEVOX_URL || 'http://localhost:50021';
+const DEFAULT_SPEAKER = 3;
 
-// CORS 設定（開発用: すべてのオリジンを許可）
-const corsOptions = {
-  origin: '*', // Allow all origins (development only)
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-};
+// ★修正2: axios のプロキシを明示的に無効化
+const axiosInstance = axios.create({
+  proxy: false,
+  timeout: 60000,
+});
 
-app.use(cors(corsOptions));
+// AquesTalkPlayer（フォールバック）※パスは環境変数 AQUESTALK_PATH で上書き可能（可搬性対応）
+const AQUESTALK_PATH = process.env.AQUESTALK_PATH
+  || 'D:\\AquesTalkPlayer\\aquestalkplayer_20250606\\aquestalkplayer\\AquesTalkPlayer.exe';
+
+// キャッシュディレクトリ
+const CACHE_DIR = path.join(__dirname, 'voice-cache');
+const FALLBACK_CACHE_DIR = path.join(__dirname, 'voice-cache-fallback');
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
+if (!fs.existsSync(FALLBACK_CACHE_DIR)) fs.mkdirSync(FALLBACK_CACHE_DIR);
+
+app.use(cors());
 app.use(express.json());
 
-// ルートルート（テスト用）
+// ヘルスチェック
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Voice server is running' });
+});
+
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Voice server is running' });
 });
 
-// ピングエンドポイント（デバッグ用）
-app.get('/ping', (req, res) => {
-  res.json({
-    status: 'ok',
-    time: new Date().toISOString(),
-    env: {
-      VOICEVOX_URL: process.env.VOICEVOX_URL || 'not set',
-      PORT: process.env.PORT || 'not set',
-    }
-  });
-});
-
-// ヘルスチェック
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Voice server (VOICEVOX)' });
-});
-
-// 音声生成エンドポイント
+// ─── 音声生成エンドポイント ───
 app.post('/speak', async (req, res) => {
-  const { text, speaker } = req.body;
-  // アプリ側の話者選択を反映（未指定時はデフォルト話者）
-  const speakerId = Number.isInteger(speaker) ? speaker : SPEAKER_ID;
-  console.log(`🎤 音声生成リクエスト: "${text}" (speaker=${speakerId})`);
+  const { text, speaker = DEFAULT_SPEAKER } = req.body;
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ error: 'テキストが指定されていません' });
+  }
+  console.log(`🎤 音声生成リクエスト: "${text}" (speaker=${speaker})`);
 
-  if (!text) {
-    console.error('❌ テキストが空です');
-    return res.status(400).json({ error: 'テキストが指定されていません。' });
+  const hash = crypto.createHash('md5').update(`${text}:${speaker}`).digest('hex');
+  const cachedFilePath = path.join(CACHE_DIR, `${hash}.wav`);
+  const fallbackCachedFilePath = path.join(FALLBACK_CACHE_DIR, `${hash}.wav`);
+
+  if (fs.existsSync(cachedFilePath)) {
+    console.log(`✅ キャッシュから音声を返却 (speaker=${speaker})`);
+    return res.sendFile(cachedFilePath);
+  }
+  if (fs.existsSync(fallbackCachedFilePath)) {
+    console.log(`⚠️ フォールバックキャッシュから音声を返却 (speaker=${speaker})`);
+    return res.sendFile(fallbackCachedFilePath);
   }
 
   try {
-    console.log(`📡 VOICEVOX Engine にリクエスト送信: ${VOICEVOX_URL}/audio_query`);
-
-    // 1. 音声クエリを作成
-    const queryResponse = await axios.post(
+    // ★修正3: axiosInstance を使用（プロキシ無効）
+    const queryResponse = await axiosInstance.post(
       `${VOICEVOX_URL}/audio_query`,
       null,
-      {
-        params: { text, speaker: speakerId },
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000, // 60秒タイムアウト
-      }
+      { params: { text, speaker } }
     );
-    console.log(`✅ audio_query 成功`);
-
-    // 2. 音声を合成
-    console.log(`📡 VOICEVOX Engine に合成リクエスト送信`);
-    const synthesisResponse = await axios.post(
+    const synthResponse = await axiosInstance.post(
       `${VOICEVOX_URL}/synthesis`,
       queryResponse.data,
-      {
-        params: { speaker: speakerId },
-        responseType: 'arraybuffer',
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000, // 60秒タイムアウト
-      }
+      { params: { speaker }, responseType: 'arraybuffer' }
     );
-    console.log(`✅ synthesis 成功 (${synthesisResponse.data.length} バイト)`);
-
-    // 3. 音声データを返却
-    const audioBuffer = Buffer.from(synthesisResponse.data);
-    console.log(`📤 音声データ返却 (${audioBuffer.length} バイト)`);
-
-    res.set({
-      'Content-Type': 'audio/wav',
-      'Content-Length': audioBuffer.length,
-    });
-    res.send(audioBuffer);
-    console.log(`✅ 音声生成完了: "${text}"`);
-
+    const audioBuffer = Buffer.from(synthResponse.data);
+    fs.writeFileSync(cachedFilePath, audioBuffer);
+    console.log(`💾 音声をキャッシュに保存: ${hash}.wav (speaker=${speaker})`);
+    res.sendFile(cachedFilePath);
   } catch (error) {
-    console.error('❌ 音声生成エラー:', error.message);
-    if (error.response) {
-      console.error('  レスポンスステータス:', error.response.status);
-      console.error('  レスポンスデータ:', error.response.data);
+    console.error('❌ VOICEVOX エラー:', error.message);
+    console.warn('⚠️ VOICEVOX 失敗 → AquesTalkPlayer でフォールバック');
+    if (!fs.existsSync(AQUESTALK_PATH)) {
+      return res.status(500).json({ error: '音声生成に失敗しました（フォールバックなし）' });
     }
-    if (error.code === 'ECONNABORTED') {
-      console.error('  ⏰ タイムアウト発生');
-    }
-    res.status(500).json({
-      error: '音声生成に失敗しました。',
-      details: error.message,
+    const { exec } = require('child_process');
+    const tempFilePath = path.join(__dirname, `voice_${Date.now()}.wav`);
+    const command = `"${AQUESTALK_PATH}" /T "${text}" /W "${tempFilePath}"`;
+    exec(command, (execError) => {
+      if (execError || !fs.existsSync(tempFilePath)) {
+        return res.status(500).json({ error: '音声生成に失敗しました' });
+      }
+      fs.renameSync(tempFilePath, fallbackCachedFilePath);
+      res.sendFile(fallbackCachedFilePath);
     });
   }
 });
 
-// Keep-alive: VOICEVOX Engine のスリープを防ぐ
-setInterval(async () => {
-  try {
-    await axios.get(`${VOICEVOX_URL}/`, { timeout: 5000 });
-    console.log('💓 VOICEVOX Engine ヘルスチェック OK');
-  } catch (e) {
-    console.log('💔 VOICEVOX Engine ヘルスチェック失敗:', e.message);
-  }
-}, 5 * 60 * 1000); // 5分ごと
+// ─── サーバー起動 ───
+const server = app.listen(PORT, () => {
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`🎙️  Voice Server (VOICEVOX + AquesTalk フォールバック)`);
+  console.log(`📡 ポート: http://localhost:${PORT}`);
+  console.log(`🗣️  VOICEVOX Engine: ${VOICEVOX_URL}`);
+  console.log(`📁 キャッシュ: ${CACHE_DIR}`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('エンドポイント:');
+  console.log('  POST /speak  - 音声生成 (body: {"text": "...", "speaker": 3})');
+  console.log('  GET  /health - ヘルスチェック');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+});
 
-// サーバー起動
-app.listen(PORT, () => {
-  console.log(`🎙️ Voice Server (VOICEVOX) running on port ${PORT}`);
-  console.log(`📡 VOICEVOX Engine URL: ${VOICEVOX_URL}`);
-  console.log(`🗣️  Default Speaker ID: ${SPEAKER_ID}（リクエストの speaker を優先）`);
-}).on('error', (err) => {
+server.on('error', (err) => {
   console.error('❌ Server failed to start:', err);
 });

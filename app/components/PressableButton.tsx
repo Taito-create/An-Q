@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useTheme } from '../theme';
 
 // ─────────────────────────────────────────────
@@ -63,6 +63,9 @@ const PressableButton = ({
   const { br } = useTheme();
   void br; // 将来の共通角丸適用フック（現在は呼び出し側スタイルを優先）
 
+  // Web キーボードナビゲーション用フォーカス状態（P1：アクセシビリティ）
+  const [focused, setFocused] = useState(false);
+
   // Web（react-native-web）向け tooltip：Pressable は title prop を持たないため
   // DOM ノードに直接 title 属性を設定する（ネイティブでは何もしない）
   const pressableRef = useRef<View>(null);
@@ -77,6 +80,8 @@ const PressableButton = ({
   return (
     <Pressable
       ref={pressableRef}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onPress={onPress}
       onPressIn={() => {
         if (haptic) triggerHaptic(8);
@@ -93,7 +98,11 @@ const PressableButton = ({
         const scale = state.pressed ? pressScale : 1;
         // 最小タップターゲット 44x44（P1：押し間違え防止）
         const touchTarget = minTouchTarget ? { minWidth: 44, minHeight: 44 } : null;
-        return [{ transform: [{ scale }] } as ViewStyle, touchTarget, base];
+        // Web キーボードナビゲーション用のフォーカスアウトライン（P1）
+        const focusOutline = focused && Platform.OS === 'web'
+          ? ({ outlineWidth: 2, outlineColor: '#00FFC8', outlineOffset: 2 } as ViewStyle)
+          : null;
+        return [{ transform: [{ scale }] } as ViewStyle, touchTarget, base, focusOutline];
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { View, Text, TouchableOpacity } from 'react-native';
 import LoadingScreen from '../app/LoadingScreen';
@@ -54,7 +54,6 @@ const SettingsScreen = safeLazy(() => import('../app/settings'));
 const ShopScreen = safeLazy(() => import('../app/shop'));
 const AchievementsScreen = safeLazy(() => import('../app/achievements'));
 const TitleScreen = safeLazy(() => import('../app/title'));
-const TitleListScreen = safeLazy(() => import('../app/titleScreen'));
 const AppSettingsScreen = safeLazy(() => import('../app/appSettings'));
 const SubHubScreen = safeLazy(() => import('../app/subHub'));
 const GachaScreen = safeLazy(() => import('../app/gacha'));
@@ -148,7 +147,6 @@ export default function App() {
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/credits" element={<CreditsScreen />} />
           <Route path="/title" element={<TitleScreen />} />
-          <Route path="/titleScreen" element={<TitleListScreen />} />
           
           <Route path="/" element={
             <ProtectedRoute>

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../src/config/firebase';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -371,22 +372,15 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.title, { color: colors.text }]}><User size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.profile || 'Profile'}</Text>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
+        <Text style={[styles.title, { color: colors.text, flex: 1 }]}><User size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.profile || 'Profile'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity onPress={() => {
             if (isEditing) { saveProfile(); } else { setIsEditing(true); }
           }}>
             <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>
               {isEditing ? (locale === 'ja' ? '保存' : 'Save') : (locale === 'ja' ? '編集' : 'Edit')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-            onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </TouchableOpacity>
           {user && (
@@ -424,7 +418,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} scrollEnabled={!showCropModal}>
+      <ScrollView style={styles.content} scrollEnabled={!showCropModal} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* プロフィール画像表示 */}
         <View style={{ alignItems: 'center', marginBottom: 24, marginTop: 16 }}>
           {isEditing ? (

@@ -8,10 +8,50 @@ import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { recordLogin } from './missions';
 import MiniPlayer from './miniPlayer';
+import { STORAGE_KEYS } from './constants/storageKeys';
+import { useExternalAudioDetector, useAdaptiveSoundVolume } from './externalAudioDetector';
+
+/**
+ * 外部音楽検知ブリッジ（設定で ON のときのみマウントされる）。
+ * 検知フック自体がマウント時にマイク許可を求めるため、
+ * OFF 時はこのコンポーネントごと描画しないことで許可ダイアログを出さない。
+ */
+function ExternalAudioBridge() {
+  const externalAudio = useExternalAudioDetector();
+  const { soundMultiplier } = useAdaptiveSoundVolume(externalAudio.isPlaying, externalAudio.detectedApp);
+
+  useEffect(() => {
+    SoundManager.setGlobalVolumeMultiplier(soundMultiplier);
+  }, [soundMultiplier]);
+
+  return null;
+}
 
 function RootLayoutInner() {
   const { colors, isCyberpunk } = useTheme();
   const [bgmReady, setBgmReady] = useState(false);
+  // 外部音楽検知の ON/OFF（デフォルト OFF。マイク許可が必要なため）
+  const [externalAudioDetectionEnabled, setExternalAudioDetectionEnabled] = useState(false);
+
+  // 設定画面でトグルされた値を反映するため、マウント時とフォーカス復帰時に読み直す
+  useEffect(() => {
+    let cancelled = false;
+    const loadFlag = async () => {
+      try {
+        const v = await AsyncStorage.getItem(STORAGE_KEYS.EXTERNAL_AUDIO_DETECTION_ENABLED);
+        if (!cancelled) setExternalAudioDetectionEnabled(v === 'true');
+      } catch (e) {
+        console.warn('Failed to load external audio detection flag:', e);
+      }
+    };
+    loadFlag();
+    const onFocus = () => { loadFlag(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   useEffect(() => {
     // Initialize BGM when app starts (load only, no autoplay)
@@ -67,6 +107,7 @@ function RootLayoutInner() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {externalAudioDetectionEnabled && <ExternalAudioBridge />}
       <MiniPlayer />
       <Outlet />
     </View>

@@ -6,20 +6,19 @@ import { SoundManager } from './sound';
 import { useTheme, ThemeName, FontSize } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { AnimationLevel, animationConfigs } from './animations';
-import { Check } from 'lucide-react';
+import BackButton from './components/BackButton';
+import { Check, Palette } from 'lucide-react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { translations } from './translations';
 
 const themeOptions: { key: ThemeName; labelJa: string; labelEn: string }[] = [
-  { key: 'blue',   labelJa: 'ブルー',   labelEn: 'Blue' },
-  { key: 'green',  labelJa: 'グリーン', labelEn: 'Green' },
-  { key: 'orange', labelJa: 'オレンジ', labelEn: 'Orange' },
-  { key: 'pink',   labelJa: 'ピンク',   labelEn: 'Pink' },
-  { key: 'sakura', labelJa: 'サクラ',   labelEn: 'Sakura' },
-  { key: 'purple', labelJa: 'パープル', labelEn: 'Purple' },
-  { key: 'red',     labelJa: 'レッド',     labelEn: 'Red' },
-  { key: 'dark',    labelJa: 'ダーク',    labelEn: 'Dark' },
-  { key: 'cyberpunk', labelJa: 'サイバーパンク', labelEn: 'Cyberpunk' },
+  { key: 'cyan',       labelJa: 'シアン',       labelEn: 'Cyan' },
+  { key: 'magenta',    labelJa: 'マゼンタ',     labelEn: 'Magenta' },
+  { key: 'matrix',     labelJa: 'マトリックス', labelEn: 'Matrix' },
+  { key: 'amber',      labelJa: 'アンバー',     labelEn: 'Amber' },
+  { key: 'neonblue',   labelJa: 'ネオンブルー', labelEn: 'Neon Blue' },
+  { key: 'purple',     labelJa: 'パープル',     labelEn: 'Purple' },
+  { key: 'monochrome', labelJa: 'モノクローム', labelEn: 'Monochrome' },
 ];
 
 const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
@@ -107,24 +106,13 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
       {/* Header with close button */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale) }]}>
-          {ja ? 'テーマカラー設定' : 'Theme Settings'}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
+        <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale), flex: 1 }]}>
+          <Palette size={24} color={colors.primary} style={{ marginRight: 8 }} />{ja ? 'インターフェース設定' : 'Interface Settings'}
         </Text>
-        <TouchableOpacity
-          style={{
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            
-          }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Preset Themes */}
@@ -133,7 +121,7 @@ export default function SettingsScreen() {
           {ja ? 'プリセット' : 'Presets'}
         </Text>
         <Text style={[styles.sectionDesc, { color: colors.textSecondary, fontSize: Math.round(13 * scale) }]}>
-          {ja ? '9種類のプリセットから選択' : 'Choose from 9 preset themes'}
+          {ja ? '7種類のプリセットから選択' : 'Choose from 7 preset themes'}
         </Text>
         <View style={styles.themeGrid}>
           {themeOptions.map(opt => {

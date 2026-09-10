@@ -37,7 +37,6 @@ const TABS_SCREENS: Record<string, string[]> = {
 };
 
 const BottomNavBar = () => {
-  console.log('BottomNavBar rendered'); // レンダリング確認用ログ
   const navigate = useNavigate();
   const location = useLocation();
   const { colors: themeColors } = useTheme();
@@ -293,7 +292,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     // 影を追加（浮き上がった印象）
-    boxShadow: '0px -2px 4px rgba(0,0,0,0.08)',
+    boxShadow: '0px -4px 12px rgba(0,0,0,0.4)',
     elevation: 8,
   },
   navItem: {

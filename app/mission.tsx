@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigate } from 'react-router-dom';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useAuth } from './auth/AuthContext';
@@ -66,25 +67,11 @@ export default function MissionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/" />
+        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20), flex: 1 }]}>
           <Target size={24} color={colors.primary} style={{ marginRight: 8 }} />{locale === 'ja' ? 'ミッション' : 'Missions'}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {stats && (
-            <Text style={[styles.books, { color: colors.primary, fontSize: fs(14) }]}>
-              <BookOpen size={18} color={colors.primary} style={{ marginRight: 4 }} />{stats.totalBooks}
-            </Text>
-          )}
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-            onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Claim message */}

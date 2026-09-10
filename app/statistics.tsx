@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -189,19 +190,14 @@ export default function StatisticsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/" />
         <Text style={[styles.headerTitle, { color: colors.text }]}>
            {locale === 'ja' ? '週間統計' : 'Weekly Stats'}
         </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Lottieテスト表示 */}
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>

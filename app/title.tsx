@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { TITLE_BADGES, loadStats, saveStats, UserStats } from './missions';
@@ -8,9 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { Lock } from 'lucide-react';
+import BackButton from './components/BackButton';
 
 export default function TitleScreen() {
-  const navigate = useNavigate();
   const { colors, onPrimary, scale, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -36,8 +35,9 @@ export default function TitleScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <View>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
+        <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
             {t.titlesTitle}
           </Text>
@@ -45,27 +45,19 @@ export default function TitleScreen() {
             {unlockedCount} / {totalCount} {t.unlockedLabel}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {stats?.equippedTitle && (
-            <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-              <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
-                {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
-                {locale === 'ja'
-                  ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
-                  : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-          >
-            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>{locale === 'ja' ? '戻る' : 'Back'}</Text>
-          </TouchableOpacity>
-        </View>
+        {stats?.equippedTitle && (
+          <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+            <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
+              {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}
+              {locale === 'ja'
+                ? TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleJa
+                : TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.titleEn}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <ScrollView style={styles.list}>
+      <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Stats summary */}
         {stats && (
           <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

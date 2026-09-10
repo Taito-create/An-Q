@@ -17,6 +17,8 @@ class SoundManager {
   private static currentSESet: SEType = 'effect1';
   private static bgmRate = 1.0;
   private static seEnabled = true;
+  // 外部音楽検知時の全体音量倍率（0〜1。BGM・SE の両方に掛ける）
+  private static globalVolumeMultiplier = 1.0;
 
   static async initialize() {
     if (this.initialized) return;
@@ -75,9 +77,9 @@ class SoundManager {
     const sound = this.sounds[key];
     if (sound) {
       sound.currentTime = 0;
-      // スマホの場合は音量を小さく
-      const volume = isMobile ? 0.4 : 0.7;
-      sound.volume = volume;
+      // スマホの場合は音量を小さく（外部音楽検知時はさらに倍率を掛ける）
+      const baseVolume = isMobile ? 0.4 : 0.7;
+      sound.volume = Math.max(0, Math.min(1, baseVolume * this.globalVolumeMultiplier));
       try {
         await sound.play();
         console.log(` Played: ${type}`);
@@ -102,6 +104,23 @@ class SoundManager {
     await this.play('decide');
   }
 
+  /**
+   * 外部音楽検知による全体音量倍率（0〜1）を設定する。
+   * SE（play 時）と 再生中の BGM の両方に即時反映される。
+   */
+  static setGlobalVolumeMultiplier(multiplier: number) {
+    const clamped = Math.max(0, Math.min(1, multiplier));
+    this.globalVolumeMultiplier = clamped;
+    if (this.bgm) {
+      this.bgm.volume = clamped;
+    }
+    console.log(' Global volume multiplier set to:', clamped);
+  }
+
+  static getGlobalVolumeMultiplier(): number {
+    return this.globalVolumeMultiplier;
+  }
+
   static async initializeBGM() {
     const settings = await this.getBGMSettings();
     this.bgmEnabled = settings.enabled;
@@ -122,6 +141,7 @@ class SoundManager {
     audio.loop = true;
     audio.playbackRate = this.bgmRate;
     audio.src = `/sounds/BGM/${bgmType}.mp3`;  // src を個別に設定
+    audio.volume = this.globalVolumeMultiplier;
     
     this.bgm = audio;
     this.currentBGM = bgmType;
@@ -135,6 +155,7 @@ class SoundManager {
 
   static async playBGM() {
     if (this.bgm && this.bgmEnabled) {
+      this.bgm.volume = this.globalVolumeMultiplier;
       try {
         await this.bgm.play();
         console.log('BGM playing');

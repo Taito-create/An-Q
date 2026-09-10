@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useLocale } from './hooks/useLocale';
@@ -704,15 +705,7 @@ export default function CalendarScreen() {
       contentContainerStyle={styles.scrollContent}
     >
       <View style={[styles.header, { borderBottomColor: colors.border, justifyContent: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-        <PressableButton
-          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
-          onPress={() => {
-            SoundManager.play('decide');
-            navigate('/sub');
-          }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </PressableButton>
+        <BackButton to="/sub" />
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           $ SCHEDULED TRANSFERS
         </Text>
@@ -859,7 +852,7 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingBottom: 20 },
+  scrollContent: { paddingBottom: 100 },
   header: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   calendarContainer: { padding: 16, alignItems: 'center' },

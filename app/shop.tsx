@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Alert, Image } from 'react-native';
 import PressableButton from './components/PressableButton';
+import BackButton from './components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
@@ -130,12 +131,7 @@ export default function ShopScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
-        <PressableButton
-          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </PressableButton>
+        <BackButton to="/sub" />
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20), flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           {t.shopTitle}
         </Text>
@@ -164,7 +160,7 @@ export default function ShopScreen() {
         </View>
       ) : null}
 
-      <ScrollView style={styles.list}>
+      <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* ===== 一般アイテム（コイン/本） ===== */}
         <Text style={[styles.sectionTitle, { color: colors.text, fontSize: fs(16) }]}>
           {locale === 'ja' ? 'アイテムショップ' : 'Item Shop'}

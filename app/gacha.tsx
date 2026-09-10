@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView, Image } from 'react-native';
 import PressableButton from './components/PressableButton';
+import BackButton from './components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
@@ -130,13 +131,8 @@ useEffect(() => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ヘッダー */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
-        <PressableButton
-          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </PressableButton>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexShrink: 1 }}>
           <Image source={IMAGES.coin} style={{ width: 22, height: 22, resizeMode: 'contain' }} />
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
@@ -155,7 +151,7 @@ useEffect(() => {
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingBottom: 100 }]}>
         {/* メインバナー */}
         <View style={[styles.banner, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
           <Text style={[styles.bannerTitle, { color: colors.primary }]}>

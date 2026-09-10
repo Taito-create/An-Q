@@ -100,14 +100,14 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   title: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: 'monospace',
     letterSpacing: 1,
     marginBottom: 8,
   },
   line: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'monospace',
     lineHeight: 18,
   },

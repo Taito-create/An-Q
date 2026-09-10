@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Ionicons } from '../src/icons';
+import { Calendar, ClipboardList, Award, ShoppingBag, Timer, Palette, BarChart3, Music } from 'lucide-react';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,16 +18,16 @@ export default function ReorderConfirmScreen() {
   const after = safeParseArray<string>(searchParams.get('after'), []);
   const mode = searchParams.get('mode') || 'compact';
 
-  // ラベル定義
-  const labels: Record<string, { ja: string; en: string; icon: string }> = {
-    calendar:      { ja: 'カレンダー',       en: 'Calendar',    icon: 'calendar-outline' },
-    mission:       { ja: 'ミッション',       en: 'Missions',    icon: 'clipboard-outline' },
-    title:         { ja: '称号',             en: 'Titles',      icon: 'ribbon-outline' },
-    shop:          { ja: 'ショップ',         en: 'Shop',        icon: 'storefront-outline' },
-    manage:        { ja: 'タイマー設定',     en: 'Timer',       icon: 'timer-outline' },
-    themeSettings: { ja: 'テーマカラー設定', en: 'Theme',       icon: 'color-palette-outline' },
-    browse:        { ja: '学習履歴',         en: 'History',     icon: 'stats-chart' },
-    music:         { ja: '音楽設定',         en: 'Music',       icon: 'musical-notes' },
+  // ラベル定義（icon は Lucide コンポーネントへの参照）
+  const labels: Record<string, { ja: string; en: string; icon: React.ComponentType<any> }> = {
+    calendar:      { ja: 'カレンダー',       en: 'Calendar',    icon: Calendar },
+    mission:       { ja: 'ミッション',       en: 'Missions',    icon: ClipboardList },
+    title:         { ja: '称号',             en: 'Titles',      icon: Award },
+    shop:          { ja: 'ショップ',         en: 'Shop',        icon: ShoppingBag },
+    manage:        { ja: 'タイマー設定',     en: 'Timer',       icon: Timer },
+    themeSettings: { ja: 'テーマカラー設定', en: 'Theme',       icon: Palette },
+    browse:        { ja: '学習履歴',         en: 'History',     icon: BarChart3 },
+    music:         { ja: '音楽設定',         en: 'Music',       icon: Music },
   };
 
   const apply = async () => {
@@ -51,10 +51,11 @@ export default function ReorderConfirmScreen() {
       {order.map((key, i) => {
         const def = labels[key];
         if (!def) return null;
+        const IconComp = def.icon;
         return (
           <View key={key} style={[styles.item, { borderBottomColor: colors.border }]}>
             <Text style={[styles.num, { color: colors.primary }]}>{i + 1}</Text>
-            <Ionicons name={def.icon as any} size={18} color={colors.primary} style={styles.icon} />
+            <IconComp size={18} color={colors.primary} style={styles.icon} />
             <Text style={[styles.label, { color: colors.text }]}>{ja ? def.ja : def.en}</Text>
           </View>
         );

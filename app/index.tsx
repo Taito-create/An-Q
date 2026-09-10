@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    StyleSheet, Text, View, TouchableOpacity, Image,
+    StyleSheet, Text, View, Image,
   ScrollView, StatusBar, Alert, Animated, ActivityIndicator
 } from 'react-native';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import PressableButton from './components/PressableButton';
+import RomeaSpeechBubble from './components/RomeaSpeechBubble';
 import TerminalLog, { TerminalLogHandle } from './components/TerminalLog';
 import PatternBackground from './patternBackground';
 import { IMAGES } from './constants/images';
@@ -26,9 +27,6 @@ import {
   Target,
   BookOpen,
   ChevronRight,
-  PenSquare,
-  Share2,
-  Package,
   Coins,
   AlertTriangle,
   Lightbulb,
@@ -45,7 +43,7 @@ import {
   Trophy
 } from 'lucide-react';
 import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission, UserStats, loadTodayCorrect, loadWeeklyProgress, WeeklyProgress, setQuickQuizCountCache, TITLE_BADGES } from './missions';
-import { AnimationLevel, createShakeAnimation, createPulseAnimation, bgDurationMap } from './animations';
+import { AnimationLevel, createShakeAnimation, createPulseAnimation } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
@@ -227,7 +225,7 @@ const HomeScreen = React.memo(() => {
   const fontSize = {
     title: screenType === 'desktop' ? 18 : screenType === 'tablet' ? 16 : 15,
     body: screenType === 'desktop' ? 15 : screenType === 'tablet' ? 14 : 13,
-    small: screenType === 'desktop' ? 12 : screenType === 'tablet' ? 11 : 10,
+    small: screenType === 'desktop' ? 12 : screenType === 'tablet' ? 12 : 12,
   };
 
   const t = translations[currentLocale];
@@ -888,6 +886,15 @@ const HomeScreen = React.memo(() => {
       }]}
       onPress={() => { SoundManager.play('decide'); navigateWithAnimation('/create'); }}
     >
+      <RomeaSpeechBubble
+        message={
+          locale === 'ja'
+            ? 'ようこそ！まずは問題を作成して、最初の記憶をインストールしましょう。'
+            : 'Welcome! Create your first question to install your first memory.'
+        }
+        romeaSize={80}
+        style={{ marginBottom: 16 }}
+      />
       <View style={[styles.emptyStatsIcon, { borderColor: colors.primary + '55' }]}>
         <Zap size={22} color={colors.primary} />
       </View>
@@ -1394,7 +1401,7 @@ const HomeScreen = React.memo(() => {
           style={{
             color: colors.textSecondary,
             fontFamily: 'monospace',
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: 0.5,
             marginTop: 6,
           }}
@@ -2039,14 +2046,14 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   terminalLogTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: 'monospace',
     letterSpacing: 1,
     marginBottom: 8,
   },
   terminalLogLine: {
-    fontSize:  11,
+    fontSize:  12,
     fontFamily: 'monospace',
     lineHeight: 18,
   },

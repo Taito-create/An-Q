@@ -2,193 +2,73 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Theme color presets
+// サイバーパンク・バリエーション（背景・カード・テキストは共通、primary のみ異なる）
+const CYBER_BASE = {
+  onPrimary: '#000000',
+  secondary: '#58A6FF',
+  background: '#0B0E14',
+  card: '#161B22',
+  text: '#E6EDF3',
+  textSecondary: '#B0B8C0',
+  border: '#4A5560',
+  success: '#3FB950',
+  warning: '#D29922',
+  error: '#FF7B72',
+} as const;
+
 const themePresets = {
-  blue: {
-    name: 'Blue',
-    primary: '#2563EB',
-    onPrimary: '#FFFFFF',
-    secondary: '#60A5FA',
-    background: '#F8FAFC',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+  cyan: {
+    name: 'Cyan',
+    ...CYBER_BASE,
+    primary: '#00FFC8',
   },
-  green: {
-    name: 'Green',
-    primary: '#16A34A',
-    onPrimary: '#FFFFFF',
-    secondary: '#86EFAC',
-    background: '#F7FAF7',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+  magenta: {
+    name: 'Magenta',
+    ...CYBER_BASE,
+    primary: '#FF0080',
   },
-  orange: {
-    name: 'Orange',
-    primary: '#EA580C',
-    onPrimary: '#FFFFFF',
-    secondary: '#FDBA74',
-    background: '#FFFAF5',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+  matrix: {
+    name: 'Matrix',
+    ...CYBER_BASE,
+    primary: '#00FF41',
   },
-  pink: {
-    name: 'Pink',
-    primary: '#DB2777',
-    onPrimary: '#FFFFFF',
-    secondary: '#F9A8D4',
-    background: '#FFF7FB',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+  amber: {
+    name: 'Amber',
+    ...CYBER_BASE,
+    primary: '#FFB000',
   },
-  sakura: {
-    name: 'Sakura',
-    primary: '#E11D48',
-    onPrimary: '#FFFFFF',
-    secondary: '#FDA4AF',
-    background: '#FFF7F8',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+  neonblue: {
+    name: 'Neon Blue',
+    ...CYBER_BASE,
+    primary: '#58A6FF',
   },
   purple: {
     name: 'Purple',
-    primary: '#7C3AED',
-    onPrimary: '#FFFFFF',
-    secondary: '#C084FC',
-    background: '#FAF7FF',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
+    ...CYBER_BASE,
+    primary: '#B794F6',
   },
-  red: {
-    name: 'Red',
-    primary: '#DC2626',
-    onPrimary: '#FFFFFF',
-    secondary: '#F87171',
-    background: '#FFF7F7',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#64748B',
-    border: '#E2E8F0',
-    success: '#4CAF50',
-    warning: '#D97706',
-    error: '#DC2626',
-  },
-  dark: {
-    name: 'Dark',
-    primary: '#60A5FA',
-    onPrimary: '#0F172A',
-    secondary: '#93C5FD',
-    background: '#0F172A',
-    card: '#111827',
-    text: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    border: '#334155',
-    success: '#4CAF50',
-    warning: '#F59E0B',
-    error: '#F87171',
-  },
-  cyberpunk: {
-    name: 'Cyberpunk',
-    primary: '#00FFC8',      // サイバーシアン（メインCTA）
-    onPrimary: '#000000',    // シアン上のテキストは黒
-    secondary: '#58A6FF',    // 補助アクセント
-    background: '#0B0E14',   // 漆黒に近い濃紺
-    card: '#161B22',         // カード背景
-    text: '#E6EDF3',         // メインテキスト（ほぼ白）
-    textSecondary: '#8B949E',// サブテキスト
-    border: '#30363D',       // 境界線
-    success: '#3FB950',
-    warning: '#D29922',
-    error: '#FF7B72',
-  },
-  retro: {
-    name: 'Retro',
-    primary: '#E86F2C',
-    onPrimary: '#FFFFFF',
-    secondary: '#F4A261',
-    background: '#FFF4EC',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#6B7280',
-    border: '#E8D5C4',
-    success: '#4CAF50',
-    warning: '#F59E0B',
-    error: '#DC2626',
-  },
-  sunset: {
-    name: 'Sunset',
-    primary: '#F97316',
-    onPrimary: '#FFFFFF',
-    secondary: '#FDBA74',
-    background: '#FFF7ED',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#78716C',
-    border: '#FED7AA',
-    success: '#4CAF50',
-    warning: '#F59E0B',
-    error: '#DC2626',
-  },
-  mint: {
-    name: 'Mint',
-    primary: '#0D9488',
-    onPrimary: '#FFFFFF',
-    secondary: '#5EEAD4',
-    background: '#F0FDFA',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#5F6B6A',
-    border: '#CCFBF1',
-    success: '#4CAF50',
-    warning: '#F59E0B',
-    error: '#DC2626',
-  },
-  lavender: {
-    name: 'Lavender',
-    primary: '#8B5CF6',
-    onPrimary: '#FFFFFF',
-    secondary: '#C4B5FD',
-    background: '#F8F6FF',
-    card: '#FFFFFF',
-    text: '#1A1A1A',
-    textSecondary: '#6D6A7A',
-    border: '#E4E0F5',
-    success: '#4CAF50',
-    warning: '#F59E0B',
-    error: '#DC2626',
+  monochrome: {
+    name: 'Monochrome',
+    ...CYBER_BASE,
+    primary: '#E6EDF3',
   },
 };
 
 export type ThemeName = keyof typeof themePresets;
-export type ThemeColors = typeof themePresets.blue;
+export type ThemeColors = {
+  name: string;
+  primary: string;
+  onPrimary: string;
+  secondary: string;
+  background: string;
+  card: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  success: string;
+  warning: string;
+  error: string;
+};
 
 export type FontSize = 'small' | 'medium' | 'large';
 export type PatternType = 'none' | 'dots' | 'stripes' | 'grid' | 'waves' | 'diamonds';
@@ -199,9 +79,9 @@ export type PatternType = 'none' | 'dots' | 'stripes' | 'grid' | 'waves' | 'diam
 export const globalTokens = {
   background: '#0B0E14',
   card: '#161B22',
-  border: '#30363D',
+  border: '#4A5560',
   text: '#E6EDF3',
-  textSecondary: '#8B949E',
+  textSecondary: '#B0B8C0',
   primary: '#00FFC8',
   onPrimary: '#000000',
   success: '#3FB950',
@@ -251,7 +131,7 @@ export const useTheme = () => {
   // 各プリセットに定義した onPrimary を優先する。定義が無い場合は明度でフォールバック。
   const lum = getLuminance(context.colors.primary);
   const onPrimary = context.colors.onPrimary || (lum > 150 ? '#1A1A1A' : '#FFFFFF');
-  const isCyberpunk = context.currentTheme === 'cyberpunk';
+  const isCyberpunk = true; // 全7テーマがダーク系サイバーベースのため常にtrue
   // 全画面共通のボーダー半径（鋭角4px）
   const br = globalTokens.borderRadius;
   const typography = globalTokens.typography;
@@ -266,37 +146,19 @@ function getLuminance(hex: string): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-// カスタムカラーからテーマを生成する
+// カスタムカラーからテーマを生成する（アクセントのみ変更・ダーク世界観を維持）
 function buildCustomTheme(hex: string): ThemeColors {
-  const lum = getLuminance(hex);
-  const isDark = lum < 60;
-  const isLight = lum > 180;
-
-  // 背景・カード・テキストを明度に応じて調整
-  const background = isDark ? '#1A1A2E' : isLight ? '#F0F0F0' : '#F8F9FA';
-  const card = isDark ? '#2A2A3E' : '#FFFFFF';
-  const text = isDark ? '#FFFFFF' : '#1A1A1A';
-  const textSecondary = isDark ? '#B6B6B6' : '#667085';
-  const border = isDark ? hex + '55' : hex + '2E';
-
   return {
     name: 'Custom',
+    ...CYBER_BASE,
     primary: hex,
-    onPrimary: lum > 150 ? '#1A1A1A' : '#FFFFFF',
-    secondary: hex + 'AA',
-    background,
-    card,
-    text,
-    textSecondary,
-    border,
-    success: '#4CAF50',
-    warning: '#FF9500',
-    error: '#FF3B30',
   };
 }
 
+
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTheme, setCurrentTheme] = useState<ThemeName>('cyberpunk');
+  const [currentTheme, setCurrentTheme] = useState<ThemeName>('cyan');
   const [customColor, setCustomColorState] = useState<string | null>(null);
   const [fontSize, setFontSizeState] = useState<FontSize>('medium');
   const [pattern, setPatternState] = useState<PatternType>('none');
@@ -374,7 +236,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   if (isLoading) return null;
 
   return (
-    <ThemeContext.Provider value={{ currentTheme: customColor ? 'custom' : currentTheme, colors, setTheme, setCustomColor, availableThemes, fontSize, setFontSize, scale, customColor, pattern, setPattern, isCyberpunk: currentTheme === 'cyberpunk' }}>
+    <ThemeContext.Provider value={{ currentTheme: customColor ? 'custom' : currentTheme, colors, setTheme, setCustomColor, availableThemes, fontSize, setFontSize, scale, customColor, pattern, setPattern, isCyberpunk: true }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput,
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import PressableButton from './components/PressableButton';
 import { translations } from './translations';
@@ -522,11 +523,9 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}> 
-        <PressableButton
-          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}> 
+        <BackButton
           onPress={() => {
-            SoundManager.play('decide');
             if (selectedFolder) {
               setSelectedFolder(null);
               setFolderQuestions([]);
@@ -534,9 +533,7 @@ export default function BrowseQuestionsScreen() {
               navigate('/create');
             }
           }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </PressableButton>
+        />
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           $ MANAGE NODES
         </Text>
@@ -576,24 +573,6 @@ export default function BrowseQuestionsScreen() {
           >
             <Text style={[styles.headerBtnText, { color: isFolderDeleteMode ? onPrimary : colors.error }]}>
               
-            </Text>
-          </PressableButton>
-          <PressableButton
-            style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-            onPress={() => { 
-              SoundManager.play('decide'); 
-              if (selectedFolder) {
-                // フォルダ詳細ビューからフォルダ一覧に戻る
-                setSelectedFolder(null);
-                setFolderQuestions([]);
-              } else {
-                // 作成ハブに戻る
-                navigate('/create'); 
-              }
-            }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-              {locale === 'ja' ? '戻る' : 'Back'}
             </Text>
           </PressableButton>
         </View>
@@ -1688,7 +1667,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  mainScrollContent: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28 },
+  mainScrollContent: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 100 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 16 },
   title: { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   card: {

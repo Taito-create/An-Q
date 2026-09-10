@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       include: [
@@ -24,13 +24,23 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['react-native-calendars'],
   },
+  esbuild: {
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: true,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: {
         main: './index.html',
+      },
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+        },
       },
     },
   },
@@ -38,4 +48,4 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-});
+}));

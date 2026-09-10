@@ -234,6 +234,7 @@ const VOICE_SERVER_URL = import.meta.env.VITE_VOICE_SERVER_URL || 'http://localh
 export const speakWithServer = async (text: string): Promise<void> => {
   try {
     console.log(' speakWithServer called with:', text);
+    console.log('🔊 VOICE_SERVER_URL:', VOICE_SERVER_URL);
     const response = await fetch(VOICE_SERVER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

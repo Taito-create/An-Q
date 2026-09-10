@@ -8,8 +8,12 @@
 // ─────────────────────────────────────────────
 import coinCyber from '../../assets/images/coin_cyber.png';
 import bookCyber from '../../assets/images/book_cyber.png';
+import backArrowCyber from '../../assets/images/back_arrow.png';
+import romeaImage from '../../assets/images/romea.png';
 
 export const IMAGES = {
   coin: { uri: coinCyber },
   book: { uri: bookCyber },
+  backArrow: { uri: backArrowCyber },
+  romea: { uri: romeaImage },
 } as const;

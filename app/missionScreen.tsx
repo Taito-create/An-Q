@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigate } from 'react-router-dom';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useAuth } from './auth/AuthContext';
@@ -69,8 +70,9 @@ export default function MissionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, flex: 1 }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/" />
+        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20), flex: 1 }]}>
           <Target size={24} color={colors.primary} style={{ marginRight: 8 }} />{ja ? 'ミッション' : 'Missions'}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -79,14 +81,6 @@ export default function MissionScreen() {
               <BookOpen size={18} color={colors.primary} style={{ marginRight: 4 }} />{stats.totalBooks}
             </Text>
           )}
-          <TouchableOpacity
-            style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary, borderRadius: isCyberpunk ? 0 : 10, alignItems: 'center', justifyContent: 'center', minWidth: 70 }}
-            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-          >
-            <Text style={{ color: onPrimary, fontWeight: '700', fontSize: 14 }}>
-              {ja ? '戻る' : 'Back'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -112,7 +106,7 @@ export default function MissionScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.list} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView style={styles.list} contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}>
         {filteredMissions.map(mission => {
           const p = stats ? getMissionProgress(mission, progress, stats) : null;
           const current = p?.current ?? 0;

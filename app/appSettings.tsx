@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate } from 'react-router-dom';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { SoundManager } from './sound';
 import { useBGM } from './bgmContext';
@@ -10,10 +11,6 @@ import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { safeRender } from './utils/renderHelpers';
 import {
-  voicePresetLabels,
-  voicePresetDescriptions,
-  getStoredVoicePreset,
-  setStoredVoicePreset,
   speakText,
   initSpeechVoices,
   VOICEVOX_SPEAKERS,
@@ -36,16 +33,31 @@ export default function AppSettingsScreen() {
 
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [seEnabled, setSeEnabled] = useState(true);
+  // 外部音楽検知（デフォルト OFF。マイク許可が必要なため）
+  const [externalAudioDetectionEnabled, setExternalAudioDetectionEnabled] = useState(false);
   const [voiceEngine, setVoiceEngine] = useState<'web' | 'voicevox'>('web');
   const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   const [voicevoxMode, setVoicevoxMode] = useState<'direct' | 'proxy'>('direct');
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEYS.DEV_MODE_ENABLED).then(v => setDevModeEnabled(v === 'true'));
-    AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED).then(v => setSeEnabled(v !== 'false'));
-    AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENGINE).then(v => setVoiceEngine(v === 'voicevox' ? 'voicevox' : 'web'));
-    AsyncStorage.getItem(STORAGE_KEYS.VOICEVOX_SPEAKER).then(v => setVoicevoxSpeaker(v ? parseInt(v, 10) : 3));
-    AsyncStorage.getItem('voicevox_mode').then(v => setVoicevoxMode(v === 'proxy' ? 'proxy' : 'direct'));
+    AsyncStorage.getItem(STORAGE_KEYS.DEV_MODE_ENABLED)
+      .then(v => setDevModeEnabled(v === 'true'))
+      .catch(e => console.warn('Failed to load dev mode flag:', e));
+    AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED)
+      .then(v => setSeEnabled(v !== 'false'))
+      .catch(e => console.warn('Failed to load SE flag:', e));
+    AsyncStorage.getItem(STORAGE_KEYS.EXTERNAL_AUDIO_DETECTION_ENABLED)
+      .then(v => setExternalAudioDetectionEnabled(v === 'true'))
+      .catch(e => console.warn('Failed to load external audio detection flag:', e));
+    AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENGINE)
+      .then(v => setVoiceEngine(v === 'voicevox' ? 'voicevox' : 'web'))
+      .catch(e => console.warn('Failed to load voice engine:', e));
+    AsyncStorage.getItem(STORAGE_KEYS.VOICEVOX_SPEAKER)
+      .then(v => setVoicevoxSpeaker(v ? parseInt(v, 10) : 3))
+      .catch(e => console.warn('Failed to load voicevox speaker:', e));
+    AsyncStorage.getItem('voicevox_mode')
+      .then(v => setVoicevoxMode(v === 'proxy' ? 'proxy' : 'direct'))
+      .catch(e => console.warn('Failed to load voicevox mode:', e));
 
     // 音声エンジンを初期化
     initSpeechVoices();
@@ -86,6 +98,12 @@ export default function AppSettingsScreen() {
     SoundManager.play('decide');
   };
 
+  const handleExternalAudioDetection = async (val: boolean) => {
+    setExternalAudioDetectionEnabled(val);
+    await AsyncStorage.setItem(STORAGE_KEYS.EXTERNAL_AUDIO_DETECTION_ENABLED, val ? 'true' : 'false');
+    SoundManager.play('decide');
+  };
+
   const handleVoicePreview = () => {
     SoundManager.play('decide');
     const text = locale === 'ja' ? 'こんにちは！テストです。' : 'Hello! This is a test.';
@@ -114,21 +132,14 @@ export default function AppSettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20) }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
+        <Text style={[styles.headerTitle, { color: colors.text, fontSize: fs(20), flex: 1 }]}>
           <Settings size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.appSettings}
         </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.list}>
+      <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 }}>
 
         {/* 言語 */}
         <SectionHeader title={locale === 'ja' ? '言語 / Language' : 'Language'} />
@@ -179,6 +190,26 @@ export default function AppSettingsScreen() {
               />
             }
           />
+          <Row
+            label={locale === 'ja' ? '外部音楽を検知して音量を自動調整' : 'Auto-adjust volume when external music is detected'}
+            right={
+              <Switch
+                value={externalAudioDetectionEnabled}
+                onValueChange={handleExternalAudioDetection}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFF"
+              />
+            }
+          />
+          {/* マイク許可の説明（ON時は許可ダイアログが表示される旨を明示） */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 12 }}>
+            <Mic size={14} color={colors.textSecondary} />
+            <Text style={{ color: colors.textSecondary, fontSize: fs(11), flex: 1, lineHeight: 16 }}>
+              {locale === 'ja'
+                ? '有効にするとマイクへのアクセス許可を求めます。許可されない場合も、既存の音量設定のまま動作します。'
+                : 'Enabling this requests microphone access. If denied, the app keeps using the current volume settings.'}
+            </Text>
+          </View>
           <Row
             label={t.musicSettings}
             right={
@@ -378,7 +409,6 @@ const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', gap: 6 },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   segBtnText: { fontWeight: '600' },
-  voicePresetList: { flexDirection: 'column', gap: 8 },
   engineToggle: { flexDirection: 'row', gap: 6 },
   engineBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   speakerList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, maxWidth: 200 },

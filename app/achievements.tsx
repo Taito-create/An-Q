@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
@@ -156,22 +157,16 @@ export default function AchievementsScreen() {
             backgroundColor: colors.card,
             borderBottomColor: colors.border,
             flexDirection: 'row',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             alignItems: 'center',
+            gap: 10,
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
+        <BackButton to="/sub" />
+        <Text style={[styles.headerTitle, { color: colors.text, flex: 1 }]}>
           {t.achievements}
         </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
-            {locale === 'ja' ? '戻る' : 'Back'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Progress Summary */}
@@ -287,7 +282,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   gridContainer: {
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   badgesGrid: {
     flexDirection: 'row',

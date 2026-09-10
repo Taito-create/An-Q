@@ -155,17 +155,17 @@ export default function MiniPlayer() {
 }
 
 const styles = StyleSheet.create({
-  container: { borderBottomWidth: 1, paddingHorizontal: 12, paddingVertical: 6, zIndex: 100 },
+  container: { borderBottomWidth: 1, paddingHorizontal: 12, paddingVertical: 10, zIndex: 100 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   trackInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' },
   noteIcon: { fontSize: 13 },
   trackName: { flex: 1, fontSize: 12, fontWeight: '500' },
   expandIcon: { fontSize: 10 },
   presetBadge: { fontSize: 10 },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  ctrlBtn: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ctrlBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   ctrlText: { fontSize: 13 },
-  playBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  playBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   playText: { fontSize: 15 },
   expandedArea: { marginTop: 4, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, gap: 6 },
   speedLabel: { fontSize: 11 },

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, onSnapshot, runTransaction, Unsubscribe } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { STORAGE_KEYS } from '../../app/constants/storageKeys';
 
 export interface TitleDefinition {
   id: string;
@@ -71,22 +72,6 @@ const DEFAULT_PROFILE: UserProgressDocument = {
   joinDate: Date.now(),
   lastLoginDate: Date.now(),
   achievements: [],
-};
-
-const STORAGE_KEYS = {
-  username: 'user_username',
-  bio: 'user_bio',
-  profileImage: 'user_profile_image',
-  currentTitle: 'user_current_title',
-  unlockedTitles: 'user_unlocked_titles',
-  level: 'user_level',
-  xp: 'user_xp',
-  coins: 'user_coins',
-  books: 'user_books',
-  streak: 'streakCount',
-  lastStudyDate: 'lastStudyDate',
-  joinDate: 'join_date',
-  lastLoginDate: 'lastLoginDate',
 };
 
 export const TITLE_LIBRARY: TitleDefinition[] = [
@@ -264,19 +249,19 @@ async function syncLocalStorage(document: UserProgressDocument) {
   // 最新の currentXP / nextLevelXP を即時読み込めるようにする
   const profileCache = JSON.stringify(document);
   await AsyncStorage.multiSet([
-    [STORAGE_KEYS.username, document.username],
-    [STORAGE_KEYS.bio, document.bio],
-    [STORAGE_KEYS.profileImage, document.profileImage || ''],
-    [STORAGE_KEYS.currentTitle, document.currentTitle],
-    [STORAGE_KEYS.unlockedTitles, JSON.stringify(document.unlockedTitles)],
-    [STORAGE_KEYS.level, String(document.level)],
-    [STORAGE_KEYS.xp, String(document.currentXP)],
-    [STORAGE_KEYS.coins, String(document.totalCoins)],
-    [STORAGE_KEYS.books, String(document.totalBooks)],
-    [STORAGE_KEYS.streak, String(document.streakDays)],
-    [STORAGE_KEYS.lastStudyDate, new Date(document.lastLoginDate).toDateString()],
-    [STORAGE_KEYS.joinDate, String(document.joinDate)],
-    [STORAGE_KEYS.lastLoginDate, String(document.lastLoginDate)],
+    [STORAGE_KEYS.USER_USERNAME, document.username],
+    [STORAGE_KEYS.USER_BIO, document.bio],
+    [STORAGE_KEYS.USER_PROFILE_IMAGE, document.profileImage || ''],
+    [STORAGE_KEYS.USER_CURRENT_TITLE, document.currentTitle],
+    [STORAGE_KEYS.USER_UNLOCKED_TITLES, JSON.stringify(document.unlockedTitles)],
+    [STORAGE_KEYS.USER_LEVEL, String(document.level)],
+    [STORAGE_KEYS.USER_XP, String(document.currentXP)],
+    [STORAGE_KEYS.USER_COINS, String(document.totalCoins)],
+    [STORAGE_KEYS.USER_BOOKS, String(document.totalBooks)],
+    [STORAGE_KEYS.STREAK_COUNT, String(document.streakDays)],
+    [STORAGE_KEYS.LAST_STUDY_DATE, new Date(document.lastLoginDate).toDateString()],
+    [STORAGE_KEYS.JOIN_DATE, String(document.joinDate)],
+    [STORAGE_KEYS.LAST_LOGIN_DATE, String(document.lastLoginDate)],
     ['user_profile_cache', profileCache],
   ]);
 }
@@ -325,19 +310,19 @@ async function readLocalProgress(): Promise<Partial<UserProgressDocument> & Reco
       username, bio, profileImage, currentTitle, unlockedTitles,
       level, xp, coins, books, streak, lastStudyDate, joinDate, lastLoginDate
     ] = await AsyncStorage.multiGet([
-      STORAGE_KEYS.username,
-      STORAGE_KEYS.bio,
-      STORAGE_KEYS.profileImage,
-      STORAGE_KEYS.currentTitle,
-      STORAGE_KEYS.unlockedTitles,
-      STORAGE_KEYS.level,
-      STORAGE_KEYS.xp,
-      STORAGE_KEYS.coins,
-      STORAGE_KEYS.books,
-      STORAGE_KEYS.streak,
-      STORAGE_KEYS.lastStudyDate,
-      STORAGE_KEYS.joinDate,
-      STORAGE_KEYS.lastLoginDate,
+      STORAGE_KEYS.USER_USERNAME,
+      STORAGE_KEYS.USER_BIO,
+      STORAGE_KEYS.USER_PROFILE_IMAGE,
+      STORAGE_KEYS.USER_CURRENT_TITLE,
+      STORAGE_KEYS.USER_UNLOCKED_TITLES,
+      STORAGE_KEYS.USER_LEVEL,
+      STORAGE_KEYS.USER_XP,
+      STORAGE_KEYS.USER_COINS,
+      STORAGE_KEYS.USER_BOOKS,
+      STORAGE_KEYS.STREAK_COUNT,
+      STORAGE_KEYS.LAST_STUDY_DATE,
+      STORAGE_KEYS.JOIN_DATE,
+      STORAGE_KEYS.LAST_LOGIN_DATE,
     ]);
 
     return {

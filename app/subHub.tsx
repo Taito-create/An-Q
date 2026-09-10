@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
-import { Settings, Volume2, Package, ShoppingBag, Gift, Trophy, Calendar } from 'lucide-react';
+import { Settings, Volume2, Package, ShoppingBag, Gift, Trophy, Calendar, Palette } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -59,8 +59,8 @@ export default function SubHubScreen() {
   const menuItems = [
     {
       id: 'theme',
-      icon: <Settings size={24} color={colors.primary} />,
-      title: locale === 'ja' ? 'インターフェース設定' : 'Theme & Appearance',
+      icon: <Palette size={24} color={colors.primary} />,
+      title: locale === 'ja' ? 'インターフェース設定' : 'Interface Settings',
       description: locale === 'ja' ? 'テーマやフォントサイズを変更' : 'Change theme and font size',
       onPress: () => navigate('/settings'),
     },

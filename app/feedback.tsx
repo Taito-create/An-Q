@@ -286,8 +286,8 @@ export default function FeedbackScreen() {
                       { color: colors.textSecondary },
                       difficulty === level && [
                         styles.difficultyTextActive,
-                        //  サイバーパンク/ダークで背景がネオン色になる場合は黒文字に切り替え
-                        { color: (isCyberpunk || currentTheme === 'dark') ? colors.text : onPrimary },
+                        //  ダークベースの全テーマで背景がネオン色になる場合は黒文字に切り替え
+                        { color: isCyberpunk ? colors.text : onPrimary },
                       ],
                     ]}>
                       {level === 'easy' ? t.easy : level === 'medium' ? t.medium : t.hard}

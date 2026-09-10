@@ -6,6 +6,7 @@ import { SoundManager } from './sound';
 import { useTheme } from './theme';
 import { loadStats } from './missions';
 import { useCustomBGM } from './customBGMContext';
+import BackButton from './components/BackButton';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useSE } from './seContext';
@@ -123,17 +124,12 @@ export default function MusicScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* ヘッダー: タイトル + 戻るボタン */}
-      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
+      {/* ヘッダー: 戻るボタン（左） + タイトル */}
+      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <BackButton to="/sub" />
+        <Text style={[styles.headerTitle, { color: colors.text, flex: 1 }]}>
           {locale === 'ja' ? '音楽設定' : 'Music Settings'}
         </Text>
-        <TouchableOpacity
-          style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-          onPress={() => { SoundManager.play('decide'); navigate('/sub'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{ja ? '戻る' : 'Back'}</Text>
-        </TouchableOpacity>
       </View>
       {/* 重複警告バナー */}
       {duplicateWarning && duplicateWarning.length > 0 && (
@@ -403,7 +399,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: 'bold' },
   container: { flex: 1 },
   scrollContent: { flex: 1 },
-  scrollContainer: { padding: 16, paddingBottom: 90 },
+  scrollContainer: { padding: 16, paddingBottom: 100 },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', marginTop: 16, marginBottom: 8 },
   hint: { fontSize: 11, marginBottom: 6 },
   presetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },

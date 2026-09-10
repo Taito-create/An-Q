@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Pressable, TouchableOpacity, Alert,
+  StyleSheet, Pressable, Alert,
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform
 } from 'react-native';
 import LottieView from 'lottie-react-native';
@@ -10,9 +10,10 @@ import errorJson from '../src/assets/animations/error.json';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import PressableButton from './components/PressableButton';
-import { incrementStat, recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from './missions';
+import { recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useQuestionsContext } from './context/QuestionsContext';
@@ -21,9 +22,9 @@ import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
-import { awardQuizCompletion, incrementXP } from '../src/utils/userProgress';
-import { speak as speakText, stopSpeech, getStoredVoicePreset, setStoredVoicePreset, VoicePreset, voicePresetLabels, speakText as speakTextWithPreset } from './utils/speechUtils';
-import { Volume2, BookOpen, RefreshCw, Mic, ClipboardList, Flame, Folder, Play, Check, Pause, Heart, X } from 'lucide-react';
+import { awardQuizCompletion } from '../src/utils/userProgress';
+import { speak as speakText, stopSpeech, speakWithVoicevoxProxy, VOICEVOX_SPEAKERS } from './utils/speechUtils';
+import { Volume2, RefreshCw, Mic, ClipboardList, Folder, Play, Check, Pause, Heart, X } from 'lucide-react';
 import './quiz.css';
 
 // ──────────────────────────────────────────────
@@ -101,8 +102,8 @@ export default function QuizScreen() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanationText, setExplanationText] = useState('');
   
-  // 現在の問題を取得
-  const currentQuestion = shuffledQuestions[currentIndex];
+  // 現在の問題を取得（範囲外アクセス時は null にしてクラッシュを防止）
+  const currentQuestion = shuffledQuestions[currentIndex] ?? null;
   
   // グループ構造の正解候補を取得
   const answerGroups = useMemo(() => {
@@ -124,11 +125,18 @@ export default function QuizScreen() {
   // 自動再生モード
   const [autoPlayMode, setAutoPlayMode] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
-  const [voicePreset, setVoicePreset] = useState<VoicePreset>('standard');
+  // 音声エンジン選択（Web Speech API / VOICEVOX）
+const [voiceEngine, setVoiceEngine] = useState<'web' | 'voicevox'>('web');
+const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   const autoPlayInterval = 3;
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
   const [quizCompleted, setQuizCompleted] = useState(false);
+  // 自動再生完了時の選択UI
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completeCountdown, setCompleteCountdown] = useState(10);
+  // 自動再生リピート用キー（変更すると autoplay useEffect が再実行され新セッションが開始される）
+  const [autoPlayRepeatKey, setAutoPlayRepeatKey] = useState(0);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoPlayPhaseRef = useRef<'question' | 'answer'>('question');
   const autoPlayRemainingRef = useRef<number>(5);
@@ -242,7 +250,13 @@ export default function QuizScreen() {
     loadTimerSetting();
     loadTimerPresets();
     SoundManager.initialize();
-    getStoredVoicePreset().then(p => setVoicePreset(p));
+    // 音声エンジン・VOICEVOX話者を読み込み
+    AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENGINE)
+      .then(v => setVoiceEngine(v === 'voicevox' ? 'voicevox' : 'web'))
+      .catch(e => console.warn('Failed to load voice engine:', e));
+    AsyncStorage.getItem(STORAGE_KEYS.VOICEVOX_SPEAKER)
+      .then(v => setVoicevoxSpeaker(v ? parseInt(v, 10) : 3))
+      .catch(e => console.warn('Failed to load voicevox speaker:', e));
   }, []);
 
   // ──────────────────────────────────────────────
@@ -260,12 +274,45 @@ export default function QuizScreen() {
     stopSpeech();
   };
 
-  const handleVoicePresetChange = async (preset: VoicePreset) => {
-    setVoicePreset(preset);
-    await setStoredVoicePreset(preset);
+  // ──────────────────────────────────────────────
+  // 自動再生完了後：リピート / ホームへ戻る
+  // ──────────────────────────────────────────────
+  const handleAutoPlayRepeat = () => {
     SoundManager.play('decide');
-    speakTextWithPreset(locale === 'ja' ? 'こんにちは！テストです。' : 'Hello! This is a test.', 'ja-JP', preset);
+    setShowCompleteModal(false);
+    setCompleteCountdown(10);
+    // autoPlayMode / quizStarted は変更しない＝画面ちらつき防止
+    // 先頭問題から再生し直す（同じ問題順）
+    currentIndexRef.current = 0;
+    setCurrentIndex(0);
+    questionStartTime.current = Date.now();
+    // repeatKey を変えると autoplay useEffect が再実行され、
+    // ++autoPlaySessionRef.current で新しいセッションが開始される
+    setAutoPlayRepeatKey((k) => k + 1);
   };
+
+  const handleGoHome = () => {
+    setShowCompleteModal(false);
+    stopAutoPlay();
+    navigate('/');
+  };
+
+  // 完了モーダルの10秒カウントダウン → 自動リピート
+  useEffect(() => {
+    if (!showCompleteModal) return;
+    const timer = setInterval(() => {
+      setCompleteCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleAutoPlayRepeat();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCompleteModal]);
 
   // ──────────────────────────────────────────────
   // 自動再生（音声完了待ち対応版）
@@ -298,7 +345,7 @@ export default function QuizScreen() {
     const sessionId = ++autoPlaySessionRef.current;
 
     if (speechEnabled) {
-      const PAUSE_AFTER_SPEECH = 500;
+      const PAUSE_AFTER_SPEECH = 3000;
 
       const wait = (ms: number): Promise<boolean> => {
         return new Promise((resolve) => {
@@ -323,8 +370,11 @@ export default function QuizScreen() {
         console.log(`[AutoPlay] Question phase: #${idx + 1}`);
 
         const textToSpeak = q.reading || q.question;
-        console.log('About to speak question, using:', typeof speakText);
-        await speakText(textToSpeak);
+        if (voiceEngine === 'voicevox') {
+          await speakWithVoicevoxProxy(textToSpeak, voicevoxSpeaker);
+        } else {
+          await speakText(textToSpeak);
+        }
         console.log('Question speech completed');
 
         if (!isActive()) return;
@@ -346,7 +396,11 @@ export default function QuizScreen() {
         console.log(`[AutoPlay] Answer phase: #${idx + 1}`);
 
         const answerText = getAnswerText(q);
-        await speakText(answerText);
+        if (voiceEngine === 'voicevox') {
+          await speakWithVoicevoxProxy(answerText, voicevoxSpeaker);
+        } else {
+          await speakText(answerText);
+        }
 
         if (!isActive()) return;
 
@@ -356,19 +410,10 @@ export default function QuizScreen() {
         const nextIdx = idx + 1;
         if (nextIdx >= shuffledQuestions.length) {
           console.log('[AutoPlay] All questions completed');
-          setQuizCompleted(true);
-          
-          await wait(10000);
-          if (!isActive()) return;
-          
-          if (quizCompleted) {
-            console.log('[AutoPlay] Auto-restarting after 10 seconds');
-            setQuizCompleted(false);
-            currentIndexRef.current = 0;
-            setCurrentIndex(0);
-            if (!isActive()) return;
-            await playQuestion(0);
-          }
+          // セッションを無効化し、完了モーダルを表示
+          autoPlaySessionRef.current += 1;
+          setShowCompleteModal(true);
+          setCompleteCountdown(10);
         } else {
           currentIndexRef.current = nextIdx;
           setCurrentIndex(nextIdx);
@@ -460,7 +505,7 @@ export default function QuizScreen() {
         autoPlayTimerRef.current = null;
       }
     };
-  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length, speechEnabled]);
+  }, [autoPlayMode, quizStarted, isPaused, autoPlayInterval, shuffledQuestions.length, speechEnabled, autoPlayRepeatKey]);
 
   // ──────────────────────────────────────────────
   // 無操作検知（スリープ学習モード用）
@@ -762,6 +807,12 @@ export default function QuizScreen() {
 
     const elapsed = Math.round((Date.now() - questionStartTime.current) / 1000);
     const currentQuestion = shuffledQuestions[currentIndex];
+    if (!currentQuestion) {
+      // 境界ガード：問題配列が空・範囲外のときは状態を復帰して中断
+      isSubmittingRef.current = false;
+      setAnswered(false);
+      return;
+    }
     
     let actualCorrectAnswer: boolean | number | string = getAnswerText(currentQuestion);
     let correct: boolean = false;
@@ -1081,12 +1132,7 @@ export default function QuizScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-          <PressableButton
-            style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
-            onPress={() => { SoundManager.play('decide'); navigate('/'); }}
-          >
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-          </PressableButton>
+          <BackButton to="/" />
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
             <ClipboardList size={20} color={colors.primary} style={{ marginRight: 6 }} />$ SELECT QUIZ CONFIG
           </Text>
@@ -1383,32 +1429,24 @@ export default function QuizScreen() {
                 </View>
                 {speechEnabled && (
                   <View style={{ marginTop: 12 }}>
-                    <Text style={[{ fontSize: 13, color: colors.text, marginBottom: 8 }]}>
-                      <Mic size={16} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? 'ボイスプリセット' : 'Voice Preset'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                      {(['standard', 'yukkuri', 'slow', 'energetic', 'calm', 'deep'] as VoicePreset[]).map((preset) => (
-                        <PressableButton
-                          key={preset}
-                          style={{
-                            backgroundColor: voicePreset === preset ? colors.primary : colors.background,
-                            borderColor: voicePreset === preset ? colors.primary : colors.border,
-                            borderWidth: 1,
-                            borderRadius: 10,
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
-                          }}
-                          onPress={() => handleVoicePresetChange(preset)}
-                        >
-                          <Text style={{
-                            color: voicePreset === preset ? (isCyberpunk ? '#1A1A1A' : '#fff') : colors.text,
-                            fontSize: 13,
-                            fontWeight: '600',
-                          }}>
-                            {voicePresetLabels[preset]}
-                          </Text>
-                        </PressableButton>
-                      ))}
+                    {/* 現在の音声設定表示 + 設定画面への導線 */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Mic size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 12, color: colors.text, fontFamily: 'monospace' }}>
+                          {voiceEngine === 'voicevox'
+                            ? `VOICEVOX: ${VOICEVOX_SPEAKERS.find((s) => s.id === voicevoxSpeaker)?.nameJa || '--'}`
+                            : 'Web Speech'}
+                        </Text>
+                      </View>
+                      <PressableButton
+                        style={{ paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.primary, borderRadius: 4 }}
+                        onPress={() => { SoundManager.play('decide'); navigate('/appSettings'); }}
+                      >
+                        <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>
+                          {locale === 'ja' ? '変更 →' : 'Change →'}
+                        </Text>
+                      </PressableButton>
                     </View>
                   </View>
                 )}
@@ -1578,12 +1616,7 @@ export default function QuizScreen() {
           <Text style={[{ fontSize: 20, fontWeight: '700', color: colors.text }]}>
             {isReverseMode
               ? shuffledQuestions[currentIndex].question
-              : (shuffledQuestions[currentIndex].descriptiveAnswer
-                || (shuffledQuestions[currentIndex].answerType === 'truefalse'
-                  ? (shuffledQuestions[currentIndex].trueFalseAnswer ? '○' : '')
-                  : shuffledQuestions[currentIndex].multipleChoice?.options?.[shuffledQuestions[currentIndex].multipleChoice?.correctAnswer ?? 0] || '')
-              )
-            }
+              : getAnswerText(shuffledQuestions[currentIndex])}
           </Text>
         </View>
       )}
@@ -1851,7 +1884,7 @@ export default function QuizScreen() {
                       }}
                       disabled={answered || isPaused}
                     >
-                      <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>
+                      <Text style={[styles.descriptiveBtnText, { color: isCyberpunk ? '#000000' : '#fff' }]}>
                         {userDescriptiveAnswers.some(a => a && a.trim()) ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}
                       </Text>
                     </PressableButton>
@@ -1883,7 +1916,7 @@ export default function QuizScreen() {
                         onPress={() => handleAnswer(userDescriptiveAnswer)}
                         disabled={answered || isPaused}
                       >
-                        <Text style={[styles.descriptiveBtnText, { color: (isCyberpunk || currentTheme === 'dark') ? '#000000' : '#fff' }]}>{userDescriptiveAnswer.trim() ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}</Text>
+                        <Text style={[styles.descriptiveBtnText, { color: isCyberpunk ? '#000000' : '#fff' }]}>{userDescriptiveAnswer.trim() ? t.checkAnswer : (locale === 'ja' ? 'スキップ' : 'Skip')}</Text>
                       </PressableButton>
                   </View>
                 )}
@@ -2019,6 +2052,41 @@ export default function QuizScreen() {
         </View>
       </Modal>
 
+      {/* 自動再生完了モーダル（リピート / ホーム戻る + 10秒自動リピート） */}
+      <Modal visible={showCompleteModal} transparent animationType="fade">
+        <View style={styles.completeModalOverlay}>
+          <View style={[styles.completeModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.completeModalTitle, { color: colors.primary }]}>
+              $ TRANSFER COMPLETE
+            </Text>
+            <Text style={[styles.completeModalMessage, { color: colors.text }]}>
+              {locale === 'ja' ? '全問終了しました。もう一度挑戦しますか？' : 'All questions completed. Try again?'}
+            </Text>
+            <Text style={[styles.completeModalCountdown, { color: colors.warning }]}>
+              {locale === 'ja' ? `あと ${completeCountdown}秒で自動リピート` : `Auto-repeat in ${completeCountdown}s`}
+            </Text>
+            <View style={styles.completeModalButtons}>
+              <PressableButton
+                style={[styles.completeModalBtn, { backgroundColor: colors.primary }]}
+                onPress={handleAutoPlayRepeat}
+              >
+                <Text style={[styles.completeModalBtnText, { color: onPrimary }]}>
+                  ▶ {locale === 'ja' ? 'もう一度繰り返す' : 'Repeat'}
+                </Text>
+              </PressableButton>
+              <PressableButton
+                style={[styles.completeModalBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
+                onPress={handleGoHome}
+              >
+                <Text style={[styles.completeModalBtnText, { color: colors.text }]}>
+                  ↺ {locale === 'ja' ? 'ホームに戻る' : 'Go Home'}
+                </Text>
+              </PressableButton>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -2091,7 +2159,7 @@ const styles = StyleSheet.create({
   quizContent: { 
     paddingHorizontal: 18, 
     paddingTop: 18, 
-    paddingBottom: 28,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   topBar: { 
@@ -2429,5 +2497,58 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  // 自動再生完了モーダル
+  completeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  completeModal: {
+    width: '92%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 24,
+    alignItems: 'center',
+  },
+  completeModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 2,
+    marginBottom: 12,
+  },
+  completeModalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  completeModalCountdown: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    marginBottom: 20,
+  },
+  completeModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  completeModalBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    borderRadius: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeModalBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
 });

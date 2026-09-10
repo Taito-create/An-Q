@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
+import { IMAGES } from './constants/images';
 
 interface Props {
   variant?: 'load1' | 'load2' | 'load3' | 'load4';
@@ -66,7 +67,10 @@ export default function LoadingScreen({ variant = 'load3', onRetry, error }: Pro
             {error ? errorText : loadingText}
           </Text>
         </View>
-        <img src={`/${variant}.webp`} alt="Loading character" width={100} height={100} style={{ objectFit: 'contain' }} />
+        <Image
+          source={IMAGES.romea}
+          style={{ width: 100, height: 100, resizeMode: 'contain' }}
+        />
         
         {/* エラー時の再試行ボタン */}
         {error && onRetry && (

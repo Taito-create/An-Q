@@ -14,6 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import BackButton from './components/BackButton';
 import { useTheme } from './theme';
 import PressableButton from './components/PressableButton';
 import { loadStats, incrementStat } from './missions';
@@ -827,7 +828,7 @@ export default function CreateQuestionScreen() {
         </View>
       )}
 
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
 
       {/* OCRルート用バナー：画像からの一括生成を開始（ファイル選択はユーザー操作で発火） */}
       {isOcrRoute && (
@@ -844,12 +845,7 @@ export default function CreateQuestionScreen() {
       )}
 
       <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-        <PressableButton
-          style={{ minHeight: 44, minWidth: 44, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: br, borderWidth: 1, borderColor: colors.primary, backgroundColor: 'transparent' }}
-          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>← {locale === 'ja' ? '戻る' : 'Back'}</Text>
-        </PressableButton>
+        <BackButton to="/create" />
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
           <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />$ ENCODE MEMORY DATA
         </Text>
