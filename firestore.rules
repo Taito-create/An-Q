@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────
+    // 既存コレクション (An-Q 本体)
+    // 現状のクライアント実装 (userQuestions / userProgress / sharedQuizzes)
+    // は認証済みユーザーのみが自分のドキュメントに触る前提のため、
+    // 既存動作を壊さない最小ルールを付与する
+    // ─────────────────────────────────────────────
+    match /userQuestions/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /userProgress/{userId} {
+      // read: 対戦相手のプロフィール (OpponentCard) を表示するため、認証済みなら他ユーザーも読取可
+      // write: 本人のみ
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 共有コードは「知っている人だけが読める」使い切り方式のため、
+    // 認証済みであれば読取可・作成可、更新/削除は不可
+    match /sharedQuizzes/{code} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // ─────────────────────────────────────────────
+    // リアルタイム対戦 (Phase 3)
+    // コレクション: battleRooms/{roomId}
+    // ─────────────────────────────────────────────
+    match /battleRooms/{roomId} {
+      // 参加者 (host / guest) のみ購読・取得可
+      allow read: if request.auth != null
+        && (request.auth.uid == resource.data.hostId
+          || request.auth.uid == resource.data.guestId);
+
+      // 認証済みなら誰でも作成可 (hostId の偽装は create 時の検証で防止)
+      // 通常ルーム: guestId == null && status == 'waiting'
+      // 再戦ルーム (requestRematch): 両者確定済みのため guestId 引継ぎ + status == 'creating' を許可
+      allow create: if request.auth != null
+        && request.resource.data.hostId == request.auth.uid
+        && ((request.resource.data.guestId == null && request.resource.data.status == 'waiting')
+          || (request.resource.data.status == 'creating'));
+
+      // 参加者のみ更新可 (退出・進行の詳細はクライアントの transaction で担保)
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.hostId
+          || request.auth.uid == resource.data.guestId);
+
+      // クライアントからの削除は禁止 (status: finished / abandoned で対応)
+      allow delete: if false;
+    }
+  }
+}

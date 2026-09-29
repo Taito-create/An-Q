@@ -111,8 +111,8 @@ export default function SubHubScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
-          <Package size={22} color={colors.primary} style={{ marginRight: 8 }} />$ SYSTEM TOOLS
+        <Text style={[styles.headerTitle, { color: colors.text, letterSpacing: 1 }]}>
+          <Package size={22} color={colors.primary} style={{ marginRight: 8 }} />メニュー
         </Text>
       </View>
 

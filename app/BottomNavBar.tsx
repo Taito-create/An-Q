@@ -32,7 +32,7 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 // 各タブに属する詳細画面（タブ直下パスだけでなく、これらの画面でも対応タブをアクティブにする）
 const TABS_SCREENS: Record<string, string[]> = {
   '/create': ['/browse', '/timer'],
-  '/multi': ['/inbox'],
+  '/multi': ['/inbox', '/battle'],
   '/sub': ['/settings', '/music', '/appSettings', '/profile', '/missions', '/statistics', '/credits', '/shop', '/gacha', '/achievements', '/calendar'],
 };
 

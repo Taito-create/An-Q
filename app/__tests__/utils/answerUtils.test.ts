@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { getAnswerText } from '../../utils/answerUtils';
 import { Question } from '../../types/question';
 

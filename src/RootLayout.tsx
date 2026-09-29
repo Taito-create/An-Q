@@ -8,8 +8,10 @@ import { SEProvider } from '../app/seContext';
 import { CustomBGMProvider } from '../app/customBGMContext';
 import { AuthProvider } from '../app/auth/AuthContext';
 import { QuestionsProvider } from '../app/context/QuestionsContext';
+import { RoomsProvider } from '../app/context/RoomsContext';
 import MiniPlayer from '../app/miniPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../app/constants/storageKeys';
 import { recordLogin } from '../app/missions';
 import { useLocation } from 'react-router-dom';
 
@@ -121,16 +123,17 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
   useEffect(() => {
     const initializeSettings = async () => {
-      // BGMのデフォルト値を設定（まだ存在しない場合のみ）
-      const bgmSetting = await AsyncStorage.getItem('bgm_enabled');
+      // 後方互換キー (bgm_enabled) の既定値を設定（まだ存在しない場合のみ）
+      // ※ BGM の正となる保存先は SoundManager が扱う `bgm_settings`
+      const bgmSetting = await AsyncStorage.getItem(STORAGE_KEYS.BGM_ENABLED);
       if (bgmSetting === null) {
-        await AsyncStorage.setItem('bgm_enabled', 'false');
+        await AsyncStorage.setItem(STORAGE_KEYS.BGM_ENABLED, 'false');
       }
       
       // 効果音のデフォルト値を設定
-      const seSetting = await AsyncStorage.getItem('se_enabled');
+      const seSetting = await AsyncStorage.getItem(STORAGE_KEYS.SE_ENABLED);
       if (seSetting === null) {
-        await AsyncStorage.setItem('se_enabled', 'false');
+        await AsyncStorage.setItem(STORAGE_KEYS.SE_ENABLED, 'false');
       }
     };
 
@@ -138,8 +141,15 @@ export default function RootLayout({ children }: RootLayoutProps) {
       try {
         await SoundManager.initialize();
         await SoundManager.initializeBGM();
-        console.log('Force starting BGM playback...');
-        await SoundManager.playBGM();
+        // 設定 (bgm_settings) が ON のときだけ再生する。
+        // 以前は設定を確認せず無条件に playBGM() を呼んでいたため、
+        // トグルを OFF にしても起動時に BGM が再生される不具合があった。
+        if (SoundManager.getBGMStatus().enabled) {
+          console.log('Starting BGM playback (enabled in settings)...');
+          await SoundManager.playBGM();
+        } else {
+          console.log('BGM is disabled in settings, skipping playback');
+        }
         setBgmReady(true);
         console.log('BGM initialization completed');
       } catch (error) {
@@ -166,8 +176,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
       }
     };
     
-    initializeSettings();
-    initializeBGM();
+    // 既定値 (bgm_enabled / se_enabled) を確定させてから BGM 設定を読み込む
+    // (旧キーからの移行と再生判定を同じ設定値で行うため順序を保証する)
+    const initializeAudio = async () => {
+      await initializeSettings();
+      await initializeBGM();
+    };
+
+    initializeAudio();
     migrateTimerKeys();
     recordLogin();
   }, []);
@@ -179,12 +195,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <CustomBGMProvider>
             <AuthProvider>
               <QuestionsProvider>
+                <RoomsProvider>
                 <ThemedRoot>
                   <BootGate>
                     <MiniPlayer />
                     {children}
                   </BootGate>
                 </ThemedRoot>
+                </RoomsProvider>
               </QuestionsProvider>
             </AuthProvider>
           </CustomBGMProvider>

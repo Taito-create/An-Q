@@ -1,12 +1,26 @@
 // app/sound.tsx - 修正版
 
 import { safeParseObject } from './utils/storageUtils';
+import { STORAGE_KEYS } from './constants/storageKeys';
 
 export type SoundType = 'select' | 'decide' | 'complete' | 'question' | 'correct' | 'wrong' | 'delete';
 export type BGMType = 'BGM1' | 'BGM2' | 'BGM3' | 'BGM4';
 export type SEType = 'effect1' | 'effect2' | 'effect3' | 'effect4';
 
 const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
+
+// ─────────────────────────────────────────────
+// BGM 設定の保存先（唯一のキー）
+// 旧実装は `bgm_enabled` ('true'/'false' の生文字列) と
+// `bgm_settings` (JSON) の2つに分かれていたため、トグルを OFF にしても
+// bgm_settings.enabled が true のまま残り、起動時に BGM が再生される不整合が起きていた。
+// 以後は `bgm_settings` を正とし、`bgm_enabled` は後方互換のミラーとしてのみ書く。
+// ─────────────────────────────────────────────
+export const BGM_SETTINGS_KEY = STORAGE_KEYS.BGM_SETTINGS;
+export const LEGACY_BGM_ENABLED_KEY = STORAGE_KEYS.BGM_ENABLED;
+/** 未設定時の BGM 既定値（RootLayout が設定する既定＝OFF に合わせる） */
+export const DEFAULT_BGM_ENABLED = false;
+const DEFAULT_BGM_SETTINGS = { enabled: DEFAULT_BGM_ENABLED, currentBGM: 'BGM1' };
 
 class SoundManager {
   private static sounds: { [key: string]: HTMLAudioElement | null } = {};
@@ -124,10 +138,18 @@ class SoundManager {
   static async initializeBGM() {
     const settings = await this.getBGMSettings();
     this.bgmEnabled = settings.enabled;
-    this.currentBGM = settings.currentBGM as BGMType;
-    
+    this.currentBGM = (settings.currentBGM as BGMType) || 'BGM1';
+
+    console.log(' BGM settings:', settings);
+
     if (this.bgmEnabled) {
       await this.loadBGM(this.currentBGM);
+    } else {
+      // OFF のときは音源を読み込まない（音源があると playBGM で鳴ってしまう余地を残さない）
+      if (this.bgm) {
+        this.bgm.pause();
+      }
+      console.log(' BGM is OFF, skipping load/playback');
     }
   }
 
@@ -154,7 +176,12 @@ class SoundManager {
   }
 
   static async playBGM() {
-    if (this.bgm && this.bgmEnabled) {
+    if (!this.bgmEnabled) {
+      // 設定が OFF のときは絶対に再生しない（起動時の強制再生対策の最終ガード）
+      console.log(' BGM is OFF, playBGM skipped');
+      return;
+    }
+    if (this.bgm) {
       this.bgm.volume = this.globalVolumeMultiplier;
       try {
         await this.bgm.play();
@@ -173,14 +200,25 @@ class SoundManager {
 
   static async updateBGMSetting(enabled: boolean, bgmType?: BGMType) {
     this.bgmEnabled = enabled;
+
     if (bgmType) {
+      // loadBGM 内で「enabled なら再生」+ 設定保存まで行う
       await this.loadBGM(bgmType);
-    } else if (enabled) {
-      await this.playBGM();
+      return;
+    }
+
+    if (enabled) {
+      if (this.bgm) {
+        await this.playBGM();
+        await this.saveBGMSettings();
+      } else {
+        // OFF 起動などで音源が未ロードの場合は、現在のプリセットを読み込んで再生する
+        await this.loadBGM(this.currentBGM || 'BGM1');
+      }
     } else {
       await this.pauseBGM();
+      await this.saveBGMSettings();
     }
-    await this.saveBGMSettings();
   }
 
   static async setBGMRate(rate: number) {
@@ -190,18 +228,46 @@ class SoundManager {
     }
   }
 
-  static async getBGMSettings() {
-    const defaultSettings = { enabled: true, currentBGM: 'BGM1' };
-    const saved = localStorage.getItem('bgm_settings');
-    return safeParseObject(saved, defaultSettings);
+  /**
+   * BGM 設定を読み出す（保存先は `bgm_settings` の1箇所のみ）。
+   * - 未保存の場合は旧キー `bgm_enabled` から一度だけ移行する
+   * - それも無い場合は既定値（OFF）を使う
+   */
+  static async getBGMSettings(): Promise<{ enabled: boolean; currentBGM: string }> {
+    const saved = localStorage.getItem(BGM_SETTINGS_KEY);
+
+    if (saved) {
+      const parsed = safeParseObject(saved, DEFAULT_BGM_SETTINGS);
+      return {
+        enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_BGM_SETTINGS.enabled,
+        currentBGM: typeof parsed.currentBGM === 'string' && parsed.currentBGM
+          ? parsed.currentBGM
+          : DEFAULT_BGM_SETTINGS.currentBGM,
+      };
+    }
+
+    // 旧キー (`bgm_enabled`) からの移行：'true' のときだけ ON として引き継ぐ
+    const legacy = localStorage.getItem(LEGACY_BGM_ENABLED_KEY);
+    const migrated = {
+      enabled: legacy === null ? DEFAULT_BGM_ENABLED : legacy === 'true',
+      currentBGM: DEFAULT_BGM_SETTINGS.currentBGM,
+    };
+    try {
+      localStorage.setItem(BGM_SETTINGS_KEY, JSON.stringify(migrated));
+    } catch (e) {
+      console.warn('Failed to migrate BGM settings:', e);
+    }
+    return migrated;
   }
 
+  /** BGM 設定を保存する（`bgm_enabled` には後方互換のミラーを書く） */
   private static async saveBGMSettings() {
     const settings = {
       enabled: this.bgmEnabled,
       currentBGM: this.currentBGM
     };
-    localStorage.setItem('bgm_settings', JSON.stringify(settings));
+    localStorage.setItem(BGM_SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(LEGACY_BGM_ENABLED_KEY, String(this.bgmEnabled));
   }
 
   static getBGMStatus() {

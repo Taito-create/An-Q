@@ -451,7 +451,8 @@ export default function MultiScreen() {
             </TouchableOpacity>
 
             {/* 生成されたコード表示 */}
-            {generatedCode && (
+            {/* 文字列 state は '' のとき View の子として text node 判定されるため boolean 化する */}
+            {!!generatedCode && (
               <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 12, marginVertical: 12 }}>
                 <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
                   {locale === 'ja' ? '共有コード（6文字）:' : 'Share Code (6 chars):'}

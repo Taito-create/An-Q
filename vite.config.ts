@@ -1,7 +1,18 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  // .env を読み込んで Cloudinary の値をグローバル定数として注入する
+  // （import.meta.env を直接書くと Jest(CJS) で構文エラーになるため、
+  //   アプリ側も import.meta を参照せずこのグローバルだけを見る設計にしている）
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    // Cloudinary 用の環境変数をグローバルとして定義（アプリ側は globalThis 経由でのみ参照）
+    define: {
+      __VITE_CLOUDINARY_CLOUD_NAME__: JSON.stringify(env.VITE_CLOUDINARY_CLOUD_NAME ?? ''),
+      __VITE_CLOUDINARY_UPLOAD_PRESET__: JSON.stringify(env.VITE_CLOUDINARY_UPLOAD_PRESET ?? ''),
+    },
   plugins: [
     react({
       include: [
@@ -48,4 +59,5 @@ export default defineConfig(({ mode }) => ({
     port: 3000,
     open: true,
   },
-}));
+  };
+});

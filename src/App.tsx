@@ -9,6 +9,7 @@ import { CURRENT_APP_VERSION } from './config/version';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { syncLoginStreak } from './utils/userProgress';
+import { STORAGE_KEYS } from '../app/constants/storageKeys';
 import { Sparkles } from 'lucide-react';
 import BottomNavBar from '../app/BottomNavBar';
 // 遷移ラグ解消（P1-6）：クイズ設定画面は遅延ロードせずバンドルに含める
@@ -53,6 +54,8 @@ const ResultsScreen = safeLazy(() => import('../app/results'));
 const SettingsScreen = safeLazy(() => import('../app/settings'));
 const ShopScreen = safeLazy(() => import('../app/shop'));
 const AchievementsScreen = safeLazy(() => import('../app/achievements'));
+const BattleScreen = safeLazy(() => import('../app/battle'));
+const BattleLobbyScreen = safeLazy(() => import('../app/battleLobby'));
 const TitleScreen = safeLazy(() => import('../app/title'));
 const AppSettingsScreen = safeLazy(() => import('../app/appSettings'));
 const SubHubScreen = safeLazy(() => import('../app/subHub'));
@@ -115,8 +118,14 @@ export default function App() {
     const cachedVersion = localStorage.getItem('app_version');
 
     if (cachedVersion && cachedVersion !== CURRENT_APP_VERSION) {
+      // プロフィール画像は AsyncStorage (Web では localStorage) にしか存在しないため、
+      // バージョン更新時のクリアで失われないように退避してから復元する
+      const localProfileImage = localStorage.getItem(STORAGE_KEYS.USER_PROFILE_IMAGE);
       localStorage.clear();
       sessionStorage.clear();
+      if (localProfileImage) {
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE_IMAGE, localProfileImage);
+      }
       localStorage.setItem('app_version', CURRENT_APP_VERSION);
       window.location.reload();
     } else if (!cachedVersion) {
@@ -282,6 +291,16 @@ export default function App() {
           <Route path="/achievements" element={
             <ProtectedRoute>
               <AchievementsScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/battle/:roomId" element={
+            <ProtectedRoute>
+              <BattleScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/battle" element={
+            <ProtectedRoute>
+              <BattleLobbyScreen />
             </ProtectedRoute>
           } />
           <Route path="*" element={<NotFound />} />

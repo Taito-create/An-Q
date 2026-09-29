@@ -228,7 +228,7 @@ export default function AppSettingsScreen() {
                   style={[styles.engineBtn, { backgroundColor: voiceEngine === 'web' ? colors.primary : colors.background, borderColor: colors.border }]}
                   onPress={() => handleEngineChange('web')}
                 >
-                  <Text style={{ color: voiceEngine === 'web' ? onPrimary : colors.text, fontWeight: '600', fontSize: 12 }}>Web Speech</Text>
+                  <Text style={{ color: voiceEngine === 'web' ? onPrimary : colors.text, fontWeight: '600', fontSize: 12 }}>{locale === 'ja' ? 'ブラウザ音声' : 'Web Speech'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.engineBtn, { backgroundColor: voiceEngine === 'voicevox' ? colors.primary : colors.background, borderColor: colors.border }]}

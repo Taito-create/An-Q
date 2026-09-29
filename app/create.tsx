@@ -21,7 +21,7 @@ import { loadStats, incrementStat } from './missions';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { Question, ImageAnnotation } from './types/question';
 import { useAuth } from './auth/AuthContext';
-import { awardQuestionCreation, incrementXP } from '../src/utils/userProgress';
+import { awardQuestionCreation, incrementXP, uploadImageToCloudinary } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
 import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText } from 'lucide-react';
@@ -29,9 +29,6 @@ import './create.css';
 
 export default function CreateQuestionScreen() {
   const navigate = useNavigate();
-  const location = useLocation();
-  // /create/ocr ルートでは OCR（画像から一括生成）モードで表示する
-  const isOcrRoute = location.pathname.startsWith('/create/ocr');
   const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
@@ -50,7 +47,9 @@ export default function CreateQuestionScreen() {
   const [explanation, setExplanation] = useState('');
   const [multipleChoice, setMultipleChoice] = useState({
     options: ['', '', '', ''],
-    correctAnswers: [0] as number[]
+    correctAnswers: [0] as number[],
+    // 四択は常に複数選択を許可する（トグルで切り替えず、最大4つまで選択できる）
+    allowMultiple: true,
   });
   const [tags, setTags] = useState<string[]>([]);
   // tagMasterList は Context から取得（デバイス間同期対応）
@@ -59,8 +58,8 @@ export default function CreateQuestionScreen() {
   const [showAddTagModal, setShowAddTagModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
 
-  // タグ削除モード用 state
-  const [isTagDeleteMode, setIsTagDeleteMode] = useState(false);
+  // タグ管理モーダル（A13）
+  const [showTagManagerModal, setShowTagManagerModal] = useState(false);
 
   // タグ削除確認モーダル用 state
   const [showTagDeleteModal, setShowTagDeleteModal] = useState(false);
@@ -72,9 +71,6 @@ export default function CreateQuestionScreen() {
 
   // 作成中フラグ（二重送信防止）
   const [isCreating, setIsCreating] = useState(false);
-
-  // タグ固定モード（2回押しで有効、3回目で解除）
-  const [tagLockMode, setTagLockMode] = useState<Record<string, boolean>>({});
 
   // 読み仮名（音声読み上げ用）
   const [reading, setReading] = useState('');
@@ -479,6 +475,8 @@ export default function CreateQuestionScreen() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
+      // iOS Safari で「カメラ」「写真ライブラリ」「ファイル」を選べるようにする
+      input.capture = 'environment';
       input.onchange = async (e: Event) => {
         const target = e.target as HTMLInputElement;
         const file = target.files?.[0];
@@ -656,6 +654,18 @@ export default function CreateQuestionScreen() {
         Alert.alert('エラー', locale === 'ja' ? '画像データが正しくありません' : 'Invalid image data');
         return false;
       }
+      // 画像は Cloudinary へアップロードして URL で保存する
+      let imageUrl: string | null = selectedImage;
+      if (selectedImage && selectedImage.startsWith('data:image')) {
+        // Base64 のままだと Firestore の1MB制限に達するため、Cloudinary にアップロードして URL で保存する
+        // 失敗時は Base64 のまま保存（従来動作にフォールバック）
+        const uploaded = await uploadImageToCloudinary(selectedImage);
+        if (uploaded) {
+          imageUrl = uploaded;
+        } else {
+          console.warn('Cloudinary upload failed, keeping Base64');
+        }
+      }
       const newQuestion: Question = {
         id: Date.now(),
         enabled: true,
@@ -666,7 +676,7 @@ export default function CreateQuestionScreen() {
         isShared: false,
         ...newQuestionData,
         question: newQuestionData.question || '',
-        image: selectedImage || newQuestionData.image || null,
+        image: imageUrl || newQuestionData.image || null,
         imageAnnotations: [],
         reading: reading.trim() || undefined,
       };
@@ -717,7 +727,12 @@ export default function CreateQuestionScreen() {
     } else if (answerType === 'multiple') {
       if (multipleChoice.options.some(opt => !opt.trim())) { SoundManager.play('select'); Alert.alert(t.error, t.fillAllOptions); return; }
       if (multipleChoice.correctAnswers.length === 0) { SoundManager.play('select'); Alert.alert(t.error, locale === 'ja' ? '正解を選択してください' : 'Please select at least one correct answer'); return; }
-      dataToSave.multipleChoice = { options: multipleChoice.options, correctAnswers: multipleChoice.correctAnswers };
+      dataToSave.multipleChoice = {
+        options: multipleChoice.options,
+        correctAnswers: multipleChoice.correctAnswers,
+        // 四択は常に複数選択を許可して保存する
+        allowMultiple: true,
+      };
       dataToSave.explanation = explanation.trim();
     }
     const success = await saveQuestion(dataToSave);
@@ -737,11 +752,9 @@ export default function CreateQuestionScreen() {
       setTimeout(() => setShowToast(false), 3000); // Auto dismiss after 3s
       
       setQuestion(''); setAnswerGroups([['']]);
-      // ロックされたタグのみ維持、それ以外はリセット
-      const lockedTags = Object.keys(tagLockMode).filter(key => tagLockMode[key]);
-      setTags(lockedTags);
+      // 選択済みのタグはそのまま維持する（Terminal Lite 方針: ロック機構は廃止）
       setAnswerType('descriptive');
-      setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0] });
+      setTrueFalseAnswer(true); setExplanation(''); setMultipleChoice({ options: ['', '', '', ''], correctAnswers: [0], allowMultiple: true });
       setSelectedImage(null);
       setReading('');
     }
@@ -753,26 +766,10 @@ export default function CreateQuestionScreen() {
     }
   };
 
+  // タグをタップ=LOCALで選択/解除する（Terminal Lite 方針: ロックや削除モードは廃止）
   const handleTagToggle = async (tag: string) => {
     SoundManager.play('select');
-    const isSelected = tags.includes(tag);
-    const isLocked = tagLockMode[tag] || false;
-
-    if (isLocked) {
-      // 3回目: ロック解除 + 選択解除
-      setTagLockMode(prev => ({ ...prev, [tag]: false }));
-      setTags(prev => prev.filter(t => t !== tag));
-      return;
-    }
-
-    if (isSelected) {
-      // 2回目: ロック（作成後も選択を維持）
-      setTagLockMode(prev => ({ ...prev, [tag]: true }));
-      return;
-    }
-
-    // 1回目: 選択（一時的、作成後にリセット）
-    setTags(prev => [...prev, tag]);
+    setTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
   };
 
   const handleTagLongPress = (tag: string) => {
@@ -809,8 +806,8 @@ export default function CreateQuestionScreen() {
     await addTag(trimmed);
     setTags(prev => [...prev, trimmed]);
     setNewTagName('');
+    // タグ管理モーダルを閉じたまま、追加したタグをすぐ使えるようにする
     setShowAddTagModal(false);
-    setIsTagDeleteMode(false);
     SoundManager.play('complete');
   };
 
@@ -830,62 +827,18 @@ export default function CreateQuestionScreen() {
 
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: 100 }}>
 
-      {/* OCRルート用バナー：画像からの一括生成を開始（ファイル選択はユーザー操作で発火） */}
-      {isOcrRoute && (
-        <PressableButton
-          title="画像から文字を抽出"
-          style={{ marginBottom: 16, padding: 14, backgroundColor: colors.primary + '18', borderColor: colors.primary, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-          onPress={() => handleOcrExtract({ type: 'question' })}
-        >
-          <ScanText size={22} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
-            SCAN NODE
-          </Text>
-        </PressableButton>
-      )}
-
       <View style={[styles.header, { borderBottomColor: colors.border, marginBottom: 16, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-        <BackButton to="/create" />
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
-          <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />$ ENCODE MEMORY DATA
+        <BackButton to='/create' />
+        <Text style={[styles.headerTitle, { color: colors.text, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+          <PenSquare size={22} color={colors.primary} style={{ marginRight: 8 }} />問題を作成
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <PressableButton
-            style={[styles.addTagHeaderBtn, { 
-              backgroundColor: isTagDeleteMode ? colors.error : colors.primary,
-              borderRadius: 8, 
-              paddingHorizontal: 14, 
-              paddingVertical: 8 
-            }]}
-            onPress={() => {
-              if (isTagDeleteMode) {
-                setIsTagDeleteMode(false);
-              } else {
-                if (tagMasterList.length === 0) {
-                  Alert.alert(
-                    locale === 'ja' ? '削除するタグがありません' : 'No tags to delete',
-                    locale === 'ja' ? 'タグが存在しないため、削除モードを開始できません。' : 'There are no tags to delete.'
-                  );
-                  return;
-                }
-                setIsTagDeleteMode(true);
-              }
-            }}
-          >
-            <Text style={[styles.addTagHeaderBtnText, { 
-              color: isTagDeleteMode ? '#ffffff' : onPrimary, 
-              fontWeight: 'bold', 
-              fontSize: 13 
-            }]}>
-              {isTagDeleteMode ? ' キャンセル' : '− タグ'}
-            </Text>
-          </PressableButton>
-          <PressableButton
             style={[styles.addTagHeaderBtn, { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }]}
-            onPress={() => setShowAddTagModal(true)}
+            onPress={() => setShowTagManagerModal(true)}
           >
             <Text style={[styles.addTagHeaderBtnText, { color: onPrimary, fontWeight: 'bold', fontSize: 13 }]}>
-              ＋ タグ
+              タグを管理
             </Text>
           </PressableButton>
         </View>
@@ -894,79 +847,41 @@ export default function CreateQuestionScreen() {
       {/* タグセクション - 横スクロール表示 */}
       {tagMasterList.length > 0 && (
         <View style={[styles.tagSection, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 }]}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 6 }} numberOfLines={1}>
-            NODE LABELS:
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 6 }} numberOfLines={1}>
+            タグ
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
               {tagMasterList.map((tag) => {
                 const isSelected = tags.includes(tag);
-                const isDeleteMode = isTagDeleteMode;
-                
                 return (
                   <PressableButton
                     key={tag}
-                    style={[
-                      styles.tagChip,
-                      {
-                        backgroundColor: isDeleteMode 
-                          ? colors.error + '20' 
-                          : isSelected ? colors.primary : colors.primary + '20',
-                        borderColor: isDeleteMode 
-                          ? colors.error 
-                          : isSelected ? colors.primary : colors.border,
-                        borderWidth: 2,
-                        borderRadius: 20,
-                        paddingHorizontal: 14,
-                        paddingVertical: 6,
-                        opacity: isDeleteMode ? 0.9 : 1,
-                      }
-                    ]}
-                    onPress={() => {
-                      if (isDeleteMode) {
-                        setTagToDelete(tag);
-                        setShowTagDeleteModal(true);
-                        return;
-                      }
-                      handleTagToggle(tag);
-                    }}
-                    onLongPress={() => {
-                      if (!isDeleteMode) {
-                        setTagToDelete(tag);
-                        setShowTagDeleteModal(true);
-                      }
-                    }}
+                    style={[styles.tagChip, {
+                      backgroundColor: isSelected ? colors.primary : colors.primary + '20',
+                      borderColor: isSelected ? colors.primary : colors.border,
+                      borderWidth: 2, borderRadius: 20,
+                      paddingHorizontal: 14, paddingVertical: 6,
+                    }]}
+                    onPress={() => handleTagToggle(tag)}
+                    onLongPress={() => handleTagLongPress(tag)}
                   >
-                    <Text style={[
-                      styles.tagChipText,
-                      {
-                        color: isDeleteMode 
-                          ? colors.error 
-                          : isSelected ? onPrimary : colors.primary,
-                        fontWeight: isSelected || isDeleteMode ? 'bold' : '500',
-                        fontSize: 13,
-                      }
-                    ]}>
-                      {isDeleteMode ? ' ' : ''}
-                      {!isDeleteMode && tagLockMode[tag] ? ' ' : ''}
-                      {isSelected && !isDeleteMode && !tagLockMode[tag] ? ' ' : ''}{tag}
-                    </Text>
+                    <Text style={[styles.tagChipText, {
+                      color: isSelected ? onPrimary : colors.primary,
+                      fontWeight: isSelected ? 'bold' : '500',
+                      fontSize: 13,
+                    }]}>{tag}</Text>
                   </PressableButton>
                 );
               })}
             </View>
           </ScrollView>
-          {isTagDeleteMode && (
-            <Text style={{ color: colors.error, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-              {locale === 'ja' ? ' 削除したいタグをタップしてください' : ' Tap the tag you want to delete'}
-            </Text>
-          )}
         </View>
       )}
 
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>ANSWER TYPE:</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>回答形式</Text>
         <View style={styles.answerTypeContainer}>
           {[{ id: 'descriptive', label: t.descriptive }, { id: 'truefalse', label: t.truefalse }, { id: 'multiple', label: t.multiple }].map((type) => (
             <PressableButton key={type.id} style={[styles.answerTypeButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, answerType === type.id && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => { SoundManager.play('select'); setAnswerType(type.id as any); }}>
@@ -981,15 +896,18 @@ export default function CreateQuestionScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
           {!showCropUI && (
             <PressableButton
-              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, padding: 10 }]}
+              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
               onPress={() => handleOcrExtract({ type: 'question' })}
               disabled={ocrLoading}
             >
-              <ScanText size={20} color={onPrimary} />
+              <ScanText size={16} color={onPrimary} />
+              <Text style={{ color: onPrimary, fontWeight: '600', fontSize: 13 }}>
+                {locale === 'ja' ? '写真や画像で入力' : 'Scan image'}
+              </Text>
             </PressableButton>
           )}
         </View>
-        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]} value={question} onChangeText={setQuestion} placeholder={t.question} placeholderTextColor={colors.textSecondary} multiline />
+        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]} value={question} onChangeText={setQuestion} placeholder={locale === 'ja' ? '問題を入力' : 'Enter the question'} placeholderTextColor={colors.textSecondary} multiline />
 
         {/* 読み仮名入力（任意） */}
         <View style={{ marginTop: 8, marginBottom: 12 }}>
@@ -1006,11 +924,11 @@ export default function CreateQuestionScreen() {
             }]}
             value={reading}
             onChangeText={setReading}
-            placeholder={locale === 'ja' ? '例: もり おうがい' : 'e.g., mori ougai'}
+            placeholder={locale === 'ja' ? '問題文を平仮名で入力' : 'Enter the question in hiragana'}
             placeholderTextColor={colors.textSecondary}
           />
           <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
-            {locale === 'ja' ? '※ 音声読み上げ時に使用されます（任意）' : '※ Used for text-to-speech (optional)'}
+            {locale === 'ja' ? '※ 音声読み上げ時に使用されます' : '※ Used for text-to-speech'}
           </Text>
         </View>
 
@@ -1137,12 +1055,16 @@ export default function CreateQuestionScreen() {
                         newGroups[groupIndex][answerIndex] = text;
                         setAnswerGroups(newGroups);
                       }}
-                      placeholder={locale === 'ja' ? '言い換え候補を入力' : 'Enter alternative answer'}
+                      placeholder={locale === 'ja' ? '正解を入力' : 'Enter the correct answer'}
                       placeholderTextColor={colors.textSecondary}
                     />
                     {group.length > 1 && answerIndex > 0 && (
                       <PressableButton
-                        style={{ padding: 6, borderRadius: 16, backgroundColor: colors.error + '20' }}
+                        style={{
+                          width: 28, height: 28, borderRadius: 14,
+                          alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: colors.error + '20',
+                        }}
                         onPress={() => {
                           const newGroups = answerGroups.map(g => [...g]);
                           newGroups[groupIndex] = newGroups[groupIndex].filter((_, i) => i !== answerIndex);
@@ -1150,7 +1072,7 @@ export default function CreateQuestionScreen() {
                           setAnswerGroups(filtered.length > 0 ? filtered : [['']]);
                         }}
                       >
-                        <Text style={{ color: colors.error, fontSize: 16, fontWeight: 'bold' }}>×</Text>
+                        <Text style={{ color: colors.error, fontSize: 16, fontWeight: 'bold', lineHeight: 20 }}>×</Text>
                       </PressableButton>
                     )}
                   </View>
@@ -1187,10 +1109,10 @@ export default function CreateQuestionScreen() {
               onPress={() => setAnswerGroups([...answerGroups, ['']])}
             >
               <Text style={[styles.addAnswerSlotBtnText, { color: colors.primary, fontSize: 15, fontWeight: 'bold' }]}>
-                ＋ {locale === 'ja' ? '新しい正解を追加（複数空欄用）' : 'Add new answer slot (for multiple blanks)'}
+                {locale === 'ja' ? '正解を追加' : 'Add answer slot'}
               </Text>
               <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
-                {locale === 'ja' ? '例：「AとB」のような複数回答が必要な問題に' : 'For questions requiring multiple answers like "A and B"'}
+                {locale === 'ja' ? '例：「〜を二つ答えよ。」→「A」「B」' : 'e.g. "Name two..." -> "A" "B"'}
               </Text>
             </PressableButton>
           </View>
@@ -1206,7 +1128,7 @@ export default function CreateQuestionScreen() {
                 style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br, marginTop: 10 }]}
                 value={explanation}
                 onChangeText={setExplanation}
-                placeholder={locale === 'ja' ? '備考（どこが違うのか・解説）' : 'Note (explanation)'}
+                placeholder={locale === 'ja' ? '備考や解説を入力(任意)' : 'Note (optional)'}
                 placeholderTextColor={colors.textSecondary}
                 multiline
               />
@@ -1230,25 +1152,39 @@ export default function CreateQuestionScreen() {
               />
             ))}
             <View style={styles.correctAnswerContainer}>
-              <Text style={[styles.correctAnswerLabel, { color: colors.text }]}>{t.correctAnswer}:</Text>
+              <Text style={[styles.correctAnswerLabel, { color: colors.text }]}>
+                {t.correctAnswer}
+                <Text style={{ color: colors.textSecondary }}>
+                  {locale === 'ja' ? '（1つ以上選択）' : ' (select one or more)'}
+                </Text>
+              </Text>
               <View style={styles.correctAnswerButtonsRow}>
                 {[0, 1, 2, 3].map((i) => {
                   const isSelected = multipleChoice.correctAnswers.includes(i);
                   return (
                     <PressableButton
                       key={i}
-                      style={[styles.correctAnswerButton, { backgroundColor: colors.background, borderRadius: br, borderWidth: 1, borderColor: colors.border }, isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      style={[styles.correctAnswerButton, {
+                        backgroundColor: isSelected ? colors.primary : colors.background,
+                        borderRadius: br,
+                        borderWidth: 1,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      }]}
                       onPress={() => {
                         SoundManager.play('decide');
-                        if (isSelected) {
-                          const newAnswers = multipleChoice.correctAnswers.filter(a => a !== i);
-                          setMultipleChoice({...multipleChoice, correctAnswers: newAnswers.length > 0 ? newAnswers : [0]});
-                        } else {
-                          setMultipleChoice({...multipleChoice, correctAnswers: [...multipleChoice.correctAnswers, i]});
-                        }
+                        // 複数選択（最低1つは必ず残す）
+                        const next = isSelected
+                          ? multipleChoice.correctAnswers.filter(a => a !== i)
+                          : [...multipleChoice.correctAnswers, i];
+                        setMultipleChoice({
+                          ...multipleChoice,
+                          correctAnswers: next.length > 0 ? next : [i],
+                        });
                       }}
                     >
-                      <Text style={[styles.correctAnswerText, { color: colors.text }, isSelected && { color: onPrimary }]}>{i + 1}</Text>
+                      <Text style={[styles.correctAnswerText, { color: isSelected ? onPrimary : colors.text }]}>
+                        {i + 1}
+                      </Text>
                     </PressableButton>
                   );
                 })}
@@ -1259,7 +1195,7 @@ export default function CreateQuestionScreen() {
               style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br, marginTop: 10 }]}
               value={explanation}
               onChangeText={setExplanation}
-              placeholder={locale === 'ja' ? '備考・解説（任意）' : 'Note / Explanation (optional)'}
+              placeholder={locale === 'ja' ? '備考や解説を入力(任意)' : 'Note (optional)'}
               placeholderTextColor={colors.textSecondary}
               multiline
             />
@@ -1276,8 +1212,8 @@ export default function CreateQuestionScreen() {
           onPress={handleManualCreate}
           disabled={isCreating}
         >
-          <Text style={[styles.buttonText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]}>
-            {isCreating ? 'STORING...' : '▶ STORE TO MEMORY'}
+          <Text style={[styles.buttonText, { color: onPrimary }]}>
+            {isCreating ? '保存中...' : '保存'}
           </Text>
         </PressableButton>
       </View>
@@ -1325,6 +1261,83 @@ export default function CreateQuestionScreen() {
         </View>
       </Modal>
 
+      {/* タグ管理モーダル（A13）: 一覧・追加・削除を1画面で完結させる */}
+      <Modal visible={showTagManagerModal} transparent animationType="fade" statusBarTranslucent={true}>
+        <View style={[styles.modalOverlay, { zIndex: 9998 }]}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {locale === 'ja' ? 'タグを管理' : 'Manage Tags'}
+            </Text>
+
+            {/* 既存タグ一覧（四択の1〜4と同じスタイルの丸角ボタン） */}
+            {tagMasterList.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {tagMasterList.map((tag) => (
+                  <PressableButton
+                    key={tag}
+                    style={[
+                      styles.correctAnswerButton,
+                      {
+                        backgroundColor: tags.includes(tag) ? colors.primary : colors.background,
+                        borderRadius: br,
+                        borderWidth: 1,
+                        borderColor: tags.includes(tag) ? colors.primary : colors.border,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                      },
+                    ]}
+                    onPress={() => handleTagToggle(tag)}
+                    onLongPress={() => {
+                      setTagToDelete(tag);
+                      setShowTagDeleteModal(true);
+                    }}
+                  >
+                    <Text style={[styles.correctAnswerText, { color: tags.includes(tag) ? onPrimary : colors.text }]}>
+                      {tag}
+                    </Text>
+                  </PressableButton>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16, textAlign: 'center' }}>
+                {locale === 'ja' ? 'タグがまだありません' : 'No tags yet'}
+              </Text>
+            )}
+            <Text style={{ color: colors.textSecondary, fontSize: 11, marginBottom: 16, textAlign: 'center' }}>
+              {locale === 'ja' ? 'タップで選択／長押しで削除' : 'Tap to select / long-press to delete'}
+            </Text>
+
+            {/* タグを追加 */}
+            <TextInput
+              style={[styles.modalInput, { borderColor: colors.border, color: colors.text, marginBottom: 12 }]}
+              value={newTagName}
+              onChangeText={setNewTagName}
+              placeholder={locale === 'ja' ? 'タグ名を入力' : 'Enter tag name'}
+              placeholderTextColor={colors.textSecondary}
+              maxLength={20}
+            />
+            <View style={styles.modalButtons}>
+              <PressableButton
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setShowTagManagerModal(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
+                  {locale === 'ja' ? '閉じる' : 'Close'}
+                </Text>
+              </PressableButton>
+              <PressableButton
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleAddNewTag}
+              >
+                <Text style={[styles.modalSaveText, { color: onPrimary }]}>
+                  {locale === 'ja' ? '追加' : 'Add'}
+                </Text>
+              </PressableButton>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* タグ削除確認モーダル */}
       <Modal visible={showTagDeleteModal} transparent animationType="fade" statusBarTranslucent={true}>
         <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
@@ -1357,10 +1370,6 @@ export default function CreateQuestionScreen() {
                     await removeTag(tagToDelete);
                     setTags(prev => prev.filter(t => t !== tagToDelete));
                     SoundManager.play('delete');
-                    
-                    if (tagMasterList.length <= 1) {
-                      setIsTagDeleteMode(false);
-                    }
                     
                     setShowTagDeleteModal(false);
                     setTagToDelete(null);

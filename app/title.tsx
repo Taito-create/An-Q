@@ -45,7 +45,8 @@ export default function TitleScreen() {
             {unlockedCount} / {totalCount} {t.unlockedLabel}
           </Text>
         </View>
-        {stats?.equippedTitle && (
+        {/* 文字列（未装着時は ''）は View の子として text node 判定されるため boolean 化する */}
+        {!!stats?.equippedTitle && (
           <View style={[styles.equippedBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
             <Text style={[styles.equippedText, { color: colors.primary, fontSize: fs(12) }]}>
               {TITLE_BADGES.find(b => b.id === stats.equippedTitle)?.icon}{' '}

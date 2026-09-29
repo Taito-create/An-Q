@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useCustomBGM } from './customBGMContext';
 import { useBGM } from './bgmContext';
 import { useTheme } from './theme';
-import { SoundManager } from './sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Music, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 
@@ -133,14 +132,10 @@ export default function MiniPlayer() {
         <View style={styles.controls}>
           <TouchableOpacity
             style={[styles.playBtn, { backgroundColor: bgmEnabled ? colors.primary : colors.border }]}
-            onPress={async () => {
-              if (bgmEnabled) {
-                await SoundManager.pauseBGM();
-                toggleBGM(false);
-              } else {
-                await SoundManager.playBGM();
-                toggleBGM(true);
-              }
+            onPress={() => {
+              // 再生/停止と設定保存は toggleBGM が一括で行う
+              // （SoundManager を直接叩くとメモリ上の状態と保存先がずれるため呼ばない）
+              toggleBGM(!bgmEnabled);
             }}
           >
             {bgmEnabled ? <Pause size={22} color={onPrimary} /> : <Play size={22} color={onPrimary} />}

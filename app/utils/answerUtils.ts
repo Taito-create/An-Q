@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Question } from '../types/question';
+import { Question, MultipleChoice } from '../types/question';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
 /**
@@ -24,18 +24,33 @@ export const normalizeForCompare = (text: string): string => {
     .toLowerCase(); // 小文字化
 };
 
+/** ASCII（英数字・記号のみ）だけで構成されているか */
+const isAsciiOnly = (s: string): boolean => /^[\x00-\x7F]+$/.test(s);
+
 export const checkDescriptiveAnswer = (userAnswer: string, question: Question): boolean => {
   const groups = getAnswerGroups(question);
   if (groups.length === 0) {
     return false;
   }
 
-  // 判定共通ロジック：正解が3文字以上なら部分一致も許可、
-  // 1〜2文字は完全一致のみ（誤判定防止のため、既存仕様と同じ）
+  // 判定共通ロジック:
+  // - 英語（ASCIIのみ）: 部分一致は誤判定を生むため完全一致のみ
+  //   例) 正解 "apple" に対し "pineapple" は不正解
+  // - 日本語を含む: 3文字以上なら部分一致も許可（社会/理科で必要）
+  //   例) 正解 "りんご" に対し "りんごジュース" は正解
+  // - 1〜2文字は完全一致のみ（既存仕様を維持）
   const matchesAny = (userPart: string, candidates: string[]): boolean => {
     const normalizedUserPart = normalizeForCompare(userPart);
     return candidates.some(candidate => {
       const correct = normalizeForCompare(candidate);
+      // 空文字の正解候補は無効とする（未設定データで '' === '' が true になり
+      // 「答えが未設定の問題」が正解と判定されてしまうため）
+      if (correct === '') return false;
+      // 英語（ASCIIのみ）同士は完全一致必須
+      if (isAsciiOnly(correct) && isAsciiOnly(normalizedUserPart)) {
+        return normalizedUserPart === correct;
+      }
+      // 日本語を含む場合は従来通り3文字以上で部分一致を許可
       if (correct.length >= 3) {
         return normalizedUserPart === correct || normalizedUserPart.includes(correct);
       }
@@ -65,25 +80,71 @@ export const checkDescriptiveAnswer = (userAnswer: string, question: Question): 
 };
 
 /**
+ * multipleChoice を新形式（correctAnswers 配列 + allowMultiple）へ正規化する。
+ * 旧データ（correctAnswer が数値 / どちらもない）を読み取り専用で吸収する。
+ */
+export function normalizeMultipleChoice(mc: any): MultipleChoice | undefined {
+  if (!mc || !Array.isArray(mc.options)) return undefined;
+
+  const allowMultiple = mc.allowMultiple === true;
+
+  // 新形式: correctAnswers が配列
+  if (Array.isArray(mc.correctAnswers)) {
+    const correctAnswers = mc.correctAnswers.filter(
+      (i: any): i is number => typeof i === 'number' && Number.isFinite(i),
+    );
+    return {
+      options: mc.options.map((o: any) => String(o ?? '')),
+      correctAnswers: correctAnswers.length > 0 ? correctAnswers : [0],
+      allowMultiple,
+    };
+  }
+
+  // 旧形式: correctAnswer が数値
+  if (typeof mc.correctAnswer === 'number' && Number.isFinite(mc.correctAnswer)) {
+    return {
+      options: mc.options.map((o: any) => String(o ?? '')),
+      correctAnswers: [mc.correctAnswer],
+      allowMultiple: false,
+    };
+  }
+
+  return {
+    options: mc.options.map((o: any) => String(o ?? '')),
+    correctAnswers: [0],
+    allowMultiple: false,
+  };
+}
+
+/**
  * Firestoreから取得した問題データをアプリケーション用に正規化する
  * - descriptiveAnswerGroups が JSON 文字列の場合に配列にパースする
+ * - multipleChoice を correctAnswers 配列形式へ正規化する
  */
 export const normalizeQuestionFromFirestore = (q: any): Question => {
   if (!q) return q;
+
+  const withMultipleChoice = (question: any): any => {
+    if (!question.multipleChoice) return question;
+    const normalized = normalizeMultipleChoice(question.multipleChoice);
+    // 正規化できない（options が不正）場合は既存値をそのまま残す
+    if (!normalized) return question;
+    return { ...question, multipleChoice: normalized };
+  };
 
   // descriptiveAnswerGroups が JSON 文字列の場合にパース
   if (q.descriptiveAnswerGroups && typeof q.descriptiveAnswerGroups === 'string') {
     try {
       const parsed = JSON.parse(q.descriptiveAnswerGroups);
       if (Array.isArray(parsed)) {
-        return { ...q, descriptiveAnswerGroups: parsed };
+        return withMultipleChoice({ ...q, descriptiveAnswerGroups: parsed });
       }
     } catch (e) {
       console.error('normalizeQuestionFromFirestore parse failed:', e, q.id);
-      return { ...q, descriptiveAnswerGroups: undefined };
+      return withMultipleChoice({ ...q, descriptiveAnswerGroups: undefined });
     }
   }
-  return q;
+  return withMultipleChoice(q);
 };
 
 /**
@@ -175,9 +236,19 @@ export const getAnswerText = (question: Question): string => {
     if (question.answerType === 'multiple') {
       if (question.multipleChoice?.options) {
         const options = question.multipleChoice.options;
-        const correct = question.multipleChoice.correctAnswer;
-        if (options && Array.isArray(options) && correct !== undefined) {
-          const answer = options[correct] || '選択肢がありません';
+        // 新形式 (correctAnswers) を優先し、旧形式 (correctAnswer) にもフォールバック
+        const correctIndices: number[] = Array.isArray(question.multipleChoice.correctAnswers)
+          && question.multipleChoice.correctAnswers.length > 0
+          ? question.multipleChoice.correctAnswers
+          : (typeof question.multipleChoice.correctAnswer === 'number'
+            ? [question.multipleChoice.correctAnswer]
+            : []);
+        if (Array.isArray(options) && correctIndices.length > 0) {
+          // 複数正解は「正解: A, C」のように連結して表示
+          const answer = correctIndices
+            .map(i => options[i])
+            .filter(Boolean)
+            .join(', ') || '選択肢がありません';
           return `正解: ${answer}`;
         }
       }

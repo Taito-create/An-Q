@@ -706,8 +706,8 @@ export default function CalendarScreen() {
     >
       <View style={[styles.header, { borderBottomColor: colors.border, justifyContent: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
         <BackButton to="/sub" />
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
-          $ SCHEDULED TRANSFERS
+        <Text style={[styles.headerTitle, { color: colors.text, letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+          学習予定
         </Text>
       </View>
 

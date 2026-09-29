@@ -13,7 +13,8 @@ import { SoundManager } from './sound';
 import { loadStats } from './missions';
 import { useAuth } from './auth/AuthContext';
 import ImageCropper from '../src/components/ImageCropper';
-import { equipTitle, getTitleDisplay, normalizeUserProfileDocument, resolveTitleDefinition, TITLE_LIBRARY } from '../src/utils/userProgress';
+import { equipTitle, getBattleStats, getTitleDisplay, isRemoteProfileImageUrl, normalizeUserProfileDocument, readLocalProfileImage, resolveTitleDefinition, saveLocalProfileImage, TITLE_LIBRARY, uploadProfileImageToCloudinary } from '../src/utils/userProgress';
+import type { BattleStats } from '../src/utils/userProgress';
 import { safeParse, safeParseArray } from './utils/storageUtils';
 import { User, BarChart3, Flame, Camera, Trophy } from 'lucide-react';
 
@@ -37,6 +38,8 @@ interface UserProfile {
   joinDate: number;
   lastLoginDate: number;
   achievements: string[];
+  /** 対戦戦績 (未定義の旧ドキュメントは 0 として扱う) */
+  battleStats?: BattleStats;
 }
 
 export default function ProfileScreen() {
@@ -69,6 +72,7 @@ export default function ProfileScreen() {
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editUsername, setEditUsername] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editProfileImage, setEditProfileImage] = useState<string | null>(null);
@@ -119,7 +123,8 @@ export default function ProfileScreen() {
     try {
       const storedUsername = await AsyncStorage.getItem('user_username') || 'An-Q Learner';
       const storedBio = await AsyncStorage.getItem('user_bio') || '';
-      const storedProfileImage = await AsyncStorage.getItem('user_profile_image') || null;
+      // 画像は AsyncStorage が唯一の保存先（未設定は null）
+      const storedProfileImage = await readLocalProfileImage();
       const storedLevel = parseInt(await AsyncStorage.getItem('user_level') || '1', 10);
       const storedXP = parseInt(await AsyncStorage.getItem('user_xp') || '0', 10);
       const storedCoins = parseInt(await AsyncStorage.getItem('user_coins') || '0', 10);
@@ -174,7 +179,11 @@ export default function ProfileScreen() {
           const mergedProfile = normalizeUserProfileDocument({
             username: data.username || username,
             bio: data.bio || bio,
-            profileImage: data.profileImage ?? profileImage,
+            // 画像はローカル (AsyncStorage) を優先する。
+            // Firestore には Cloudinary の http(s) URL が保存されるが、
+            // そちらを採用すると自分の画面では Base64 の鮮度が落ちてしまうため、
+            // 「ローカルが無い場合のみ」URL で補完する。
+            profileImage: profileImage || (isRemoteProfileImageUrl(data.profileImage) ? data.profileImage : null),
             currentTitle: data.currentTitle ?? currentTitle,
             unlockedTitles: data.unlockedTitles ?? unlockedTitles,
             level: Math.max(data.level ?? 0, level),
@@ -217,7 +226,9 @@ export default function ProfileScreen() {
 
           // キャッシュ更新
           await AsyncStorage.setItem('user_username', username);
-          await AsyncStorage.setItem('user_profile_image', profileImage || '');
+          // 画像は AsyncStorage が唯一の保存先。値がある場合のみ書き戻す
+          // ('' でローカルに保存済みの画像を消さない)
+          if (profileImage) await saveLocalProfileImage(profileImage);
           await AsyncStorage.setItem('user_bio', bio);
           await AsyncStorage.setItem('user_current_title', currentTitle);
           await AsyncStorage.setItem('user_unlocked_titles', JSON.stringify(unlockedTitles));
@@ -289,21 +300,40 @@ export default function ProfileScreen() {
 
   const saveProfile = async () => {
     try {
-      // 1. ローカルストレージに保存
+      setIsSaving(true);
+
+      // 1. 画像は Cloudinary にアップロードして URL を取得する
+      //    (Base64 のまま Firestore へ書くと 1MB 制限超過＝400 Bad Request になる)
+      //    既に URL（保存済みの画像）の場合はそのまま再利用する
+      let remoteImageUrl: string | null = null;
+      if (editProfileImage && editProfileImage.startsWith('data:image')) {
+        remoteImageUrl = await uploadProfileImageToCloudinary(editProfileImage);
+        if (!remoteImageUrl) {
+          // アップロード失敗時はこの端末では保存するが、共有できない旨を伝える
+          Alert.alert(
+            '警告',
+            '画像のアップロードに失敗しました。\n他のユーザーには画像が表示されない可能性があります。'
+          );
+        }
+      } else if (isRemoteProfileImageUrl(editProfileImage)) {
+        remoteImageUrl = editProfileImage;
+      }
+
+      // 2. ローカルストレージに保存（自分の画面での即時表示用）
       await AsyncStorage.setItem('user_username', editUsername);
       await AsyncStorage.setItem('user_bio', editBio);
       await AsyncStorage.setItem('user_current_title', profile.currentTitle);
       await AsyncStorage.setItem('user_unlocked_titles', JSON.stringify(profile.unlockedTitles));
-      if (editProfileImage) {
-        await AsyncStorage.setItem('user_profile_image', editProfileImage);
-      }
+      // 画像は未設定・削除（null）も含めて必ず反映する
+      await saveLocalProfileImage(editProfileImage);
 
-      // 2.  Firestoreに保存（容量制限を受けないため確実に同期します）
+      // 3. Firestore には Cloudinary の URL のみ保存する（相手のカードから参照される）
       if (user) {
+        console.log('Saving to Firestore:', { profileImage: remoteImageUrl });
         await setDoc(doc(db, 'userProgress', user.uid), {
           username: editUsername,
           bio: editBio,
-          profileImage: editProfileImage,
+          profileImage: remoteImageUrl,
           currentTitle: profile.currentTitle,
           unlockedTitles: profile.unlockedTitles,
         }, { merge: true });
@@ -323,6 +353,8 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Failed to save profile:', error);
       Alert.alert('エラー', '保存に失敗しました。');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -343,6 +375,8 @@ export default function ProfileScreen() {
   };
 
   const xpProgress = Math.min((profile.currentXP / profile.nextLevelXP) * 100, 100);
+  // 対戦戦績 (未定義は 0 埋め)
+  const battleStats = getBattleStats(profile);
 
   const handleLogout = async () => {
     SoundManager.play('decide');
@@ -376,11 +410,18 @@ export default function ProfileScreen() {
         <BackButton to="/sub" />
         <Text style={[styles.title, { color: colors.text, flex: 1 }]}><User size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.profile || 'Profile'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => {
-            if (isEditing) { saveProfile(); } else { setIsEditing(true); }
-          }}>
+          <TouchableOpacity
+            disabled={isSaving}
+            onPress={() => {
+              if (isEditing) { saveProfile(); } else { setIsEditing(true); }
+            }}
+          >
             <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>
-              {isEditing ? (locale === 'ja' ? '保存' : 'Save') : (locale === 'ja' ? '編集' : 'Edit')}
+              {isSaving
+                ? (locale === 'ja' ? '保存中...' : 'Saving...')
+                : isEditing
+                  ? (locale === 'ja' ? '保存' : 'Save')
+                  : (locale === 'ja' ? '編集' : 'Edit')}
             </Text>
           </TouchableOpacity>
           {user && (
@@ -535,6 +576,7 @@ export default function ProfileScreen() {
           <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 12 }}><BarChart3 size={18} color={colors.primary} style={{ marginRight: 6 }} />{locale === 'ja' ? '統計' : 'Stats'}</Text>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '作成した問題' : 'Problems Created'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuestionsCreated}</Text></View>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'クイズ実施' : 'Quizzes Played'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{profile.totalQuizzesPlayed}</Text></View>
+          <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '対戦戦績' : 'Battles'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}>{battleStats.totalBattles === 0 ? (locale === 'ja' ? 'なし' : 'None') : `${battleStats.totalBattles}戦 ${battleStats.wins}勝 ${battleStats.losses}敗 ${battleStats.draws}分`}</Text></View>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? '正答率' : 'Correct Rate'}</Text><Text style={{ color: colors.success || '#4CAF50', fontWeight: '700' }}>{profile.correctRate}%</Text></View>
           <View style={styles.statRow}><Text style={{ color: colors.text }}>{locale === 'ja' ? 'ストリーク' : 'Streak'}</Text><Text style={{ color: colors.primary, fontWeight: '700' }}><Flame size={16} color={colors.primary} style={{ marginRight: 4 }} />{profile.streakDays}</Text></View>
         </View>

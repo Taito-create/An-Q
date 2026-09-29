@@ -160,7 +160,11 @@ export default function MusicScreen() {
                   pause();
                 }
                 const fileKey = (preset as any).file || 'BGM1';
-                await SoundManager.updateBGMSetting(bgmEnabled, fileKey as any);
+                // ON/OFF は SoundManager (bgm_settings) を正とする
+                // (context の古い値で誤って設定を書き換えないため)
+                const settings = await SoundManager.getBGMSettings();
+                await SoundManager.updateBGMSetting(settings.enabled, fileKey as any);
+                await refreshBGM();
                 SoundManager.play('decide');
               }}
             >

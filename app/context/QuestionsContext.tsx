@@ -18,7 +18,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { Question, Folder } from '../types/question';
 import { Alert } from 'react-native';
 import { safeParseArray, loadTagMasterList, addTagToMasterList, removeTagFromMasterList } from '../utils/storageUtils';
-import { normalizeQuestionFromFirestore } from '../utils/answerUtils';
+import { normalizeMultipleChoice, normalizeQuestionFromFirestore } from '../utils/answerUtils';
 
 // Contextの型定義
 interface QuestionsContextType {
@@ -468,14 +468,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
-            //  options を平坦な文字列配列に強制
-            const rawOptions = q.multipleChoice.options || ['', '', '', ''];
-            sanitized.multipleChoice = {
-              options: Array.isArray(rawOptions) 
-                ? rawOptions.map((opt: any) => String(opt || ''))
-                : ['', '', '', ''],
-              correctAnswer: q.multipleChoice.correctAnswer ?? 0
-            };
+            //  旧形式（correctAnswer: number）も吸収し、
+            //  新形式（correctAnswers: number[] + allowMultiple）へ正規化する
+            const normalizedMC = normalizeMultipleChoice(q.multipleChoice);
+            if (normalizedMC) {
+              sanitized.multipleChoice = normalizedMC;
+            }
           }
           if (q.explanation) {
             sanitized.explanation = q.explanation;
@@ -484,7 +482,9 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         // 画像データがある場合
         if (q.image) {
-          sanitized.image = q.image;
+          // Base64 のまま Firestore に書くと 1MB 制限に達するため、URL のみ許可する
+          // （Cloudinary へのアップロードは create.tsx / browse.tsx 側で実施済み）
+          sanitized.image = q.image.startsWith('data:') ? null : q.image;
         }
         if (q.imageAnnotations && q.imageAnnotations.length > 0) {
           //  imageAnnotations を安全なオブジェクト配列に強制
@@ -614,18 +614,18 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (q.explanation) sanitized.explanation = q.explanation;
         } else if (q.answerType === 'multiple') {
           if (q.multipleChoice) {
-            //  options を平坦な文字列配列に強制
-            const rawOptions = q.multipleChoice.options || ['', '', '', ''];
-            sanitized.multipleChoice = {
-              options: Array.isArray(rawOptions)
-                ? rawOptions.map((opt: any) => String(opt || ''))
-                : ['', '', '', ''],
-              correctAnswer: q.multipleChoice.correctAnswer ?? 0
-            };
+            //  旧形式（correctAnswer: number）も吸収し、
+            //  新形式（correctAnswers: number[] + allowMultiple）へ正規化する
+            const normalizedMC = normalizeMultipleChoice(q.multipleChoice);
+            if (normalizedMC) sanitized.multipleChoice = normalizedMC;
           }
           if (q.explanation) sanitized.explanation = q.explanation;
         }
-        if (q.image) sanitized.image = q.image;
+        if (q.image) {
+          // Base64 のまま Firestore に書くと 1MB 制限に達するため、URL のみ許可する
+          // （Cloudinary へのアップロードは create.tsx / browse.tsx 側で実施済み）
+          sanitized.image = q.image.startsWith('data:') ? null : q.image;
+        }
         if (q.imageAnnotations && q.imageAnnotations.length > 0) {
           //  imageAnnotations を安全なオブジェクト配列に強制
           sanitized.imageAnnotations = q.imageAnnotations.map(ann => ({

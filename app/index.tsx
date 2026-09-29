@@ -45,7 +45,7 @@ import {
 import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission, UserStats, loadTodayCorrect, loadWeeklyProgress, WeeklyProgress, setQuickQuizCountCache, TITLE_BADGES } from './missions';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation } from './animations';
 import { useAuth } from './auth/AuthContext';
-import { readUserProfileDocument, getTitleDisplay } from '../src/utils/userProgress';
+import { readUserProfileDocument, readLocalProfileImage, getTitleDisplay } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { safeParse, safeParseArray } from './utils/storageUtils';
 import LottieView from 'lottie-react-native';
@@ -87,9 +87,9 @@ const badgeIconMap: Record<string, React.ComponentType<any>> = {
 
 // 疑似ターミナルログは app/components/TerminalLog.tsx に分離（ref で addLog 公開）
 const TERMINAL_LOG_HEAD = [
-  'INITIALIZING SYSTEM...',
-  'AWAITING USER INPUT...',
-  'STATUS: ONLINE',
+  'システムを起動しています...',
+  'ユーザー入力待機中...',
+  'ステータス: オンライン',
 ];
 
 const HomeScreen = React.memo(() => {
@@ -108,6 +108,8 @@ const HomeScreen = React.memo(() => {
   const [userLevel, setUserLevel] = useState(1);
   const [userCoins, setUserCoins] = useState(0);
   const [profile, setProfile] = useState<any>(null);
+  // プロフィール画像は AsyncStorage が唯一の保存先（Firestore には保存しない）
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [xpProgress, setXpProgress] = useState(0);
   const fireAnimationRef = useRef<LottieView>(null);
 
@@ -259,7 +261,7 @@ const HomeScreen = React.memo(() => {
     const id = setInterval(() => setStatusTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
-  // SYSTEM LOG の動的ログ（▶ INITIATE 押下時に追加）
+  // SYSTEM LOG の動的ログ（学習を始める 押下時に追加）
   // SYSTEM LOG の ref（addLog を外部から呼び出す）
   const terminalLogRef = useRef<TerminalLogHandle>(null);
   const [motivationalMessage, setMotivationalMessage] = useState('');
@@ -384,6 +386,10 @@ const HomeScreen = React.memo(() => {
 
   const loadUserProgress = async () => {
     try {
+      // 0. プロフィール画像は AsyncStorage を唯一の保存先として読み込む
+      //    (Firestore には保存しないため profile.profileImage は通常 null)
+      setProfileImage(await readLocalProfileImage());
+
       // 1. まずローカルのキャッシュ（AsyncStorage）から最速で読み込んで、画面に即表示！
       const cachedLevel = await AsyncStorage.getItem(STORAGE_KEYS.USER_LEVEL);
       const cachedCoins = await AsyncStorage.getItem(STORAGE_KEYS.USER_COINS);
@@ -889,7 +895,7 @@ const HomeScreen = React.memo(() => {
       <RomeaSpeechBubble
         message={
           locale === 'ja'
-            ? 'ようこそ！まずは問題を作成して、最初の記憶をインストールしましょう。'
+            ? 'ようこそ！まずは問題を作成して、学習を始めましょう。'
             : 'Welcome! Create your first question to install your first memory.'
         }
         romeaSize={80}
@@ -899,21 +905,21 @@ const HomeScreen = React.memo(() => {
         <Zap size={22} color={colors.primary} />
       </View>
       <Text style={[styles.emptyStatsTitle, { color: colors.primary }]}>
-        ▸ {locale === 'ja' ? '最初の記憶をインストール' : 'INSTALL FIRST MEMORY'}
+        {locale === 'ja' ? '問題を作成して始めましょう' : 'Create your first question'}
       </Text>
       <Text style={[styles.emptyStatsDesc, { color: colors.textSecondary }]}>
-        {locale === 'ja' ? 'タップして最初の1問を作成 正解で統計モジュール起動' : 'TAP TO CREATE — ANSWER YOUR FIRST QUESTION TO BOOT THE STATS MODULE'}
+        {locale === 'ja' ? 'タップして最初の1問を作成。正解すると統計が反映されます' : 'TAP TO CREATE — ANSWER YOUR FIRST QUESTION TO BOOT THE STATS MODULE'}
       </Text>
       {/* オンボーディングの具体的ステップ（P1：ゼロ状態UX改善） */}
       <View style={{ marginTop: 14, gap: 5, alignSelf: 'stretch' }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
-          {locale === 'ja' ? '① CREATE  —  最初の問題を作成' : '① CREATE  —  Make your first question'}
+        <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '① 作成  —  最初の問題を作成' : '① CREATE  —  Make your first question'}
         </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
-          {locale === 'ja' ? '② TRANSFER  —  クイズに挑戦して正解' : '② TRANSFER  —  Answer it correctly'}
+        <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '② 学習  —  クイズに挑戦して正解' : '② TRANSFER  —  Answer it correctly'}
         </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: 'monospace', lineHeight: 19 }} numberOfLines={1}>
-          {locale === 'ja' ? '③ BOOT  —  統計モジュールが起動' : '③ BOOT  —  Stats module boots up'}
+        <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }} numberOfLines={1}>
+          {locale === 'ja' ? '③ 記録  —  統計モジュールが起動' : '③ BOOT  —  Stats module boots up'}
         </Text>
       </View>
     </PressableButton>
@@ -968,9 +974,9 @@ const HomeScreen = React.memo(() => {
   // 転送モード選択カード（RAPID / DAILY / DEEP）
   // ─────────────────────────────────────────────
   const questMetaById: Record<string, { code: string; rewardJp: string; rewardEn: string }> = {
-    d1: { code: 'QUIZ', rewardJp: '+50 XP', rewardEn: '+50 XP' },
-    d2: { code: 'AUTHOR', rewardJp: 'UNLOCK: 称号「設計者」', rewardEn: 'UNLOCK: TITLE ARCHITECT' },
-    d3: { code: 'PERFECT', rewardJp: 'ACTIVATE: PULSE MODE', rewardEn: 'ACTIVATE: PULSE MODE' },
+    d1: { code: 'クイズ', rewardJp: '+50 XP', rewardEn: '+50 XP' },
+    d2: { code: '問題作成', rewardJp: '称号「設計者」を解放', rewardEn: 'UNLOCK: TITLE ARCHITECT' },
+    d3: { code: '全問正解', rewardJp: 'パルスモード起動', rewardEn: 'ACTIVATE: PULSE MODE' },
   };
 
   // STATUS 行（SYSTEM LOG 先頭に表示。ヘッダーからは撤去）
@@ -979,12 +985,12 @@ const HomeScreen = React.memo(() => {
     if (lastActionAt) {
       const diffMin = Math.floor((Date.now() - lastActionAt) / 60000);
       let elapsed: string;
-      if (diffMin < 1) elapsed = 'JUST NOW';
-      else if (diffMin < 60) elapsed = `${diffMin}M`;
-      else elapsed = `${Math.floor(diffMin / 60)}H ${diffMin % 60}M`;
-      return `STATUS: STANDBY (${elapsed} SINCE LAST TRANSFER)`;
+      if (diffMin < 1) elapsed = 'たった今';
+      else if (diffMin < 60) elapsed = `${diffMin}分前`;
+      else elapsed = `${Math.floor(diffMin / 60)}時間 ${diffMin % 60}分前`;
+      return `最終学習: ${elapsed}`;
     }
-    return 'STATUS: STANDBY (AWAITING FIRST TRANSFER)';
+    return 'まだ学習していません';
   })();
 
   // NEXT RANK 進行情報（ヘッダー表示用：次の未取得称号と現在値）
@@ -1006,28 +1012,30 @@ const HomeScreen = React.memo(() => {
     if (!userStats) return '';
     const unlocked = Array.isArray(userStats.unlockedTitles) ? userStats.unlockedTitles : [];
     const next = TITLE_BADGES.find((b) => !unlocked.includes(b.id));
-    if (!next) return 'RANK: MAX';
+    if (!next) return '称号: 全解除';
     const meta = RANK_THRESHOLDS[next.id];
     const name = locale === 'ja' ? next.titleJa : next.titleEn;
-    if (!meta) return `NEXT: ${name}`;
+    if (!meta) return `次の称号: ${name}`;
     const cur = Math.min(meta.get(userStats), meta.target);
-    return `NEXT: ${name} (${cur}/${meta.target})`;
+    return `次の称号: ${name} (${cur}/${meta.target})`;
   })();
 
   // ヘッダー用：最終転送からの経過時間（30秒ごとにライブ更新：P2-7）
   const lastTransferElapsed = (() => {
     void statusTick;
-    if (!lastActionAt) return locale === 'ja' ? '---（まだ転送なし）' : '--- (NO TRANSFER)';
+    if (!lastActionAt) return locale === 'ja' ? 'まだ学習していません' : 'No activity yet';
     const diffMin = Math.floor((Date.now() - lastActionAt) / 60000);
-    if (diffMin < 1) return 'JUST NOW';
-    if (diffMin < 60) return `${diffMin}M`;
-    return `${Math.floor(diffMin / 60)}H ${diffMin % 60}M`;
+    if (diffMin < 1) return locale === 'ja' ? 'たった今' : 'Just now';
+    if (diffMin < 60) return locale === 'ja' ? `${diffMin}分前` : `${diffMin}m ago`;
+    return locale === 'ja'
+      ? `${Math.floor(diffMin / 60)}時間 ${diffMin % 60}分前`
+      : `${Math.floor(diffMin / 60)}h ${diffMin % 60}m ago`;
   })();
 
   const transferModes = [
-    { key: 'rapid' as const, label: 'RAPID', caption: '短時間（5分）' },
-    { key: 'daily' as const, label: 'DAILY', caption: '日課（20問）' },
-    { key: 'deep' as const, label: 'DEEP', caption: '深掘り（全問）' },
+    { key: 'rapid' as const, label: '短期集中', caption: '短時間（5分）' },
+    { key: 'daily' as const, label: 'デイリー', caption: '日課（20問）' },
+    { key: 'deep' as const, label: '全問', caption: '深掘り（全問）' },
   ];
 
   // MEMORY CORE 表示（TerminalLog 用：初回正解まで HIDDEN）
@@ -1035,8 +1043,8 @@ const HomeScreen = React.memo(() => {
     ? (userStats.correctAnswers / userStats.quizPlayed) * 100
     : 0;
   const memoryCoreText = todayCorrect === 0 || accuracyRate === 0
-    ? 'MEMORY CORE: HIDDEN — AWAITING FIRST TRANSFER'
-    : `MEMORY CORE: ${accuracyRate.toFixed(1)}%`;
+    ? '正答率: 未計測 — 最初の学習を待っています'
+    : `正答率: ${accuracyRate.toFixed(1)}%`;
 
   const handleInitiateTransfer = () => {
     SoundManager.play('decide');
@@ -1046,8 +1054,9 @@ const HomeScreen = React.memo(() => {
       AsyncStorage.setItem('last_action_timestamp', String(now));
       setLastActionAt(now);
     } catch { /* noop */ }
-    // SYSTEM LOG に転送開始ログを追加（ref 経由でコンポーネントへ）
-    terminalLogRef.current?.addLog(`READY FOR TRANSFER (${selectedMode.toUpperCase()})`);
+    // SYSTEM LOG に学習開始ログを追加（ref 経由でコンポーネントへ）
+    const modeLabelJa = selectedMode === 'rapid' ? '短期集中' : selectedMode === 'daily' ? 'デイリー' : '全問';
+    terminalLogRef.current?.addLog(`学習開始 (${modeLabelJa})`);
     if (questionsFromHook.length === 0) {
       Alert.alert(
         locale === 'ja' ? '問題がありません' : 'No Questions',
@@ -1070,7 +1079,7 @@ const HomeScreen = React.memo(() => {
   const renderTransferSelector = () => (
     <View style={[styles.transferCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={[styles.transferHeader, { color: colors.textSecondary }]}>
-        $ SELECT TRANSFER MODE
+        学習モードを選択
       </Text>
       <View style={styles.transferTabs}>
         {transferModes.map((mode) => {
@@ -1086,15 +1095,15 @@ const HomeScreen = React.memo(() => {
                 setSelectedMode(mode.key);
                 const configLog =
                   mode.key === 'rapid'
-                    ? 'TRANSFER TYPE = RAPID (5MIN)'
+                    ? 'モード: 短期集中 (5分)'
                     : mode.key === 'daily'
-                      ? 'TRANSFER TYPE = DAILY (20 QUESTIONS)'
-                      : 'TRANSFER TYPE = DEEP (FULL SET)';
-                terminalLogRef.current?.addLog(`[CONFIG] ${configLog}`);
+                      ? 'モード: デイリー (20問)'
+                      : 'モード: 全問 (全セット)';
+                terminalLogRef.current?.addLog(configLog);
               }}
             >
               <Text style={[styles.transferTabText, { color: active ? colors.primary : colors.textSecondary }]} numberOfLines={1}>
-                {active ? '▸ ' : ''}{mode.label}
+                {mode.label}
               </Text>
               <Text style={[styles.transferTabCaption, { color: colors.textSecondary }]} numberOfLines={1}>
                 {mode.caption}
@@ -1110,7 +1119,7 @@ const HomeScreen = React.memo(() => {
         >
           <Play size={28} color={onPrimary} strokeWidth={2} />
           <Text numberOfLines={1} style={[styles.mainPlayText, { color: onPrimary }]}>
-            ▶ INITIATE
+            学習を始める
           </Text>
         </PressableButton>
       </Animated.View>
@@ -1159,17 +1168,17 @@ const HomeScreen = React.memo(() => {
           };
           const rewardText = locale === 'ja' ? meta.rewardJp : meta.rewardEn;
           const progressText = done
-            ? '[DONE]'
+            ? '[完了]'
             : current > 0
               ? `[${current}/${mission.goal}]`
-              : '[LOCKED]';
+              : '[未達成]';
           return (
             <View key={mission.id} style={styles.questItem}>
               {done
                 ? <CheckCircle2 size={16} color={colors.success} style={{ marginRight: 8 }} />
                 : <Square size={16} color={colors.border} style={{ marginRight: 8 }} />}
               <Text style={[styles.questTitleCol, { color: colors.text }]} numberOfLines={2}>
-                $ {meta.code}
+                {meta.code}
               </Text>
               <Text style={[styles.questRewardCol, { color: colors.primary }]} numberOfLines={2}>
                 {rewardText}
@@ -1236,7 +1245,9 @@ const HomeScreen = React.memo(() => {
   // ヘッダー（プロフィール画像＋XPリング）
   const renderHeader = () => {
     const titleDisplay = user ? getTitleDisplay(profile?.currentTitle || 'apprentice', currentLocale) : '見習い暗記人';
-    const profileImage = (profile as any)?.profileImage || null;
+    // 画像は AsyncStorage (profileImage state) を優先し、未取得時のみ
+    // Firestore 側の http(s) URL（旧データ）にフォールバックする
+    const imageUri = profileImage || (profile as any)?.profileImage || null;
 
     // リングの設定
     const ringSize = screenType === 'desktop' ? 64 : 56;
@@ -1325,8 +1336,8 @@ const HomeScreen = React.memo(() => {
               </Svg>
               {/* プロフィール画像 */}
               <View style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2, overflow: 'hidden', backgroundColor: colors.border }}>
-                {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={{ width: imageSize, height: imageSize }} resizeMode="cover" />
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={{ width: imageSize, height: imageSize }} resizeMode="cover" />
                 ) : (
                   <View style={{ width: imageSize, height: imageSize, backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }}>
                     <User size={imageSize * 0.4} color={colors.primary} />
@@ -1347,7 +1358,7 @@ const HomeScreen = React.memo(() => {
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <Text style={{ color: onPrimary, fontSize: 10, fontWeight: '700', fontFamily: 'monospace' }}>
+              <Text style={{ color: onPrimary, fontSize: 10, fontWeight: '700' }}>
                 Lv. {userLevel}
               </Text>
             </View>
@@ -1400,14 +1411,13 @@ const HomeScreen = React.memo(() => {
         <Text
           style={{
             color: colors.textSecondary,
-            fontFamily: 'monospace',
             fontSize: 12,
             letterSpacing: 0.5,
             marginTop: 6,
           }}
           numberOfLines={1}
         >
-          {`> SINCE LAST TRANSFER: ${lastTransferElapsed}`}
+          {`最終学習: ${lastTransferElapsed}`}
         </Text>
       </View>
 
@@ -1491,7 +1501,8 @@ const HomeScreen = React.memo(() => {
           {renderHeader()}
 
           {/* モチベーションメッセージ */}
-          {motivationalMessage && (
+          {/* 文字列 state は '' のとき View の子として text node 判定されるため boolean 化する */}
+          {!!motivationalMessage && (
             <View style={[styles.motivationalContainer, { backgroundColor: colors.primary + '15', marginBottom: 12 }]}>
                 <Lightbulb size={14} color={colors.primary} style={{ marginRight: 6 }} />
                 <Text style={[styles.motivationalText, { color: colors.text, fontSize: fontSize.small }]} numberOfLines={3}>
@@ -1575,7 +1586,6 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 0.5,
   },
   currencyContainer: {
@@ -1608,14 +1618,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     minWidth: 70,
     textAlign: 'right',
-    fontFamily: 'monospace',
   },
   languageText: {
     fontWeight: 'bold',
   },
   levelText: {
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   todayCard: {
     borderWidth: 1,
@@ -1711,7 +1719,6 @@ const styles = StyleSheet.create({
   statNumber: {
     fontWeight: 'bold',
     color: '#007AFF',
-    fontFamily: 'monospace',
   },
   statLabel: {
     color: '#666',
@@ -1762,7 +1769,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
-    fontFamily: 'monospace',
     letterSpacing: 1,
   },
   emptyStateText: {
@@ -1788,13 +1794,11 @@ const styles = StyleSheet.create({
   emptyStatsTitle: {
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   emptyStatsDesc: {
     fontSize: 13,
-    fontFamily: 'monospace',
     textAlign: 'center',
     lineHeight: 18,
     opacity: 0.85,
@@ -1803,7 +1807,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontWeight: 'bold',
     fontSize: 15,
-    fontFamily: 'monospace',
     letterSpacing: 0.5,
   },
   primaryButton: {
@@ -1857,7 +1860,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
-    fontFamily: 'monospace',
     letterSpacing: 0.3,
   },
   featureCard: {
@@ -1941,7 +1943,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 24,
     letterSpacing: 1,
-    fontFamily: 'monospace',
   },
   transferCard: {
     padding: 18,
@@ -1954,7 +1955,6 @@ const styles = StyleSheet.create({
   transferHeader: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 1,
     marginBottom:  12,
   },
@@ -1976,12 +1976,10 @@ const styles = StyleSheet.create({
   transferTabText: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 0.5,
   },
   transferTabCaption: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   questCard: {
     padding: 16,
@@ -2011,20 +2009,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     flex: 1.5,
-    fontFamily: 'monospace',
   },
   questRewardCol: {
     fontSize: 13,
     fontWeight: '600',
     flex: 2,
-    fontFamily: 'monospace',
     flexShrink: 0,
   },
   questStatusCol: {
     fontSize: 12,
     fontWeight: '500',
     width: 90,
-    fontFamily: 'monospace',
     textAlign: 'right',
     flexShrink: 0,
   },
@@ -2043,24 +2038,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 16,
-    fontFamily: 'monospace',
   },
   terminalLogTitle: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 1,
     marginBottom: 8,
   },
   terminalLogLine: {
     fontSize:  12,
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   dailyGoalLabel: {
     fontWeight: '600',
     minWidth: 90,
-    fontFamily: 'monospace',
   },
   dailyGoalBar: {
     height: 8,

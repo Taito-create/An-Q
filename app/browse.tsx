@@ -10,7 +10,8 @@ import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question, Folder, ImageAnnotation } from './types/question';
-import { getAnswerText, showAnswerAlert, getAnswerGroups } from './utils/answerUtils';
+import { getAnswerText, showAnswerAlert, getAnswerGroups, normalizeMultipleChoice } from './utils/answerUtils';
+import { uploadImageToCloudinary } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
@@ -35,7 +36,6 @@ export default function BrowseQuestionsScreen() {
     deleteFolder,
     addQuestionsToFolder,
     removeQuestionsFromFolder,
-    cleanupOrphanFolders,
     tagMasterList,
     addTag,
     removeTag
@@ -77,7 +77,6 @@ export default function BrowseQuestionsScreen() {
   const [showBatchTagModal, setShowBatchTagModal] = useState(false);
   const [batchSelectedTags, setBatchSelectedTags] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [isCompactMode, setIsCompactMode] = useState(false);
 
   // タブ管理用 state
   const [activeTab, setActiveTab] = useState<'all' | 'folders'>('all');
@@ -98,7 +97,6 @@ export default function BrowseQuestionsScreen() {
   const [showTagFilterModal, setShowTagFilterModal] = useState(false);
 
   // 問題集削除モード用 state
-  const [isFolderDeleteMode, setIsFolderDeleteMode] = useState(false);
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [folderNameToDelete, setFolderNameToDelete] = useState<string>('');
@@ -131,7 +129,8 @@ export default function BrowseQuestionsScreen() {
   const [editAnswerGroups, setEditAnswerGroups] = useState<string[][]>([['']]);
   const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
   const [editMultipleOptions, setEditMultipleOptions] = useState<string[]>(['', '', '', '']);
-  const [editMultipleCorrect, setEditMultipleCorrect] = useState(0);
+  const [editMultipleCorrectAnswers, setEditMultipleCorrectAnswers] = useState<number[]>([0]);
+  const [editMultipleAllowMultiple, setEditMultipleAllowMultiple] = useState(false);
   const [editReading, setEditReading] = useState('');
 
   // タグ一覧更新（questions 変更時に実行）
@@ -402,7 +401,12 @@ export default function BrowseQuestionsScreen() {
     
     setEditTrueFalseAnswer(question.trueFalseAnswer ?? true);
     setEditMultipleOptions(question.multipleChoice?.options || ['', '', '', '']);
-    setEditMultipleCorrect(question.multipleChoice?.correctAnswer ?? 0);
+    // 旧形式（correctAnswer）も新形式（correctAnswers）も読み取れるようにする
+    {
+      const normalized = normalizeMultipleChoice(question.multipleChoice);
+      setEditMultipleCorrectAnswers(normalized?.correctAnswers ?? [0]);
+      setEditMultipleAllowMultiple(normalized?.allowMultiple === true);
+    }
     setEditReading(question.reading || '');
     setShowEditModal(true);
   };
@@ -423,6 +427,18 @@ export default function BrowseQuestionsScreen() {
       updatedMatchMode = cleanedGroups.length > 1 ? 'all' : 'any';
     }
 
+    // 画像が Base64 の場合は Cloudinary にアップロードして URL 化する
+    // （Firestore の1MB制限を避けるため。失敗時は元の値を保持する）
+    let updatedImage = editingQuestionFull.image ?? null;
+    if (updatedImage && updatedImage.startsWith('data:image')) {
+      const uploaded = await uploadImageToCloudinary(updatedImage);
+      if (uploaded) {
+        updatedImage = uploaded;
+      } else {
+        console.warn('Cloudinary upload failed, keeping Base64');
+      }
+    }
+
     const updated: Question = {
       ...editingQuestionFull,
       question: editQuestionText.trim(),
@@ -431,8 +447,15 @@ export default function BrowseQuestionsScreen() {
       matchMode: updatedMatchMode,
       trueFalseAnswer: editingQuestionFull.answerType === 'truefalse' ? editTrueFalseAnswer : editingQuestionFull.trueFalseAnswer,
       multipleChoice: editingQuestionFull.answerType === 'multiple'
-        ? { options: editMultipleOptions, correctAnswer: editMultipleCorrect }
+        ? {
+            options: editMultipleOptions,
+            correctAnswers: editMultipleAllowMultiple
+              ? editMultipleCorrectAnswers
+              : editMultipleCorrectAnswers.slice(0, 1),
+            allowMultiple: editMultipleAllowMultiple,
+          }
         : editingQuestionFull.multipleChoice,
+      image: updatedImage,
       reading: editReading.trim() || undefined,
     };
 
@@ -534,45 +557,19 @@ export default function BrowseQuestionsScreen() {
             }
           }}
         />
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
-          $ MANAGE NODES
+        <Text style={[styles.headerTitle, { color: colors.text, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+          問題を管理
         </Text>
         <View style={styles.headerActions}>
           <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
             <Text style={[styles.countBadgeText, { color: onPrimary }]}>{filteredQuestions.length}</Text>
           </View>
           <PressableButton
-            style={[styles.compactToggleBtn, { backgroundColor: isCompactMode ? colors.primary : colors.primary + '20' }]}
-            onPress={() => { setIsCompactMode(!isCompactMode); if (isCompactMode) setExpandedQuestionId(null); }}
-          >
-            <Text style={[styles.compactToggleBtnText, { color: '#000000' }]}>
-              {isCompactMode ? '≡' : ''}
-            </Text>
-          </PressableButton>
-          <PressableButton
             style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
             <Text style={[styles.headerBtnText, { color: isSelectionMode ? onPrimary : colors.primary }]}>
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
-            </Text>
-          </PressableButton>
-          <PressableButton
-            style={[styles.headerBtn, { borderColor: colors.error, backgroundColor: isFolderDeleteMode ? colors.error : 'transparent' }]}
-            onPress={async () => {
-              const removedCount = await cleanupOrphanFolders();
-              if (removedCount > 0) {
-                Alert.alert(
-                  locale === 'ja' ? 'クリーンアップ完了' : 'Cleanup Complete',
-                  locale === 'ja'
-                    ? `実体のない問題集を${removedCount}件削除し、データを最適化しました`
-                    : `Removed ${removedCount} orphan folders and optimized data`
-                );
-              }
-            }}
-          >
-            <Text style={[styles.headerBtnText, { color: isFolderDeleteMode ? onPrimary : colors.error }]}>
-              
             </Text>
           </PressableButton>
         </View>
@@ -663,7 +660,6 @@ export default function BrowseQuestionsScreen() {
                 style={[
                   styles.card,
                   { backgroundColor: colors.card, borderColor: colors.border, boxShadow: `0px 4px 12px ${colors.primary}0F` },
-                  isCompactMode && styles.cardCompact,
                   isSelectionMode && styles.batchCompactCard,
                 ]}
               >
@@ -700,48 +696,39 @@ export default function BrowseQuestionsScreen() {
                     </View>
                   </PressableButton>
                 )}
-                <View style={[styles.cardHeader, isCompactMode && styles.cardHeaderCompact, isSelectionMode && { paddingVertical: 4, paddingHorizontal: 0 }]}>
+                <View style={[styles.cardHeader, isSelectionMode && { paddingVertical: 4, paddingHorizontal: 0 }]}>
                   <PressableButton
                     style={styles.cardHeaderLeft}
-                    onPress={() => { if (!isCompactMode) { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); } }}
+                    onPress={() => { setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id); }}
                   >
-                    {!isCompactMode && (
-                      <>
-                        <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
-                        {item.isShared && <Share2 size={12} color={colors.success} />}
-                      </>
-                    )}
+                    <>
+                      <Text style={[styles.typeBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{item.answerType === 'multiple' ? t.multiple : item.answerType === 'truefalse' ? t.truefalse : t.descriptive}</Text>
+                      {item.isShared && <Share2 size={12} color={colors.success} />}
+                    </>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.questionPreview, { color: colors.text }, isCompactMode && styles.questionPreviewCompact]} numberOfLines={isCompactMode ? 1 : 2}>{item.question}</Text>
-                      {isCompactMode && (
-                        <Text style={[styles.compactAnswerText, { color: colors.textSecondary, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>
-                          {getAnswerText(item)}
-                        </Text>
-                      )}
+                      <Text style={[styles.questionPreview, { color: colors.text }]} numberOfLines={2}>{item.question}</Text>
                     </View>
                   </PressableButton>
-                  {!isCompactMode && (
-                    <View style={styles.cardHeaderRight}>
-                      {item.image && (
-                        <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
-                          <img src={item.image} alt="" className="browse-thumbnail" />
-                        </View>
-                      )}
-                      <PressableButton
-                        onPress={() => requestDeleteQuestion(item.id)}
-                        style={styles.headerDeleteBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Trash2 size={18} color={colors.error} />
-                      </PressableButton>
-                      <PressableButton onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
-                        <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
-                      </PressableButton>
-                    </View>
-                  )}
+                  <View style={styles.cardHeaderRight}>
+                    {item.image && (
+                      <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
+                        <img src={item.image} alt='' className='browse-thumbnail' />
+                      </View>
+                    )}
+                    <PressableButton
+                      onPress={() => requestDeleteQuestion(item.id)}
+                      style={styles.headerDeleteBtn}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Trash2 size={18} color={colors.error} />
+                    </PressableButton>
+                    <PressableButton onPress={() => setExpandedQuestionId(expandedQuestionId === item.id ? null : item.id)}>
+                      <Text style={[styles.expandIcon, { color: colors.primary }]}>{expandedQuestionId === item.id ? '▲' : '▼'}</Text>
+                    </PressableButton>
+                  </View>
                 </View>
 
-                {!isCompactMode && expandedQuestionId === item.id && (
+                {expandedQuestionId === item.id && (
                   <View style={styles.expandedContent}>
                     {item.isShared && <><Share2 size={14} color={colors.success} style={{ marginRight: 6 }} /><Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>{locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text></>}
                     <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
@@ -925,24 +912,11 @@ export default function BrowseQuestionsScreen() {
                             isSelected && { backgroundColor: colors.error + '10' }
                           ]}
                           onPress={() => {
-                            if (!isFolderDeleteMode) {
-                              const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
-                              setFolderQuestions(questionsInFolder);
-                              setSelectedFolder(folder);
-                            } else {
-                              setSelectedFolderIds(prev => 
-                                prev.includes(folder.id) ? prev.filter(id => id !== folder.id) : [...prev, folder.id]
-                              );
-                            }
+                            const questionsInFolder = questions.filter(q => folder.questionIds.includes(q.id));
+                            setFolderQuestions(questionsInFolder);
+                            setSelectedFolder(folder);
                           }}
                         >
-                          {isFolderDeleteMode && (
-                            <View style={styles.folderCardCheckbox}>
-                              <Text style={[styles.checkboxText, { color: '#ffffff' }]}>
-                                {isSelected ? '' : ''}
-                              </Text>
-                            </View>
-                          )}
                           <FolderIcon size={32} color={colors.primary} />
                           <Text style={[styles.folderCardName, { color: colors.text }]} numberOfLines={2}>
                             {folder.name}
@@ -958,21 +932,6 @@ export default function BrowseQuestionsScreen() {
                   </View>
                 )}
                 
-                {isFolderDeleteMode && selectedFolderIds.length > 0 && (
-                  <PressableButton
-                    style={[styles.deleteSelectedBtn, { backgroundColor: colors.error }]}
-                    onPress={async () => {
-                      await deleteFolder(selectedFolderIds[0]); // 简化：1つずつ削除
-                      setSelectedFolderIds([]);
-                      setIsFolderDeleteMode(false);
-                      SoundManager.play('complete');
-                    }}
-                  >
-                    <Text style={[styles.deleteSelectedBtnText, { color: '#ffffff' }]}>
-                      <Trash2 size={16} color="#fff" style={{ marginRight: 6 }} />{locale === 'ja' ? `${selectedFolderIds.length}個を削除` : `Delete ${selectedFolderIds.length}`}
-                    </Text>
-                  </PressableButton>
-                )}
               </View>
             )}
           </>
@@ -1114,16 +1073,50 @@ export default function BrowseQuestionsScreen() {
             {editingQuestionFull?.answerType === 'multiple' && (
               <>
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
-                {editMultipleOptions.map((opt, i) => (
-                  <TextInput key={i} style={[styles.modalInput, { borderColor: editMultipleCorrect === i ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${editMultipleCorrect === i ? '  正解' : ''}`} placeholderTextColor={editMultipleCorrect === i ? colors.success : colors.textSecondary} />
-                ))}
-                <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>正解番号</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                  {[0, 1, 2, 3].map(i => (
-                    <PressableButton key={i} style={[styles.modalCancelBtn, { flex: 1, backgroundColor: editMultipleCorrect === i ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => setEditMultipleCorrect(i)}>
-                      <Text style={[styles.modalCancelText, { color: editMultipleCorrect === i ? '#fff' : colors.success }]}>{i + 1}</Text>
+                {editMultipleOptions.map((opt, i) => {
+                  const isCorrectOpt = editMultipleCorrectAnswers.includes(i);
+                  return (
+                    <TextInput key={i} style={[styles.modalInput, { borderColor: isCorrectOpt ? colors.success : colors.border, color: colors.text }]} value={opt} onChangeText={text => { const newOpts = [...editMultipleOptions]; newOpts[i] = text; setEditMultipleOptions(newOpts); }} placeholder={`選択肢 ${i + 1}${isCorrectOpt ? '  正解' : ''}`} placeholderTextColor={isCorrectOpt ? colors.success : colors.textSecondary} />
+                  );
+                })}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 8 }}>
+                  <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary }]}>正解番号</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>複数正解を許可</Text>
+                    <PressableButton
+                      style={{ width: 46, height: 26, borderRadius: 13, backgroundColor: editMultipleAllowMultiple ? colors.primary : colors.border, justifyContent: 'center', paddingHorizontal: 3 }}
+                      onPress={() => {
+                        const next = !editMultipleAllowMultiple;
+                        setEditMultipleAllowMultiple(next);
+                        if (!next) {
+                          setEditMultipleCorrectAnswers(prev => prev.slice(0, 1).length > 0 ? prev.slice(0, 1) : [0]);
+                        }
+                      }}
+                    >
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: editMultipleAllowMultiple ? 'flex-end' : 'flex-start' }} />
                     </PressableButton>
-                  ))}
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                  {[0, 1, 2, 3].map(i => {
+                    const isSel = editMultipleCorrectAnswers.includes(i);
+                    return (
+                      <PressableButton key={i} style={[styles.modalCancelBtn, { flex: 1, backgroundColor: isSel ? colors.success : 'transparent', borderColor: colors.success }]} onPress={() => {
+                        if (editMultipleAllowMultiple) {
+                          setEditMultipleCorrectAnswers(prev => {
+                            const next = prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i];
+                            return next.length > 0 ? next : [i];
+                          });
+                        } else {
+                          setEditMultipleCorrectAnswers([i]);
+                        }
+                      }}>
+                        <Text style={[styles.modalCancelText, { color: isSel ? '#fff' : colors.success }]}>
+                          {editMultipleAllowMultiple ? (isSel ? '☑' : '☐') : i + 1}
+                        </Text>
+                      </PressableButton>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -1784,12 +1777,7 @@ const styles = StyleSheet.create({
   },
   countBadge: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 12 },
   countBadgeText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
-  cardCompact: { marginVertical: 2, borderRadius: 12, padding: 14 },
-  cardHeaderCompact: { paddingVertical: 8, paddingHorizontal: 10 },
-  questionPreviewCompact: { fontSize: 11, lineHeight: 14 },
   compactAnswerText: { fontSize: 11, lineHeight: 14, fontStyle: 'italic' },
-  compactToggleBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
-  compactToggleBtnText: { fontSize: 16, fontWeight: 'bold' },
   closeIconButton: { fontSize: 20, fontWeight: 'bold', padding: 4 },
   modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
   tagButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },

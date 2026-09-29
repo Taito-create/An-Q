@@ -218,22 +218,22 @@ export default function ResultsScreen() {
       {showGlitch && <View style={styles.glitchOverlay} />}
       
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 2 }]} numberOfLines={1}>
-        $ TRANSFER REPORT
+      <Text style={[styles.headerTitle, { color: colors.text, letterSpacing: 2 }]} numberOfLines={1}>
+        学習結果
       </Text>
 
       {/* Score Card */}
       <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.summaryLabel, { color: colors.textSecondary, fontFamily: 'monospace', letterSpacing: 2 }]} numberOfLines={1}>
-          TRANSFER SUMMARY
+        <Text style={[styles.summaryLabel, { color: colors.textSecondary, letterSpacing: 2 }]} numberOfLines={1}>
+          結果サマリー
         </Text>
         <View style={styles.bigScore}>
           <Text style={[styles.bigScoreNum, { color: colors.primary }]}>{correctCount}</Text>
           <Text style={[styles.bigScoreSlash, { color: colors.textSecondary }]}>/</Text>
           <Text style={[styles.bigScoreTotal, { color: colors.textSecondary }]}>{total}</Text>
         </View>
-        <Text style={[styles.pctText, { color: colors.text, fontFamily: 'monospace' }]} numberOfLines={1}>
-          MEMORY INTEGRITY: {pct}%
+        <Text style={[styles.pctText, { color: colors.text,  }]} numberOfLines={1}>
+          正答率: {pct}%
         </Text>
         <Text style={[styles.gradeText, { color: grade.color }]}>{grade.label}</Text>
         {pct > 0 && pct < 100 && (
@@ -301,8 +301,8 @@ export default function ResultsScreen() {
             navigate('/quiz');
           }}
         >
-          <Text style={[styles.primaryBtnText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]} numberOfLines={1}>
-            ▶ RETRY TRANSFER
+          <Text style={[styles.primaryBtnText, { color: onPrimary, letterSpacing: 1 }]} numberOfLines={1}>
+            もう一度学習する
           </Text>
         </TouchableOpacity>
         
@@ -313,7 +313,7 @@ export default function ResultsScreen() {
             navigate('/');
           }}
         >
-          <Text style={[styles.secondaryBtnText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]} numberOfLines={1}>↺ RETURN TO TERMINAL</Text>
+          <Text style={[styles.secondaryBtnText, { color: onPrimary, letterSpacing: 1 }]} numberOfLines={1}>ホームに戻る</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginTop: 8,
-    fontFamily: 'monospace',
+    
   },
   headerTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, letterSpacing: 0.2 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 32 },

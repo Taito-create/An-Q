@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Pressable, Alert,
-  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform
+  ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform,
+  ActivityIndicator
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import successJson from '../src/assets/animations/success.json';
@@ -63,6 +64,27 @@ const getAnswerModalFontSize = (answer: string, screenWidth: number) => {
 };
 
 // ──────────────────────────────────────────────
+// 複数選択問題のユーティリティ
+// ──────────────────────────────────────────────
+
+/**
+ * 問題の正解インデックス配列を取得する。
+ * 新形式 (correctAnswers) を優先し、旧形式 (correctAnswer) にもフォールバックする。
+ * どちらもない場合は [0]（＝1番目）を正解とする（既存挙動と同じ）。
+ */
+export const getCorrectIndices = (question: Question): number[] => {
+  const mc = question?.multipleChoice;
+  if (!mc) return [0];
+  if (Array.isArray(mc.correctAnswers) && mc.correctAnswers.length > 0) {
+    return mc.correctAnswers;
+  }
+  if (typeof mc.correctAnswer === 'number') {
+    return [mc.correctAnswer];
+  }
+  return [0];
+};
+
+// ──────────────────────────────────────────────
 // メイン
 // ──────────────────────────────────────────────
 export default function QuizScreen() {
@@ -90,7 +112,8 @@ export default function QuizScreen() {
   const [showReview, setShowReview] = useState(false);
   const [mistakeCount, setMistakeCount] = useState(0);
   /* UI強化: 選択肢カードの正誤ハイライト用に、ユーザーが選んだ選択肢を追跡する */
-  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
+  /* 単一正解は1つだけ、複数正解は複数選択する */
+  const [selectedOptionIndices, setSelectedOptionIndices] = useState<number[]>([]);
     const [isLoading, setIsLoading] = useState(() => questionsLoading || allQuestionsFromHook.length === 0);
   const [userDescriptiveAnswer, setUserDescriptiveAnswer] = useState('');
   const [userDescriptiveAnswers, setUserDescriptiveAnswers] = useState<string[]>([]);
@@ -128,6 +151,9 @@ export default function QuizScreen() {
   // 音声エンジン選択（Web Speech API / VOICEVOX）
 const [voiceEngine, setVoiceEngine] = useState<'web' | 'voicevox'>('web');
 const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
+  // 現在の問題が「複数正解許可」モードかどうか（UIの挙動を切り替える）
+  const isMultipleAnswerMode = currentQuestion?.answerType === 'multiple'
+    && currentQuestion?.multipleChoice?.allowMultiple === true;
   const autoPlayInterval = 3;
   const [autoPlayPhase, setAutoPlayPhase] = useState<'question' | 'answer'>('question');
   const [autoPlayCountdown, setAutoPlayCountdown] = useState(5);
@@ -154,7 +180,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
   // UI強化: 問題が切り替わったら選択状態をリセット（選択肢の正誤ハイライト用）
   useEffect(() => {
-    setSelectedOptionIndex(null);
+    setSelectedOptionIndices([]);
   }, [currentIndex]);
 
   // 長押し用 ref
@@ -560,7 +586,28 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   useEffect(() => {
     if (quickStartCount == null) return;
     if (quickStartAppliedRef.current) return;
-    if (allQuestions.length === 0) return;
+    if (allQuestions.length === 0) {
+      // 問題を1問も作成していない場合はクイズ画面に入らせず、作成を促す。
+      // 従来はここで return するだけで通知も出ず、
+      // 設問画面が「読み込み中...」のまま何も起きない状態になっていた。
+      quickStartAppliedRef.current = true; // 再実行して無限ループになるのを防ぐ
+      Alert.alert(
+        locale === 'ja' ? '問題がありません' : 'No Questions',
+        locale === 'ja' ? 'まずは問題を作成しましょう！' : 'Create your first question to start.',
+        [
+          {
+            text: locale === 'ja' ? 'キャンセル' : 'Cancel',
+            style: 'cancel',
+            onPress: () => navigate('/'),
+          },
+          {
+            text: locale === 'ja' ? '問題を作成' : 'Create',
+            onPress: () => navigate('/create/manual'),
+          },
+        ]
+      );
+      return;
+    }
     quickStartAppliedRef.current = true;
     startQuiz(quickStartCount);
   }, [allQuestions.length, quickStartCount]);
@@ -800,7 +847,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     isSubmittingRef.current = answered;
   }, [answered]);
 
-  const handleAnswer = async (answer: boolean | number | string) => {
+  // answer: boolean(○/×) | number(単一選択のインデックス) | string(記述) | number[](複数選択)
+  const handleAnswer = async (answer: boolean | number | string | number[]) => {
     if (isSubmittingRef.current || answered) return;
     isSubmittingRef.current = true;
     setAnswered(true);
@@ -826,17 +874,31 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
           setFeedbackMessage('');
         }
         break;
-      case 'multiple':
-        const selectedIndex = answer as number;
-        const correctIndex = currentQuestion.multipleChoice?.correctAnswer ?? 0;
-        correct = selectedIndex === correctIndex;
-        actualCorrectAnswer = currentQuestion.multipleChoice?.options[correctIndex] || '';
+      case 'multiple': {
+        const correctIndices = getCorrectIndices(currentQuestion);
+        const allowMultiple = currentQuestion.multipleChoice?.allowMultiple === true;
+        if (allowMultiple) {
+          // 複数正解: セットが完全一致（数と中身の両方）才算正解
+          const selectedIndices = Array.isArray(answer) ? (answer as number[]) : [answer as number];
+          correct =
+            selectedIndices.length === correctIndices.length &&
+            selectedIndices.every(i => correctIndices.includes(i));
+        } else {
+          // 単一正解: 従来通りインデックス一致で判定
+          const selectedIndex = answer as number;
+          correct = selectedIndex === correctIndices[0];
+        }
+        actualCorrectAnswer = correctIndices
+          .map(i => currentQuestion.multipleChoice?.options[i])
+          .filter(Boolean)
+          .join(', ');
         if (!correct) {
           setFeedbackMessage(actualCorrectAnswer);
         } else {
           setFeedbackMessage('');
         }
         break;
+      }
       case 'descriptive':
         const userAnswerStr = answer as string;
         correct = checkDescriptiveAnswer(userAnswerStr, currentQuestion);
@@ -854,10 +916,16 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
     SoundManager.play(correct ? 'correct' : 'wrong');
 
+    // 複数選択の回答は「1, 3」のように文字列化して記録する
+    // （results.tsx などの表示側が文字列前提のため、配列のままだと扱えない）
+    const recordedAnswer = Array.isArray(answer)
+      ? [...answer].sort((a, b) => a - b).map(i => i + 1).join(', ')
+      : answer;
+
     const newResult: QuizResult = {
       questionId: currentQuestion.id,
       question: currentQuestion.question,
-      yourAnswer: answer,
+      yourAnswer: recordedAnswer,
       correctAnswer: actualCorrectAnswer,
       isCorrect: correct,
       timeSpent: elapsed,
@@ -887,7 +955,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     
     const answerData: UserAnswer = {
       question: currentQuestion.question,
-      yourAnswer: answer,
+      yourAnswer: recordedAnswer,
       correctAnswer: actualCorrectAnswer,
       isCorrect: correct
     };
@@ -1133,15 +1201,15 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
           <BackButton to="/" />
-          <Text style={[styles.headerTitle, { color: colors.text, fontFamily: 'monospace', letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
-            <ClipboardList size={20} color={colors.primary} style={{ marginRight: 6 }} />$ SELECT QUIZ CONFIG
+          <Text style={[styles.headerTitle, { color: colors.text, letterSpacing: 1, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+            <ClipboardList size={20} color={colors.primary} style={{ marginRight: 6 }} />クイズ設定
           </Text>
         </View>
 
         <ScrollView contentContainerStyle={[styles.quizContent, { flexGrow: 1 }]}>
           <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
-            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 10 }]}>
-              TRANSFER COUNT
+            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, letterSpacing: 1, marginBottom: 10 }]}>
+              問題数
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 10 }}>
               <PressableButton
@@ -1196,7 +1264,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
           {folders.length > 0 && (
             <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 16, marginBottom: 12 }]}>
-              <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
+              <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, letterSpacing: 1 }]}>
                 <Folder size={18} color={colors.primary} style={{ marginRight: 4 }} />{locale === 'ja' ? '問題集で絞り込み' : 'Filter by Folder'}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1248,8 +1316,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
           <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1 }]}>
-                  <RefreshCw size={18} color={colors.primary} style={{ marginRight: 4 }} />REVERSE SYNAPSE
+                <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, letterSpacing: 1 }]}>
+                  <RefreshCw size={18} color={colors.primary} style={{ marginRight: 4 }} />問題と答えを反転
                 </Text>
                 <Text style={[{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }]}>
                   {locale === 'ja' ? '回答を問題文として表示し、問題文を答えます' : 'Show the answer as the question, and answer the original question'}
@@ -1274,16 +1342,16 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
           {/* GAME MODE */}
           <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
-            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 10 }]}>
-              $ GAME MODE
+            <Text style={[{ fontSize: 14, fontWeight: 'bold', color: colors.text, letterSpacing: 1, marginBottom: 10 }]}>
+              ゲームモード
             </Text>
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               {(['standard', 'timeAttack', 'suddenDeath', 'challenge'] as const).map((mode) => {
                 const labels: Record<typeof mode, string> = {
-                  standard: 'STANDARD',
-                  timeAttack: 'TIME ATTACK',
-                  suddenDeath: 'SUDDEN DEATH',
-                  challenge: 'CHALLENGE',
+                  standard: '標準',
+                  timeAttack: 'タイムアタック',
+                  suddenDeath: 'サドンデス',
+                  challenge: 'チャレンジ',
                 };
                 const active = selectedGameMode === mode;
                 return (
@@ -1309,7 +1377,6 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                       fontSize: 11,
                       fontWeight: active ? '700' : '500',
                       color: active ? colors.primary : colors.textSecondary,
-                      fontFamily: 'monospace',
                       letterSpacing: 0.5,
                     }]}>
                       {labels[mode]}
@@ -1322,7 +1389,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             {/* サブオプション（選択されたモードに応じて表示） */}
             {selectedGameMode === 'timeAttack' && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>LIMIT:</Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary,  }}>制限時間:</Text>
                 {[30, 60, 120].map((sec) => (
                   <PressableButton
                     key={sec}
@@ -1336,7 +1403,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                     }]}
                     onPress={() => setTimeLimitSec(sec)}
                   >
-                    <Text style={{ fontSize: 11, color: timeLimitSec === sec ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>{sec}s</Text>
+                    <Text style={{ fontSize: 11, color: timeLimitSec === sec ? colors.primary : colors.textSecondary,  }}>{sec}s</Text>
                   </PressableButton>
                 ))}
               </View>
@@ -1344,7 +1411,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
             {selectedGameMode === 'suddenDeath' && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>LIVES:</Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary,  }}>残機:</Text>
                 {[3, 5].map((lives) => (
                   <PressableButton
                     key={lives}
@@ -1358,7 +1425,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                     }]}
                     onPress={() => setSuddenDeathLivesOpt(lives)}
                   >
-                    <Text style={{ fontSize: 11, color: suddenDeathLivesOpt === lives ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>♥ {lives}</Text>
+                    <Text style={{ fontSize: 11, color: suddenDeathLivesOpt === lives ? colors.primary : colors.textSecondary,  }}>♥ {lives}</Text>
                   </PressableButton>
                 ))}
               </View>
@@ -1366,7 +1433,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
             {selectedGameMode === 'challenge' && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>BET:</Text>
+                <Text style={{ fontSize: 11, color: colors.textSecondary,  }}>ベット:</Text>
                 {[50, 100].map((bet) => (
                   <PressableButton
                     key={bet}
@@ -1380,7 +1447,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                     }]}
                     onPress={() => setChallengeBet(bet)}
                   >
-                    <Text style={{ fontSize: 11, color: challengeBet === bet ? colors.primary : colors.textSecondary, fontFamily: 'monospace' }}>🪙 {bet}</Text>
+                    <Text style={{ fontSize: 11, color: challengeBet === bet ? colors.primary : colors.textSecondary,  }}>🪙 {bet}</Text>
                   </PressableButton>
                 ))}
               </View>
@@ -1433,10 +1500,10 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Mic size={14} color={colors.primary} />
-                        <Text style={{ fontSize: 12, color: colors.text, fontFamily: 'monospace' }}>
+                        <Text style={{ fontSize: 12, color: colors.text,  }}>
                           {voiceEngine === 'voicevox'
                             ? `VOICEVOX: ${VOICEVOX_SPEAKERS.find((s) => s.id === voicevoxSpeaker)?.nameJa || '--'}`
-                            : 'Web Speech'}
+                            : (locale === 'ja' ? 'ブラウザ音声' : 'Web Speech')}
                         </Text>
                       </View>
                       <PressableButton
@@ -1465,8 +1532,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             style={[styles.startButton, { backgroundColor: colors.primary }]}
             onPress={() => startQuiz()}
           >
-            <Text style={[styles.startButtonText, { color: onPrimary, fontFamily: 'monospace', letterSpacing: 1 }]}>
-              ▶ EXECUTE TRANSFER
+            <Text style={[styles.startButtonText, { color: onPrimary, letterSpacing: 1 }]}>
+              学習を開始
             </Text>
           </PressableButton>
         </ScrollView>
@@ -1526,12 +1593,26 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     );
   }
 
+  // currentQuestion が null の間（shuffledQuestions が空）はローディングを表示する。
+  // クイックスタートで /quiz に遷移した直後、startQuiz が完了する前の1フレームで
+  // currentQuestion が null になり、そのまま .topic へアクセスするとクラッシュするため。
+  if (!currentQuestion) {
+    return (
+      <View style={[styles.quizContainer, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, fontSize: 14, marginTop: 12 }}>
+          {locale === 'ja' ? '読み込み中...' : 'Loading...'}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {!autoPlayMode && (
         <View style={styles.topBar}>
-          <Text style={[styles.timer, { color: timerColor, fontFamily: 'monospace', letterSpacing: 1 }]}>
-            TIMER: {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
+          <Text style={[styles.timer, { color: timerColor, letterSpacing: 1 }]}>
+            制限時間: {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
           </Text>
           
           <Pressable
@@ -1796,11 +1877,12 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             {currentQuestion.answerType === 'multiple' && (
               <View style={styles.multipleContainer}>
                 {(() => {
-                  const correctIndex = currentQuestion.multipleChoice?.correctAnswer ?? 0;
+                  const correctIndices = getCorrectIndices(currentQuestion);
+                  const allowMultiple = currentQuestion.multipleChoice?.allowMultiple === true;
                   return currentQuestion.multipleChoice?.options.map((option, i) => {
-                    const isSelected = selectedOptionIndex === i;
-                    const isCorrectOption = answered && i === correctIndex;
-                    const isWrongSelection = answered && isSelected && i !== correctIndex;
+                    const isSelected = selectedOptionIndices.includes(i);
+                    const isCorrectOption = answered && correctIndices.includes(i);
+                    const isWrongSelection = answered && isSelected && !correctIndices.includes(i);
                     return (
                       <PressableButton
                         key={i}
@@ -1826,17 +1908,46 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                           },
                         ]}
                         onPress={() => {
-                          setSelectedOptionIndex(i);
-                          handleAnswer(i);
+                          if (allowMultiple) {
+                            // 複数正解: タップでトグルする（まだ回答は確定しない）
+                            setSelectedOptionIndices(prev =>
+                              prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i],
+                            );
+                          } else {
+                            // 単一正解: タップで即回答（従来通り）
+                            setSelectedOptionIndices([i]);
+                            handleAnswer(i);
+                          }
                         }}
                         disabled={answered || isPaused}
                       >
                         <Text style={[styles.multipleNumber, { color: colors.primary }]}>{i + 1}</Text>
                         <Text style={[styles.multipleText, { color: colors.text }]}>{option}</Text>
+                        {/* 複数正解モードではチェックボックス風で選択中であることを示す */}
+                        {allowMultiple && (
+                          <Text style={[styles.multipleText, { color: colors.primary, fontWeight: 'bold' }]}>
+                            {isSelected ? '☑' : '☐'}
+                          </Text>
+                        )}
                       </PressableButton>
                     );
                   });
                 })()}
+                {/* 複数正解モード: 「回答する」ボタンで確定 */}
+                {isMultipleAnswerMode && !answered && (
+                  <PressableButton
+                    style={[styles.multipleSubmitBtn, { backgroundColor: colors.primary, borderRadius: br }]}
+                    onPress={() => {
+                      if (selectedOptionIndices.length === 0) return;
+                      handleAnswer(selectedOptionIndices);
+                    }}
+                    disabled={isPaused || selectedOptionIndices.length === 0}
+                  >
+                    <Text style={[styles.multipleText, { color: onPrimary, fontWeight: 'bold' }]}>
+                      {locale === 'ja' ? '回答する' : 'Submit'}
+                    </Text>
+                  </PressableButton>
+                )}
               </View>
             )}
 
@@ -1879,6 +1990,22 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                     <PressableButton
                       style={[styles.descriptiveBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
                       onPress={() => {
+                        // 1つでも空欄が残っている場合は、join すると空欄が
+                        // 未入力として扱われ、意図しない不正解になるため警告する。
+                        // 何も1つも入力されていない場合（スキップ意図）のみ、そのまま送信する。
+                        const hasAnyInput = userDescriptiveAnswers.some(a => a && a.trim());
+                        const hasEmptyField =
+                          userDescriptiveAnswers.length < correctKeywords.length ||
+                          userDescriptiveAnswers.some(a => !a || !a.trim());
+                        if (hasAnyInput && hasEmptyField) {
+                          Alert.alert(
+                            locale === 'ja' ? '未入力の空欄があります' : 'Some fields are empty',
+                            locale === 'ja'
+                              ? 'すべての空欄を埋めてから回答してください'
+                              : 'Please fill in all fields before answering'
+                          );
+                          return;
+                        }
                         const fullAnswer = userDescriptiveAnswers.join(' ');
                         handleAnswer(fullAnswer);
                       }}
@@ -2057,7 +2184,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
         <View style={styles.completeModalOverlay}>
           <View style={[styles.completeModal, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.completeModalTitle, { color: colors.primary }]}>
-              $ TRANSFER COMPLETE
+              学習完了
             </Text>
             <Text style={[styles.completeModalMessage, { color: colors.text }]}>
               {locale === 'ja' ? '全問終了しました。もう一度挑戦しますか？' : 'All questions completed. Try again?'}
@@ -2071,7 +2198,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                 onPress={handleAutoPlayRepeat}
               >
                 <Text style={[styles.completeModalBtnText, { color: onPrimary }]}>
-                  ▶ {locale === 'ja' ? 'もう一度繰り返す' : 'Repeat'}
+                  {locale === 'ja' ? 'もう一度繰り返す' : 'Repeat'}
                 </Text>
               </PressableButton>
               <PressableButton
@@ -2079,7 +2206,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                 onPress={handleGoHome}
               >
                 <Text style={[styles.completeModalBtnText, { color: colors.text }]}>
-                  ↺ {locale === 'ja' ? 'ホームに戻る' : 'Go Home'}
+                  {locale === 'ja' ? 'ホームに戻る' : 'Go Home'}
                 </Text>
               </PressableButton>
             </View>
@@ -2430,6 +2557,14 @@ const styles = StyleSheet.create({
     gap: 14,
     minHeight: 64,
   },
+  // 複数正解モードの「回答する」ボタン
+  multipleSubmitBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
   multipleNumber: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -2517,7 +2652,6 @@ const styles = StyleSheet.create({
   completeModalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    fontFamily: 'monospace',
     letterSpacing: 2,
     marginBottom: 12,
   },
@@ -2528,7 +2662,6 @@ const styles = StyleSheet.create({
   },
   completeModalCountdown: {
     fontSize: 12,
-    fontFamily: 'monospace',
     marginBottom: 20,
   },
   completeModalButtons: {
@@ -2549,6 +2682,5 @@ const styles = StyleSheet.create({
   completeModalBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
 });

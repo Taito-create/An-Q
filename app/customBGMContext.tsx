@@ -269,11 +269,16 @@ export function CustomBGMProvider({ children }: { children: React.ReactNode }) {
       audioRef.current.onended = null;
     }
     // カスタムBGM再生時はプリセットBGMを停止してOFFに切り替え
-    SoundManager.pauseBGM().catch(() => {});
-    // bgmContextのON/OFF状態も更新（SoundManager含めて完全にOFF）
+    // ※ SoundManager の設定 (bgm_settings) も OFF に更新する。
+    //   単に pause するとメモリ上の enabled が true のまま残り、
+    //   後の playBGM() でプリセットBGMが復活してしまうため。
+    SoundManager.updateBGMSetting(false).catch(() => {});
     if (typeof window !== 'undefined') {
       (window as any).__customBGMPlaying = true;
+      // 既存のフック（未定義なら何もしない）
       (window as any).__bgmToggleOff?.();
+      // bgmContext 側のスイッチ表示も OFF に同期させる
+      window.dispatchEvent(new CustomEvent('bgmStateChanged', { detail: { enabled: false } }));
     }
 
     const audio = new (window as any).Audio(list[index].url);

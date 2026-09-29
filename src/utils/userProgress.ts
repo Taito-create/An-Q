@@ -3,6 +3,180 @@ import { doc, onSnapshot, runTransaction, Unsubscribe } from 'firebase/firestore
 import { db } from '../config/firebase';
 import { STORAGE_KEYS } from '../../app/constants/storageKeys';
 
+/**
+ * Firestore に保存してよい profileImage の最大長。
+ * Base64 画像 (data:URL) は数十万〜数MBになり、ドキュメント1MB制限を超えて
+ * 400 Bad Request (トランザクション失敗) を引き起こすため保存しない。
+ * 将来の Firebase Storage 運用に備え、http(s) URL のみ保存を許可する。
+ */
+const MAX_PROFILE_IMAGE_LENGTH = 10_000;
+
+/**
+ * プロフィール画像の保存方針（重要）
+ * - 自分の端末での表示用は AsyncStorage (`user_profile_image`) に Base64 で保存する（即時反映・高速）
+ * - 対戦相手に見せる用の URL は Cloudinary にアップロードし、Firestore の `profileImage` に保存する
+ *   （Firebase Storage は Blaze プランが必要なため、Cloudinary の無料枠を利用する）
+ * - Base64 のまま Firestore には書かない（1MB 制限超過＝400 Bad Request の原因）
+ * - 読み込みは readLocalProfileImage()、保存は saveLocalProfileImage() を使う。
+ */
+export const LOCAL_PROFILE_IMAGE_KEY = STORAGE_KEYS.USER_PROFILE_IMAGE;
+
+/**
+ * Firestore 書き込み用に profileImage を検査する。
+ * - Base64 (data:URL) / 上限超過 → 空文字列を返す (merge 書き込みで既存の巨大フィールドも縮小する)
+ * - http(s) URL → そのまま返す
+ */
+export function sanitizeProfileImageForFirestore(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (value.startsWith('data:')) return '';
+  if (value.length > MAX_PROFILE_IMAGE_LENGTH) return '';
+  return value;
+}
+
+/** http(s) URL 形式か（＝ Firestore 経由でも配信できる形式か） */
+export function isRemoteProfileImageUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\//.test(value);
+}
+
+/**
+ * プロフィール画像を唯一の保存先 (AsyncStorage) から読み出す。
+ * 未設定・空文字は null に正規化する（'' を View の子に渡すと
+ * react-native-web が "Unexpected text node" 警告を出すため null に統一する）。
+ * ストレージが利用できない環境（プライベートモード等）でも呼び出し側を壊さないよう、
+ * 失敗時は警告のみで null を返す。
+ */
+export async function readLocalProfileImage(): Promise<string | null> {
+  try {
+    const value = await AsyncStorage.getItem(LOCAL_PROFILE_IMAGE_KEY);
+    return value && value.trim() ? value : null;
+  } catch (e) {
+    console.warn('readLocalProfileImage failed:', e);
+    return null;
+  }
+}
+
+/** プロフィール画像を AsyncStorage に保存する（null / 空文字は削除扱い） */
+export async function saveLocalProfileImage(value: string | null | undefined): Promise<void> {
+  await AsyncStorage.setItem(LOCAL_PROFILE_IMAGE_KEY, value && value.trim() ? value : '');
+}
+
+/**
+ * Cloudinary の設定値（環境変数）を取得する。
+ *
+ * ※ `import.meta.env` は Jest (CommonJS 変換) で構文エラーになるため、
+ *   vite.config.ts の `define` で文字列定数へ置換したグローバルを直接参照する。
+ *   （`globalThis.__X__` のような間接アクセスでは define が置換できないため、
+ *     必ず素の識別子 `__VITE_CLOUDINARY_CLOUD_NAME__` として書く必要がある）
+ *   → 本番では .env の値が埋め込まれ、テストでは同名のグローバルを差し替えられる。
+ */
+function getViteEnv(): Record<string, string | undefined> {
+  // ブラウザでは define 済み定数が埋め込まれる。
+  // Jest など define が効かない環境では識別子が未定義になるため typeof で守る。
+  const definedCloudName = typeof __VITE_CLOUDINARY_CLOUD_NAME__ !== 'undefined' ? __VITE_CLOUDINARY_CLOUD_NAME__ : undefined;
+  const definedUploadPreset = typeof __VITE_CLOUDINARY_UPLOAD_PRESET__ !== 'undefined' ? __VITE_CLOUDINARY_UPLOAD_PRESET__ : undefined;
+
+  // テストからは globalThis 経由で上書きできるようにする
+  const fromGlobal = globalThis as unknown as Record<string, string | undefined>;
+  return {
+    VITE_CLOUDINARY_CLOUD_NAME: fromGlobal.__VITE_CLOUDINARY_CLOUD_NAME__ ?? definedCloudName,
+    VITE_CLOUDINARY_UPLOAD_PRESET: fromGlobal.__VITE_CLOUDINARY_UPLOAD_PRESET__ ?? definedUploadPreset,
+  };
+}
+
+/**
+ * Cloudinary の設定値を取得する。
+ * 未設定（.env がない／空文字）の場合は null を返し、呼び出し側で
+ * 「アップロードできない」ことを判断できるようにする。
+ */
+function getCloudinaryConfig(): { cloudName: string; uploadPreset: string } | null {
+  const env = getViteEnv();
+  const cloudName = env.VITE_CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = env.VITE_CLOUDINARY_UPLOAD_PRESET?.trim();
+  if (!cloudName || !uploadPreset) return null;
+  return { cloudName, uploadPreset };
+}
+
+/** Cloudinary の設定が揃っているか（UI の警告表示などに使う） */
+export function isCloudinaryConfigured(): boolean {
+  return getCloudinaryConfig() !== null;
+}
+
+/**
+ * Base64 画像を Cloudinary にアップロードし、ダウンロード URL を返す。
+ * Firebase Storage は Blaze プランが必要なため、Cloudinary の無料枠（25GB）を使う。
+ * @param base64Image data:image/jpeg;base64,... 形式の文字列
+ * @returns ダウンロードURL（失敗時は null）
+ */
+export async function uploadProfileImageToCloudinary(base64Image: string): Promise<string | null> {
+  const config = getCloudinaryConfig();
+  if (!config) {
+    console.warn('Cloudinary env vars are missing');
+    return null;
+  }
+
+  // 既に URL の場合は再アップロード不要（そのまま使う）
+  if (isRemoteProfileImageUrl(base64Image)) return base64Image;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', base64Image);
+    formData.append('upload_preset', config.uploadPreset);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+      { method: 'POST', body: formData }
+    );
+    if (!res.ok) throw new Error(`Cloudinary upload failed: ${res.status}`);
+
+    const data = await res.json();
+    return data.secure_url ?? null;
+  } catch (e) {
+    console.error('uploadProfileImageToCloudinary failed:', e);
+    return null;
+  }
+}
+
+/**
+ * 任意の画像を Cloudinary にアップロードし、ダウンロードURLを返す。
+ * プロフィール画像以外の用途（問題の画像など）でも使える汎用版。
+ *
+ * ※ Firestore の1MB制限を避けるため、問題画像も Base64 ではなくURLで保存する。
+ * ※ リサイズ用パラメータ（w=, h=）は付けない。
+ *    imageAnnotations（座標）が元の画像サイズを前提にしているため、
+ *    配信時にリサイズすると注釈の位置がズレる。
+ *
+ * @param base64Image data:image/jpeg;base64,... 形式、または既存の http(s) URL
+ * @returns ダウンロードURL（失敗時は null）
+ */
+export async function uploadImageToCloudinary(base64Image: string): Promise<string | null> {
+  // 既に URL ならそのまま返す（再アップロード不要）
+  if (isRemoteProfileImageUrl(base64Image)) return base64Image;
+
+  const config = getCloudinaryConfig();
+  if (!config) {
+    console.warn('Cloudinary env vars are missing; keeping original image');
+    return null;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('file', base64Image);
+    formData.append('upload_preset', config.uploadPreset);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
+      { method: 'POST', body: formData }
+    );
+    if (!res.ok) throw new Error(`Cloudinary upload failed: ${res.status}`);
+
+    const data = await res.json();
+    return data.secure_url ?? null;
+  } catch (e) {
+    console.error('uploadImageToCloudinary failed:', e);
+    return null;
+  }
+}
+
 export interface TitleDefinition {
   id: string;
   icon: string;
@@ -11,6 +185,13 @@ export interface TitleDefinition {
   descriptionJa: string;
   descriptionEn: string;
   category: 'starter' | 'mission' | 'event' | 'future';
+}
+
+export interface BattleStats {
+  totalBattles: number;
+  wins: number;
+  losses: number;
+  draws: number;
 }
 
 export interface UserProgressDocument {
@@ -34,6 +215,8 @@ export interface UserProgressDocument {
   joinDate: number;
   lastLoginDate: number;
   achievements: string[];
+  /** 対戦戦績 (旧ドキュメントでは未定義 → 0 扱い) */
+  battleStats?: BattleStats;
 }
 
 export interface ProgressRewardResult {
@@ -72,6 +255,7 @@ const DEFAULT_PROFILE: UserProgressDocument = {
   joinDate: Date.now(),
   lastLoginDate: Date.now(),
   achievements: [],
+  battleStats: { totalBattles: 0, wins: 0, losses: 0, draws: 0 },
 };
 
 export const TITLE_LIBRARY: TitleDefinition[] = [
@@ -206,6 +390,19 @@ function normalizeDocument(data: Partial<UserProgressDocument> & Record<string, 
     joinDate,
     lastLoginDate,
     achievements: Array.isArray(data.achievements) ? data.achievements : DEFAULT_PROFILE.achievements,
+    battleStats: normalizeBattleStats(data.battleStats),
+  };
+}
+
+function normalizeBattleStats(value: unknown): BattleStats {
+  const fallback: BattleStats = { totalBattles: 0, wins: 0, losses: 0, draws: 0 };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback;
+  const v = value as Record<string, unknown>;
+  return {
+    totalBattles: Math.max(0, Math.floor(toNumber(v.totalBattles, 0))),
+    wins: Math.max(0, Math.floor(toNumber(v.wins, 0))),
+    losses: Math.max(0, Math.floor(toNumber(v.losses, 0))),
+    draws: Math.max(0, Math.floor(toNumber(v.draws, 0))),
   };
 }
 
@@ -247,11 +444,17 @@ function applyLevelUps(document: UserProgressDocument): ProgressRewardResult {
 async function syncLocalStorage(document: UserProgressDocument) {
   // user_profile_cache を更新して、Home画面の loadUserProgress が
   // 最新の currentXP / nextLevelXP を即時読み込めるようにする
-  const profileCache = JSON.stringify(document);
-  await AsyncStorage.multiSet([
+  // ※ 画像は profileImage キーごと除外する。
+  //    旧実装は profileImage: null で埋めており、その値を
+  //    updateProgressDocument / readLocalProgress が基点にすると
+  //    Firestore の Cloudinary URL を null で上書きしてしまうため。
+  //    画像はローカルの専用キー (user_profile_image) にのみ保存する。
+  const { profileImage: _cachedImage, ...cacheDocument } = document;
+  const profileCache = JSON.stringify(cacheDocument);
+
+  const entries: [string, string][] = [
     [STORAGE_KEYS.USER_USERNAME, document.username],
     [STORAGE_KEYS.USER_BIO, document.bio],
-    [STORAGE_KEYS.USER_PROFILE_IMAGE, document.profileImage || ''],
     [STORAGE_KEYS.USER_CURRENT_TITLE, document.currentTitle],
     [STORAGE_KEYS.USER_UNLOCKED_TITLES, JSON.stringify(document.unlockedTitles)],
     [STORAGE_KEYS.USER_LEVEL, String(document.level)],
@@ -263,7 +466,22 @@ async function syncLocalStorage(document: UserProgressDocument) {
     [STORAGE_KEYS.JOIN_DATE, String(document.joinDate)],
     [STORAGE_KEYS.LAST_LOGIN_DATE, String(document.lastLoginDate)],
     ['user_profile_cache', profileCache],
-  ]);
+  ];
+
+  // プロフィール画像は AsyncStorage が唯一の保存先。
+  // Firestore 側には画像を保存しないため document.profileImage は通常 '' であり、
+  // そのまま書き戻すとローカルに保存した画像が消えてしまう。
+  // そのため「ローカルが空 かつ Firestore 側に http(s) URL が残っている」場合のみ補完する。
+  try {
+    const localImage = await AsyncStorage.getItem(LOCAL_PROFILE_IMAGE_KEY);
+    if (!localImage && isRemoteProfileImageUrl(document.profileImage)) {
+      entries.push([LOCAL_PROFILE_IMAGE_KEY, document.profileImage]);
+    }
+  } catch (e) {
+    console.warn('syncLocalStorage: failed to inspect local profile image:', e);
+  }
+
+  await AsyncStorage.multiSet(entries);
 }
 
 async function updateProgressDocument(
@@ -279,7 +497,14 @@ async function updateProgressDocument(
       const mutated = normalizeDocument(mutator(current));
       const finalResult = applyLevelUps(mutated);
 
-      transaction.set(ref, finalResult.document, { merge: true });
+      // 【重要】profileImage は Firestore 側で絶対に上書きしない
+      // 画像の URL は app/profile.tsx の saveProfile が Cloudinary へアップロードして
+      // setDoc で書き込むもの。ここで transaction.set すると、
+      // ローカルキャッシュ由来の null / '' で Cloudinary URL を消してしまう。
+      // 他のフィールド（XP・コイン・戦績など）は通常どおり更新する。
+      const { profileImage: _preservedProfileImage, ...payloadWithoutImage } = finalResult.document;
+      console.log('updateProgressDocument payload:', payloadWithoutImage);
+      transaction.set(ref, payloadWithoutImage, { merge: true });
       return finalResult;
     });
 
@@ -349,7 +574,9 @@ export function buildInitialUserProfile(username: string, profileImage: string |
   return normalizeDocument({
     ...DEFAULT_PROFILE,
     username,
-    profileImage,
+    // 画像は AsyncStorage が唯一の保存先のため Firestore には保存しない。
+    // 念のため Base64 (data:URL) / 上限超過は null へ縮小しておく（安全網）
+    profileImage: sanitizeProfileImageForFirestore(profileImage),
     joinDate: now,
     lastLoginDate: now,
     streakDays: 1,
@@ -520,6 +747,45 @@ export async function awardQuizCompletion(userId: string, input: QuizRewardInput
       correctRate: totalQuestionsAnswered > 0 ? Math.round((totalCorrectAnswers / totalQuestionsAnswered) * 100) : 0,
     };
   });
+}
+
+/**
+ * 対戦戦績を取得する (旧ドキュメントで未定義の場合は 0 埋めの戦績を返す)
+ */
+export function getBattleStats(profile: UserProgressDocument | null | undefined): BattleStats {
+  return normalizeBattleStats(profile?.battleStats);
+}
+
+/**
+ * 対戦結果を userProgress/{uid} の battleStats に加算する。
+ * - totalBattles を +1 し、outcome に応じて wins / losses / draws を +1
+ * - runTransaction で原子的に更新するため、同時更新でも整合する
+ * - 重複加算の防止は呼び出し側 (sessionStorage の battle_reward_* キー) で行う
+ * @returns 更新後の戦績 (取得/更新に失敗した場合は null)
+ */
+export async function recordBattleResult(
+  userId: string,
+  outcome: 'win' | 'lose' | 'draw'
+): Promise<BattleStats | null> {
+  const ref = doc(db, 'userProgress', userId);
+  try {
+    return await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = normalizeDocument(snapshot.exists() ? snapshot.data() : {});
+      const base = normalizeBattleStats(current.battleStats);
+      const next: BattleStats = {
+        totalBattles: base.totalBattles + 1,
+        wins: base.wins + (outcome === 'win' ? 1 : 0),
+        losses: base.losses + (outcome === 'lose' ? 1 : 0),
+        draws: base.draws + (outcome === 'draw' ? 1 : 0),
+      };
+      transaction.set(ref, { battleStats: next }, { merge: true });
+      return next;
+    });
+  } catch (error: any) {
+    console.error(' recordBattleResult failed:', error);
+    return null;
+  }
 }
 
 /**

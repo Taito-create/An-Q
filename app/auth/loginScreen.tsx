@@ -9,7 +9,7 @@ import { useTheme } from '../theme';
 import { useAuth } from './AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ImageCropper from '../../src/components/ImageCropper';
-import { buildInitialUserProfile, syncLoginStreak } from '../../src/utils/userProgress';
+import { buildInitialUserProfile, isRemoteProfileImageUrl, readLocalProfileImage, saveLocalProfileImage, syncLoginStreak, uploadProfileImageToCloudinary } from '../../src/utils/userProgress';
 
 export default function LoginScreen() {
   const { colors, onPrimary } = useTheme();
@@ -80,22 +80,30 @@ export default function LoginScreen() {
         // 2. Auth上の名前を更新
         await updateProfile(userCredential.user, { displayName: username.trim() });
 
-        // 3. 無料のFirestoreデータベースにユーザー情報を直接保存（容量制限なし）
+        // 3. プロフィール画像を Cloudinary にアップロード
+        //    (Base64 のまま Firestore へ書くと 1MB 制限超過＝400 Bad Request になる)
+        //    アップロード失敗時も登録は続行し、既定画像で動作させる
+        const remoteImageUrl = profileImage
+          ? await uploadProfileImageToCloudinary(profileImage)
+          : null;
+
+        // 4. Firestore にユーザー情報を保存
+        //    ※ Firestore には Cloudinary の URL のみ保存する（相手はこの URL を参照する）
         await setDoc(doc(db, 'userProgress', uid), {
-          ...buildInitialUserProfile(username.trim(), profileImage),
+          ...buildInitialUserProfile(username.trim(), null),
           username: username.trim(),
-          profileImage: profileImage,
           bio: '',
+          profileImage: remoteImageUrl,
         });
 
-        // 4. ローカルストレージにもキャッシュ
+        // 5. ローカルストレージにもキャッシュ
         await AsyncStorage.setItem('user_username', username.trim());
-        await AsyncStorage.setItem('user_profile_image', profileImage || '');
+        await saveLocalProfileImage(profileImage);
         await AsyncStorage.setItem('user_bio', '');
         await AsyncStorage.setItem('join_date', Date.now().toString());
         await AsyncStorage.setItem('lastLoginDate', Date.now().toString());
 
-        // 5. 自動ログインを解除して、ログイン画面へ強制遷移
+        // 6. 自動ログインを解除して、ログイン画面へ強制遷移
         await signOut(auth);
         
         Alert.alert('登録完了', 'アカウントを作成しました！ログイン画面からログインしてください。');
@@ -110,12 +118,17 @@ export default function LoginScreen() {
         const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
         const uid = userCredential.user.uid;
 
-        // ログイン成功時、Firestoreから最新の名前とアイコンを取得して同期
+        // ログイン成功時、Firestoreから最新の名前とプロフィールを取得して同期
         const userDoc = await getDoc(doc(db, 'userProgress', uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
           if (data.username) await AsyncStorage.setItem('user_username', data.username);
-          if (data.profileImage) await AsyncStorage.setItem('user_profile_image', data.profileImage);
+          // 画像は AsyncStorage が唯一の保存先。ローカルに画像が無い場合のみ、
+          // 旧データの http(s) URL を復元する（'' や Base64 で上書きしない）
+          const localImage = await readLocalProfileImage();
+          if (!localImage && isRemoteProfileImageUrl(data.profileImage)) {
+            await saveLocalProfileImage(data.profileImage);
+          }
           if (data.bio) await AsyncStorage.setItem('user_bio', data.bio);
         }
 
