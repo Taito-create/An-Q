@@ -1,8 +1,12 @@
-const CACHE_NAME = 'an-q-v4';
+const CACHE_NAME = 'an-q-v5';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/favicon.ico',
+  '/favicon-32x32.png',
+  '/favicon-16x16.png',
+  '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png'
 ];
