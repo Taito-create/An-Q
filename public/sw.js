@@ -1,14 +1,14 @@
-const CACHE_NAME = 'an-q-v5';
+const CACHE_NAME = 'an-q-v6';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/favicon.ico',
-  '/favicon-32x32.png',
-  '/favicon-16x16.png',
-  '/apple-touch-icon.png',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/favicon-v2.ico',
+  '/favicon-32x32-v2.png',
+  '/favicon-16x16-v2.png',
+  '/apple-touch-icon-v2.png',
+  '/icon-192-v2.png',
+  '/icon-512-v2.png'
 ];
 
 self.addEventListener('install', event => {

@@ -5,7 +5,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!assets|sounds|icon-|favicon|manifest\\.json|sw\\.js|screenshot).*)",
+      "source": "/((?!assets|sounds|icon-|favicon|apple-touch-icon|manifest\\.json|sw\\.js|screenshot).*)",
       "destination": "/index.html"
     }
   ],
@@ -30,6 +30,18 @@
     },
     {
       "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/((favicon|icon-|apple-touch-icon).*)",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]
