@@ -3,6 +3,60 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
+// 現在再生中の <audio>（VOICEVOX / サーバー音声で生成した音声）を保持する。
+// stopSpeech() は Web Speech しか止められなかったため、
+// モジュールスコープで audio 要素も管理して両方を停止できるようにする。
+let currentAudio: HTMLAudioElement | null = null;
+
+/** 再生中の <audio> を停止して破棄する（blob URL も解放する） */
+const stopCurrentAudio = () => {
+  if (!currentAudio) return;
+  const audio = currentAudio;
+  currentAudio = null;
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    if (audio.src && audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
+  } catch {
+    // audio 要素が既に破棄されている場合は何もしない
+  }
+};
+
+/**
+ * ボイスサーバー（voice-server）の生存確認結果を保持するキャッシュ。
+ * 連打しても /health を過度に叩かないよう30秒だけキャッシュする。
+ */
+let voiceServerAliveCache: { value: boolean; at: number } | null = null;
+
+/**
+ * ボイスサーバー（/health）の生存確認。
+ * プロキシ URL の origin から /health を導出するため、本番デプロイ時にも追従する。
+ * @param force true ならキャッシュを無視して再確認する
+ */
+export async function isVoiceServerAlive(force = false): Promise<boolean> {
+  const now = Date.now();
+  if (!force && voiceServerAliveCache && now - voiceServerAliveCache.at < 30_000) {
+    return voiceServerAliveCache.value;
+  }
+  const base = (() => {
+    try {
+      const u = new URL(import.meta.env.VITE_VOICE_PROXY_URL || 'http://localhost:3001/speak');
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return 'http://localhost:3001';
+    }
+  })();
+  try {
+    const res = await fetch(`${base}/health`, { method: 'GET' });
+    const alive = res.ok;
+    voiceServerAliveCache = { value: alive, at: now };
+    return alive;
+  } catch {
+    voiceServerAliveCache = { value: false, at: now };
+    return false;
+  }
+}
+
 // カスタム読み辞書（必要に応じて拡張）
 const readingDictionary: Record<string, string> = {
   '森鷗外': 'もりおうがい',
@@ -259,8 +313,14 @@ export const speakWithServer = async (text: string): Promise<void> => {
     }
 
     const audioUrl = URL.createObjectURL(audioBlob);
+    // 既存の再生があれば停止してから差し替える（stopSpeech で止められるように登録する）
+    stopCurrentAudio();
     const audio = new Audio(audioUrl);
-    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    currentAudio = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      if (currentAudio === audio) currentAudio = null;
+    };
     audio.onerror = (e) => {
       console.error(' Audio playback error:', e);
     };
@@ -302,9 +362,16 @@ export const speak = async (text: string): Promise<void> => {
 };
 
 export const stopSpeech = (): void => {
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel();
+  // Web Speech API
+  try {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  } catch {
+    // speechSynthesis が使えない環境では何もしない
   }
+  // VOICEVOX / サーバー音声（<audio>）
+  stopCurrentAudio();
 };
 
 export const isSpeechSupported = (): boolean => {
@@ -363,8 +430,13 @@ export async function speakWithVoicevox(text: string, speakerId: number): Promis
     }
     const audioBlob = await synthRes.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
+    stopCurrentAudio();
     const audio = new Audio(audioUrl);
-    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    currentAudio = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      if (currentAudio === audio) currentAudio = null;
+    };
     await audio.play();
   } catch (error) {
     console.error('VOICEVOX direct error:', error);
@@ -402,8 +474,13 @@ export async function speakWithVoicevoxProxy(text: string, speakerId: number): P
     }
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
+    stopCurrentAudio();
     const audio = new Audio(audioUrl);
-    audio.onended = () => URL.revokeObjectURL(audioUrl);
+    currentAudio = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      if (currentAudio === audio) currentAudio = null;
+    };
     await audio.play();
   } catch (error) {
     console.error('VOICEVOX proxy error:', error);

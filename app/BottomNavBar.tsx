@@ -31,7 +31,9 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 // 各タブに属する詳細画面（タブ直下パスだけでなく、これらの画面でも対応タブをアクティブにする）
 const TABS_SCREENS: Record<string, string[]> = {
-  '/create': ['/browse', '/timer'],
+  // /timer はクイズ設定画面（/quiz）から開かれるため、ホームタブ扱いにする
+  '/': ['/timer'],
+  '/create': ['/browse'],
   '/multi': ['/inbox', '/battle'],
   '/sub': ['/settings', '/music', '/appSettings', '/profile', '/missions', '/statistics', '/credits', '/shop', '/gacha', '/achievements', '/calendar'],
 };
@@ -80,7 +82,12 @@ const BottomNavBar = () => {
 
   // アクティブ判定
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
+    if (path === '/') {
+      if (location.pathname === '/') return true;
+      // ホーム直下の詳細画面（例: /timer）もホームタブをアクティブにする
+      const homeSiblings = TABS_SCREENS['/'] || [];
+      return homeSiblings.some((p) => location.pathname === p || location.pathname.startsWith(p + '/'));
+    }
     // タブ直下パス（/create /create/manual /multi /sub など）は前方一致で判定
     if (location.pathname.startsWith(path)) return true;
     // 詳細画面（例: /browse, /inbox, /settings など）は所属タブをアクティブにする

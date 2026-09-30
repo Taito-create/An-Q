@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet, Pressable, Alert,
   ScrollView, Text, View, Animated, TextInput, Dimensions, Modal, Switch, Platform,
@@ -25,7 +25,14 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { Question } from './types/question';
 import { useAuth } from './auth/AuthContext';
 import { awardQuizCompletion } from '../src/utils/userProgress';
-import { speak as speakText, stopSpeech, speakWithVoicevoxProxy, VOICEVOX_SPEAKERS } from './utils/speechUtils';
+import {
+  speak as speakText,
+  stopSpeech,
+  speakWithVoicevox,
+  speakWithVoicevoxProxy,
+  isVoiceServerAlive,
+  VOICEVOX_SPEAKERS,
+} from './utils/speechUtils';
 import { Volume2, RefreshCw, Mic, ClipboardList, Folder, Play, Check, Pause, Heart, X } from 'lucide-react';
 import './quiz.css';
 
@@ -126,6 +133,8 @@ export default function QuizScreen() {
 
   // 解説表示
   const [showExplanation, setShowExplanation] = useState(false);
+  // 手動読み上げ（自動再生モード以外）の再生中フラグ
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [explanationText, setExplanationText] = useState('');
   
   // 現在の問題を取得（範囲外アクセス時は null にしてクラッシュを防止）
@@ -184,6 +193,9 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // UI強化: 問題が切り替わったら選択状態をリセット（選択肢の正誤ハイライト用）
   useEffect(() => {
     setSelectedOptionIndices([]);
+    // 問題切替時に読み上げを停止（前の問題の音声が残らないようにする）
+    stopSpeech();
+    setIsSpeaking(false);
   }, [currentIndex]);
 
   // 長押し用 ref
@@ -304,7 +316,63 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       autoPlayTimerRef.current = null;
     }
     stopSpeech();
+    setIsSpeaking(false);
   };
+
+  // ──────────────────────────────────────────────
+  // 手動読み上げ（自動再生モード以外）
+  // ──────────────────────────────────────────────
+  const handleSpeakQuestion = useCallback(async () => {
+    const q = shuffledQuestions[currentIndex];
+    if (!q) return;
+
+    // 再生中に再度タップされたら停止する
+    if (isSpeaking) {
+      stopSpeech();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const textToSpeak = q.reading || q.question;
+    SoundManager.play('decide');
+    setIsSpeaking(true);
+
+    // 保存済みの音声設定を読み込む
+    const [engine, speakerRaw, modeRaw] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENGINE),
+      AsyncStorage.getItem(STORAGE_KEYS.VOICEVOX_SPEAKER),
+      AsyncStorage.getItem('voicevox_mode'),
+    ]);
+    const speaker = speakerRaw ? parseInt(speakerRaw, 10) : 3;
+    const mode = modeRaw === 'proxy' ? 'proxy' : 'direct';
+
+    // 設定が voicevox のときだけサーバー生存を確認する（'web' なら尊重して Web Speech）
+    let serverAlive = false;
+    if (engine === 'voicevox') {
+      serverAlive = await isVoiceServerAlive();
+    }
+
+    try {
+      if (engine === 'voicevox' && serverAlive) {
+        if (mode === 'proxy') {
+          await speakWithVoicevoxProxy(textToSpeak, speaker);
+        } else {
+          await speakWithVoicevox(textToSpeak, speaker);
+        }
+      } else {
+        await speakText(textToSpeak);
+      }
+    } catch (e) {
+      // VOICEVOX 失敗時は Web Speech にフォールバック
+      try {
+        await speakText(textToSpeak);
+      } catch {
+        // Web Speech も失敗した場合は諦める
+      }
+    } finally {
+      setIsSpeaking(false);
+    }
+  }, [currentIndex, shuffledQuestions, isSpeaking]);
 
   // ──────────────────────────────────────────────
   // 自動再生完了後：リピート / ホームへ戻る
@@ -1038,6 +1106,9 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // ──────────────────────────────────────────────
   const finishQuizWithResults = async (finalResults: QuizResult[]) => {
     setIsTimerActive(false);
+    // クイズ終了時に手動読み上げを停止する
+    stopSpeech();
+    setIsSpeaking(false);
 
     const totalQuestions = shuffledQuestions.length;
     const finalScore = finalResults.filter(r => r.isCorrect).length;
@@ -1779,18 +1850,37 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                 <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>
               ) : <View />}
               {!autoPlayMode && (
-                <View
-                  style={[
-                    styles.questionCounterBadge,
-                    {
-                      backgroundColor: colors.primary + '20',
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <PressableButton
+                    style={[{
+                      width: 36, height: 36, borderRadius: 18,
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isSpeaking ? colors.primary : colors.primary + '20',
+                      borderWidth: 1,
                       borderColor: colors.primary + '40',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.questionCounterText, { color: colors.primary }]}>
-                    {currentIndex + 1} / {shuffledQuestions.length}{locale === 'ja' ? '問' : ''}
-                  </Text>
+                    }]}
+                    onPress={handleSpeakQuestion}
+                    title={locale === 'ja' ? '問題を読み上げ' : 'Read aloud'}
+                    minTouchTarget={false}
+                  >
+                    <Volume2
+                      size={18}
+                      color={isSpeaking ? onPrimary : colors.primary}
+                    />
+                  </PressableButton>
+                  <View
+                    style={[
+                      styles.questionCounterBadge,
+                      {
+                        backgroundColor: colors.primary + '20',
+                        borderColor: colors.primary + '40',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.questionCounterText, { color: colors.primary }]}>
+                      {currentIndex + 1} / {shuffledQuestions.length}{locale === 'ja' ? '問' : ''}
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
