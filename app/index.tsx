@@ -42,7 +42,7 @@ import {
   Building2,
   Trophy
 } from 'lucide-react';
-import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission, UserStats, loadTodayCorrect, loadWeeklyProgress, WeeklyProgress, setQuickQuizCountCache, TITLE_BADGES } from './missions';
+import { MISSIONS, loadProgress, loadStats, getMissionProgress, Mission, UserStats, loadTodayCorrect, loadWeeklyProgress, WeeklyProgress, TITLE_BADGES } from './missions';
 import { AnimationLevel, createShakeAnimation, createPulseAnimation } from './animations';
 import { useAuth } from './auth/AuthContext';
 import { readUserProfileDocument, readLocalProfileImage, getTitleDisplay } from '../src/utils/userProgress';
@@ -95,9 +95,16 @@ const TERMINAL_LOG_HEAD = [
 const HomeScreen = React.memo(() => {
   const navigate = useNavigate();
 
-  // 遷移は即時実行（遅延なし＝INITIATE押下時のラグ・カクつき解消：P1-6）
+  // 遷移は同期実行する。
+  // 過去に requestAnimationFrame で 1 フレーム待ってから navigate していたが、
+  // モバイル（特に iOS Safari）では rAF の発火がユーザー操作のコンテキスト外で
+  // スキップ・遅延され、ボタンを押しても遷移しない事象が発生していた。
+  // 遷移にアニメーションは伴わないためフレーム待ちは不要であり、
+  // ユーザー操作の同一コンテキスト内で navigate を呼ぶのが最も確実。
+  // （万一この同期化で描画ラグが再発する場合は
+  //   setTimeout(() => navigate(path), 0) へ変更すること。rAF は使わない。）
   const navigateWithAnimation = useCallback((path: string) => {
-    requestAnimationFrame(() => navigate(path));
+    navigate(path);
   }, [navigate]);
   const { colors, fs, pattern, onPrimary, isCyberpunk, br } = useTheme();
   const locale = useLocale();
@@ -250,8 +257,6 @@ const HomeScreen = React.memo(() => {
   const [weakQuestionCount, setWeakQuestionCount] = useState(0);
   const [dailyQuests, setDailyQuests] = useState<Mission[]>([]);
   const [questProgress, setQuestProgress] = useState<{ current: number; completed: boolean }[]>([]);
-  // 転送モード選択（RAPID / DAILY / DEEP）
-  const [selectedMode, setSelectedMode] = useState<'rapid' | 'daily' | 'deep'>('rapid');
   // 最終アクション時刻（STATUS: STANDBY (nH nM SINCE LAST TRANSFER) 用）
   const [lastActionAt, setLastActionAt] = useState<number | null>(null);
   // 30秒ごとの再描画トリガー（SINCE LAST TRANSFER の経過時間をライブ更新：P2-7）
@@ -1032,12 +1037,6 @@ const HomeScreen = React.memo(() => {
       : `${Math.floor(diffMin / 60)}h ${diffMin % 60}m ago`;
   })();
 
-  const transferModes = [
-    { key: 'rapid' as const, label: '短期集中', caption: '短時間（5分）' },
-    { key: 'daily' as const, label: 'デイリー', caption: '日課（20問）' },
-    { key: 'deep' as const, label: '全問', caption: '深掘り（全問）' },
-  ];
-
   // MEMORY CORE 表示（TerminalLog 用：初回正解まで HIDDEN）
   const accuracyRate = userStats && userStats.quizPlayed > 0
     ? (userStats.correctAnswers / userStats.quizPlayed) * 100
@@ -1055,8 +1054,8 @@ const HomeScreen = React.memo(() => {
       setLastActionAt(now);
     } catch { /* noop */ }
     // SYSTEM LOG に学習開始ログを追加（ref 経由でコンポーネントへ）
-    const modeLabelJa = selectedMode === 'rapid' ? '短期集中' : selectedMode === 'daily' ? 'デイリー' : '全問';
-    terminalLogRef.current?.addLog(`学習開始 (${modeLabelJa})`);
+    terminalLogRef.current?.addLog('学習を開始');
+
     if (questionsFromHook.length === 0) {
       Alert.alert(
         locale === 'ja' ? '問題がありません' : 'No Questions',
@@ -1064,54 +1063,13 @@ const HomeScreen = React.memo(() => {
       );
       return;
     }
-    if (selectedMode === 'rapid') {
-      setQuickQuizCountCache(10);
-      navigateWithAnimation('/quiz');
-    } else if (selectedMode === 'daily') {
-      navigateWithAnimation('/missions');
-    } else {
-      // DEEP：全問モード
-      setQuickQuizCountCache(questionsFromHook.length);
-      navigateWithAnimation('/quiz');
-    }
+    // 問題数の選択は quiz.tsx の設定画面で行うため、ここでは遷移するだけ
+    navigateWithAnimation('/quiz');
   };
 
+  // 問題数の選択は quiz.tsx の設定画面で行うため、モード選択は設けない
   const renderTransferSelector = () => (
     <View style={[styles.transferCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.transferHeader, { color: colors.textSecondary }]}>
-        学習モードを選択
-      </Text>
-      <View style={styles.transferTabs}>
-        {transferModes.map((mode) => {
-          const active = selectedMode === mode.key;
-          return (
-            <PressableButton
-              key={mode.key}
-              style={[styles.transferTab, active
-                ? { backgroundColor: 'transparent', borderColor: colors.primary, borderWidth: 2 }
-                : { backgroundColor: 'transparent', borderColor: colors.border, borderWidth: 1 }]}
-              onPress={() => {
-                SoundManager.play('select');
-                setSelectedMode(mode.key);
-                const configLog =
-                  mode.key === 'rapid'
-                    ? 'モード: 短期集中 (5分)'
-                    : mode.key === 'daily'
-                      ? 'モード: デイリー (20問)'
-                      : 'モード: 全問 (全セット)';
-                terminalLogRef.current?.addLog(configLog);
-              }}
-            >
-              <Text style={[styles.transferTabText, { color: active ? colors.primary : colors.textSecondary }]} numberOfLines={1}>
-                {mode.label}
-              </Text>
-              <Text style={[styles.transferTabCaption, { color: colors.textSecondary }]} numberOfLines={1}>
-                {mode.caption}
-              </Text>
-            </PressableButton>
-          );
-        })}
-      </View>
       <Animated.View style={{ width: '100%', alignItems: 'center' }}>
         <PressableButton
           style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
@@ -1951,35 +1909,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
     elevation: 3,
-  },
-  transferHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom:  12,
-  },
-  transferTabs: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  transferTab: {
-    flex: 1,
-    height: 54,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    paddingHorizontal: 4,
-  },
-  transferTabText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  transferTabCaption: {
-    fontSize: 10,
   },
   questCard: {
     padding: 16,

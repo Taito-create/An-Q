@@ -5,7 +5,7 @@ import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { SoundManager } from './sound';
-import { PenSquare, FolderOpen, Clock } from 'lucide-react';
+import { PenSquare, FolderOpen, Clock, ListPlus } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -56,6 +56,13 @@ export default function CreateHubScreen() {
       title: locale === 'ja' ? '問題を作成' : 'Create Question',
       description: locale === 'ja' ? '手動で作成' : 'Create manually',
       onPress: () => setShowCreateOptions(true),
+    },
+    {
+      id: 'bulk',
+      icon: <ListPlus size={24} color={colors.primary} />,
+      title: locale === 'ja' ? 'まとめて作成' : 'Bulk Create',
+      description: locale === 'ja' ? '英単語リストなどを貼り付けて一括作成' : 'Paste a word list to create multiple questions',
+      onPress: () => navigate('/create/bulk'),
     },
     {
       id: 'manage',

@@ -15,12 +15,14 @@ import { uploadImageToCloudinary } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
+import { useResponsive } from './hooks/useResponsive';
 import './browse.css';
 
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { colors, onPrimary, isCyberpunk, br } = useTheme();
+  const screenType = useResponsive();
   const locale = useLocale();
   const t = translations[locale];
   const { 
@@ -40,7 +42,22 @@ export default function BrowseQuestionsScreen() {
     addTag,
     removeTag
   } = useQuestionsContext();
-  
+
+  // ヘッダーのレスポンシブ寸法。
+  // スマホ幅（375px程度）では「問題を管理」「件数バッジ」「一括編集」が詰まるため、
+  // フォント・パディング・gap・ヘッダー内側余白を端末区分で切り替える。
+  // ラベル自体は省略しない。
+  const headerMetrics = useMemo(() => {
+    switch (screenType) {
+      case 'desktop':
+        return { titleFontSize: 20, btnFontSize: 12, btnPadX: 14, btnPadY: 8, badgePadX: 10, badgePadY: 3, gap: 10, padX: 18 };
+      case 'tablet':
+        return { titleFontSize: 18, btnFontSize: 12, btnPadX: 12, btnPadY: 7, badgePadX: 9, badgePadY: 3, gap: 8, padX: 16 };
+      default: // mobile（スマホ）
+        return { titleFontSize: 16, btnFontSize: 11, btnPadX: 10, btnPadY: 6, badgePadX: 8, badgePadY: 2, gap: 6, padX: 12 };
+    }
+  }, [screenType]);
+
   // Debug: Log questions when component renders
 
   // Determine checkbox text color based on theme luminance
@@ -546,7 +563,22 @@ export default function BrowseQuestionsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}> 
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+            flexDirection: 'row',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            gap: headerMetrics.gap,
+            paddingHorizontal: headerMetrics.padX,
+            // スマホ幅で折り返さないようにする
+            flexWrap: 'nowrap',
+          },
+        ]}
+      >
         <BackButton
           onPress={() => {
             if (selectedFolder) {
@@ -557,18 +589,46 @@ export default function BrowseQuestionsScreen() {
             }
           }}
         />
-        <Text style={[styles.headerTitle, { color: colors.text, flex: 1, flexShrink: 1 }]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.headerTitle,
+            { color: colors.text, fontSize: headerMetrics.titleFontSize, flex: 1, flexShrink: 1 },
+          ]}
+          numberOfLines={1}
+        >
           問題を管理
         </Text>
-        <View style={styles.headerActions}>
-          <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+        <View style={[styles.headerActions, { gap: headerMetrics.gap }]}>
+          <View
+            style={[
+              styles.countBadge,
+              {
+                backgroundColor: colors.primary,
+                paddingHorizontal: headerMetrics.badgePadX,
+                paddingVertical: headerMetrics.badgePadY,
+              },
+            ]}
+          >
             <Text style={[styles.countBadgeText, { color: onPrimary }]}>{filteredQuestions.length}</Text>
           </View>
           <PressableButton
-            style={[styles.headerBtn, { borderColor: colors.primary, backgroundColor: isSelectionMode ? colors.primary : 'transparent' }]}
+            style={[
+              styles.headerBtn,
+              {
+                borderColor: colors.primary,
+                backgroundColor: isSelectionMode ? colors.primary : 'transparent',
+                paddingHorizontal: headerMetrics.btnPadX,
+                paddingVertical: headerMetrics.btnPadY,
+              },
+            ]}
             onPress={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedQuestionIds([]); }}
           >
-            <Text style={[styles.headerBtnText, { color: isSelectionMode ? onPrimary : colors.primary }]}>
+            <Text
+              style={[
+                styles.headerBtnText,
+                { color: isSelectionMode ? onPrimary : colors.primary, fontSize: headerMetrics.btnFontSize },
+              ]}
+            >
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
             </Text>
           </PressableButton>
@@ -1630,17 +1690,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    // スマホ幅で1行に収めるため折り返しは使わない（paddingHorizontal は JSX で動的指定）
+    flexWrap: 'nowrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 18,
     paddingVertical: 16,
     borderBottomWidth: 1,
     rowGap: 12,
     columnGap: 12,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', flexShrink: 1, paddingRight: 8 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 },
+  headerTitle: { fontWeight: 'bold', flexShrink: 1, paddingRight: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'nowrap', gap: 8 },
   segmentTabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,

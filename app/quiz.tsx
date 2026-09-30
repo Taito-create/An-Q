@@ -17,6 +17,7 @@ import PressableButton from './components/PressableButton';
 import { recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from './missions';
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
+import { useResponsive } from './hooks/useResponsive';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
@@ -90,6 +91,7 @@ export const getCorrectIndices = (question: Question): number[] => {
 export default function QuizScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
+  const screenType = useResponsive();
   const locale = useLocale();
   const t = translations[locale];
     const { questions: allQuestionsFromHook, folders, loading: questionsLoading } = useQuestionsContext();
@@ -1178,6 +1180,21 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   const timeMin = Math.floor(timeLeft / 60);
   const timeSec = timeLeft % 60;
 
+  // topBar のレスポンシブ寸法。
+  // スマホ幅（375px程度）では「制限時間」「一時停止」「クイズを中断」の3要素が
+  // 詰まって潰れるため、フォント・パディング・gap を端末区分で切り替える。
+  // ラベル自体は省略せず、縮小で収める。
+  const topBarMetrics = useMemo(() => {
+    switch (screenType) {
+      case 'desktop':
+        return { timerFontSize: 20, btnFontSize: 14, btnPadX: 18, btnPadY: 10, iconSize: 18, gap: 10 };
+      case 'tablet':
+        return { timerFontSize: 18, btnFontSize: 13, btnPadX: 14, btnPadY: 9, iconSize: 17, gap: 8 };
+      default: // mobile（スマホ）
+        return { timerFontSize: 14, btnFontSize: 11, btnPadX: 9, btnPadY: 7, iconSize: 15, gap: 6 };
+    }
+  }, [screenType]);
+
   // Play question sound when question changes
   useEffect(() => {
     if (currentQuestion && quizStarted) {
@@ -1610,48 +1627,57 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   return (
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {!autoPlayMode && (
-        <View style={styles.topBar}>
-          <Text style={[styles.timer, { color: timerColor, letterSpacing: 1 }]}>
+        <View style={[styles.topBar, { gap: topBarMetrics.gap }]}>
+          <Text
+            style={[
+              styles.timer,
+              { color: timerColor, letterSpacing: 1, fontSize: topBarMetrics.timerFontSize },
+            ]}
+          >
             制限時間: {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
           </Text>
-          
+
           <Pressable
             style={({ pressed }) => [
-              styles.pauseBtn, 
-              { 
+              styles.pauseBtn,
+              {
                 backgroundColor: isPaused ? colors.success : colors.primary,
                 borderRadius: isCyberpunk ? 0 : 999,
+                paddingHorizontal: topBarMetrics.btnPadX,
+                paddingVertical: topBarMetrics.btnPadY,
                 transform: [{ scale: pressed ? 0.95 : 1 }]
               }
-            ]} 
+            ]}
             onPress={() => {
               SoundManager.play('decide');
               setIsPaused(!isPaused);
               setIsTimerActive(isPaused);
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: topBarMetrics.gap }}>
               {isPaused
-                ? <><Play size={18} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>再開</Text></>
-                : <><Pause size={18} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold' }]}>一時停止</Text></>}
+                ? <><Play size={topBarMetrics.iconSize} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold', fontSize: topBarMetrics.btnFontSize }]}>再開</Text></>
+                : <><Pause size={topBarMetrics.iconSize} color={isCyberpunk ? '#000' : '#fff'} /><Text style={[styles.pauseBtnText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold', fontSize: topBarMetrics.btnFontSize }]}>一時停止</Text></>}
             </View>
           </Pressable>
-          
+
           <Pressable
             style={({ pressed }) => [
-              styles.quitBtnTop, 
-              { 
+              styles.quitBtnTop,
+              {
                 backgroundColor: pressed ? colors.error : colors.primary,
                 borderRadius: isCyberpunk ? 0 : 20,
+                paddingHorizontal: topBarMetrics.btnPadX,
+                paddingVertical: topBarMetrics.btnPadY,
                 transform: [{ scale: pressed ? 0.95 : 1 }]
               }
-            ]} 
+            ]}
             onPress={() => {
               SoundManager.play('decide');
               setShowConfirmModal(true);
             }}
           >
-            <Text style={[styles.quitBtnTopText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold', fontSize: 14 }]}>
+            <Text style={[styles.quitBtnTopText, { color: isCyberpunk ? '#000' : '#fff', fontWeight: 'bold', fontSize: topBarMetrics.btnFontSize }]}>
               {locale === 'ja' ? 'クイズを中断' : 'Quit Quiz'}
             </Text>
           </Pressable>
@@ -1732,7 +1758,15 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
                 <Text style={[styles.topicBadge, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>{currentQuestion.topic}</Text>
               ) : <View />}
               {!autoPlayMode && (
-                <View style={styles.questionCounterBadge}>
+                <View
+                  style={[
+                    styles.questionCounterBadge,
+                    {
+                      backgroundColor: colors.primary + '20',
+                      borderColor: colors.primary + '40',
+                    },
+                  ]}
+                >
                   <Text style={[styles.questionCounterText, { color: colors.primary }]}>
                     {currentIndex + 1} / {shuffledQuestions.length}{locale === 'ja' ? '問' : ''}
                   </Text>
@@ -2305,7 +2339,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   quitBtnTopText: { fontSize: 14, fontWeight: '600' },
-  timer: { fontSize: 20, fontWeight: 'bold', minWidth: 72, letterSpacing: 0.2 },
+  // minWidth は指定しない。スマホ幅で topBar の3要素を押し広げてしまうため
+  timer: { fontSize: 20, fontWeight: 'bold', letterSpacing: 0.2 },
   pauseBtn: {
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -2320,13 +2355,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  // 背景色・ボーダー色は JSX でテーマ色（colors.primary）を指定する。
+  // 白背景（rgba(255,255,255,0.9)）はダークテーマ上で眩しく、
+  // シアンテキストとのコントラストが不自然だったため、
+  // 半透明シアン背景 + シアンテキストに変更した。
   questionCounterBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
     alignSelf: 'flex-start',
   },
   questionCounterText: {

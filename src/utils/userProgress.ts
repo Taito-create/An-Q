@@ -687,6 +687,25 @@ export async function awardQuestionCreation(userId: string) {
   }));
 }
 
+/**
+ * 一括問題作成時の報酬をまとめて付与する（/create/bulk 用）。
+ * awardQuestionCreation は 1 問固定のため、N 問ぶんの XP・コイン・作成数を
+ * 1 回のトランザクションでまとめて加算する（通信回数を増やさない）。
+ */
+export async function awardQuestionCreationBulk(userId: string, count: number) {
+  const safeCount = Math.max(0, Math.floor(count));
+  if (safeCount === 0) {
+    // 0 問のときは updateProgressDocument を呼ばない（不要な通信・ログを避ける）
+    return readLocalProgress();
+  }
+  return updateProgressDocument(userId, (current) => ({
+    ...current,
+    totalQuestionsCreated: current.totalQuestionsCreated + safeCount,
+    currentXP: current.currentXP + 10 * safeCount,
+    totalCoins: current.totalCoins + 5 * safeCount,
+  }));
+}
+
 export async function recordQuizPlayed(userId: string) {
   return updateProgressDocument(userId, (current) => ({
     ...current,

@@ -34,6 +34,7 @@ const BrowseQuestionsScreen = safeLazy(() => import('../app/browse'));
 const CalendarScreen = safeLazy(() => import('../app/calendar'));
 const CreateQuestionScreen = safeLazy(() => import('../app/create'));
 const CreateHubScreen = safeLazy(() => import('../app/createHub'));
+const CreateBulkScreen = safeLazy(() => import('../app/createBulk'));
 const CreditsScreen = safeLazy(() => import('../app/credits'));
 const DevModeScreen = safeLazy(() => import('../app/devmode'));
 const FeedbackScreen = safeLazy(() => import('../app/feedback'));
@@ -180,6 +181,11 @@ export default function App() {
           <Route path="/create/manual" element={
             <ProtectedRoute>
               <CreateQuestionScreen />
+            </ProtectedRoute>
+          } />
+          <Route path="/create/bulk" element={
+            <ProtectedRoute>
+              <CreateBulkScreen />
             </ProtectedRoute>
           } />
           <Route path="/create/ocr" element={
