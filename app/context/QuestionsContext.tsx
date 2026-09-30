@@ -846,10 +846,22 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const deleteQuestion = useCallback(async (id: number): Promise<Question[]> => {
     console.log(' deleteQuestion called with id:', id);
-    const result = await applyQuestionsChange(current => current.filter(q => q.id !== id));
-    console.log(' deleteQuestion result:', result.length, 'questions remaining');
-    return result;
-  }, [applyQuestionsChange]);
+    const updatedQuestions = await applyQuestionsChange(current => current.filter(q => q.id !== id));
+
+    // 全てのフォルダから該当IDを除去して永続化する。
+    // これをしないとフォルダカードの件数バッジ（folder.questionIds.length）が
+    // 削除後も減らず、Firestore 上も存在しない問題のIDが残り続ける。
+    await applyFoldersChange(current =>
+      current.map(f =>
+        f.questionIds.includes(id)
+          ? { ...f, questionIds: f.questionIds.filter(qid => qid !== id) }
+          : f
+      )
+    );
+
+    console.log(' deleteQuestion result:', updatedQuestions.length, 'questions remaining');
+    return updatedQuestions;
+  }, [applyQuestionsChange, applyFoldersChange]);
 
   const updateQuestion = useCallback(async (updatedQuestion: Question): Promise<Question[]> => {
     return await applyQuestionsChange(current => current.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));

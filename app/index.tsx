@@ -726,27 +726,19 @@ const HomeScreen = React.memo(() => {
   const pulseAnim = animationLevel !== 'none' && animationLevel !== 'lite' ? createPulseAnimation(pulseIntensity) : undefined;
 
   // メインコンテンツスタイル
+  // モバイル／タブレット／デスクトップすべて1カラムで同じ順序に統一する。
+  // デスクトップのみ幅広なので maxWidth で中央寄せする。
   const mainContentStyle = {
-    mobile: { flexDirection: 'column' as const, gap: 12 },
-    tablet: { flexDirection: 'column' as const, gap: 14 },
-    desktop: { 
-      display: 'flex' as const,
-      flexDirection: 'row' as const,
+    mobile: { flexDirection: 'column' as const, gap: 12, width: '100%' as const },
+    tablet: { flexDirection: 'column' as const, gap: 12, width: '100%' as const },
+    desktop: {
+      flexDirection: 'column' as const,
       gap: 16,
-      marginBottom: 24,
+      width: '100%' as const,
+      maxWidth: 720,
+      marginLeft: 'auto' as const,
+      marginRight: 'auto' as const,
     },
-  };
-
-  const leftColumnStyle = {
-    mobile: { flex: 1 },
-    tablet: { flex: 1 },
-    desktop: { flex: 1.5, minWidth: 0 },
-  };
-
-  const rightColumnStyle = {
-    mobile: { flex: 1 },
-    tablet: { flex: 1 },
-    desktop: { flex: 1, minWidth: 0 },
   };
 
   const primaryTextColor = onPrimary;
@@ -890,7 +882,7 @@ const HomeScreen = React.memo(() => {
         backgroundColor: colors.primary + '08',
         borderRadius: br,
         alignItems: 'center',
-        paddingVertical: 28,
+        paddingVertical: screenType === 'mobile' ? 22 : 28,
         borderWidth: 1,
         borderColor: colors.primary,
         borderStyle: 'solid',
@@ -903,7 +895,7 @@ const HomeScreen = React.memo(() => {
             ? 'ようこそ！まずは問題を作成して、学習を始めましょう。'
             : 'Welcome! Create your first question to install your first memory.'
         }
-        romeaSize={80}
+        romeaSize={screenType === 'mobile' ? 64 : 80}
         style={{ marginBottom: 16 }}
       />
       <View style={[styles.emptyStatsIcon, { borderColor: colors.primary + '55' }]}>
@@ -1072,7 +1064,13 @@ const HomeScreen = React.memo(() => {
     <View style={[styles.transferCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Animated.View style={{ width: '100%', alignItems: 'center' }}>
         <PressableButton
-          style={[styles.mainPlayButton, { backgroundColor: colors.primary }]}
+          style={[
+            styles.mainPlayButton,
+            { backgroundColor: colors.primary },
+            // スマホ縦画面で窮屈にならないよう高さと余白を縮め、幅広は maxWidth で抑える
+            screenType === 'mobile' && { height: 68, paddingVertical: 20 },
+            screenType !== 'mobile' && { height: 80, paddingVertical: 28, maxWidth: 520 },
+          ]}
           onPress={handleInitiateTransfer}
         >
           <Play size={28} color={onPrimary} strokeWidth={2} />
@@ -1243,12 +1241,11 @@ const HomeScreen = React.memo(() => {
       {
         zIndex: 1000,
         position: 'relative',
-      },
-      screenType === 'desktop' && {
+        // ヘッダーのボーダー下線は全 screenType で統一する
         paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
-      }
+      },
     ]}>
       <View style={{ flex: 1 }}>
         {/* メイン行：画像＋称号＋ユーザー名＋コイン/本 */}
@@ -1476,31 +1473,20 @@ const HomeScreen = React.memo(() => {
             </View>
           ) : questionsFromHook.length === 0 ? (
             renderEmptyState()
-          ) : screenType === 'desktop' ? (
-            /* デスクトップ：2カラムレイアウト */
-            <View style={mainContentStyle.desktop}>
-              <View style={leftColumnStyle.desktop}>
-                {renderTransferSelector()}
-                {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
-                {renderWeakCard()}
-              </View>
-              <View style={rightColumnStyle.desktop}>
-                {renderDailyQuests()}
-                <TerminalLog ref={terminalLogRef} statusLine={statusText} initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]} />
-                {renderTodayQuestion()}
-                {renderAchievementBadges()}
-              </View>
-            </View>
           ) : (
-            /* モバイル／タブレット：1カラムレイアウト */
+            /* モバイル／タブレット／デスクトップ：1カラムレイアウト（PCの視覚順序に統一） */
             <View style={mainContentStyle[screenType]}>
               {renderTransferSelector()}
               {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
-              {renderTodayQuestion()}
-              {renderDailyQuests()}
               {renderWeakCard()}
+              {renderDailyQuests()}
+              <TerminalLog
+                ref={terminalLogRef}
+                statusLine={statusText}
+                initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]}
+              />
+              {renderTodayQuestion()}
               {renderAchievementBadges()}
-              <TerminalLog ref={terminalLogRef} statusLine={statusText} initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]} />
             </View>
           )}
 

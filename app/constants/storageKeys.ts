@@ -84,6 +84,9 @@ export const STORAGE_KEYS = {
   // タグ管理
   TAG_MASTER_LIST: 'tag_master_list',
 
+  // 問題管理画面の表示モード
+  BROWSE_DISPLAY_MODE: 'browse_display_mode',
+
   // マイグレーション
   DB_VERSION: 'db_version',
 } as const;

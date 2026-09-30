@@ -5,7 +5,7 @@ import { useTheme } from './theme';
 import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { SoundManager } from './sound';
-import { PenSquare, FolderOpen, Clock, ListPlus } from 'lucide-react';
+import { PenSquare, FolderOpen, ListPlus } from 'lucide-react';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -70,13 +70,6 @@ export default function CreateHubScreen() {
       title: locale === 'ja' ? '問題を管理・編集' : 'Manage Questions',
       description: locale === 'ja' ? '既存の問題を閲覧・編集' : 'View and edit questions',
       onPress: () => navigate('/browse'),
-    },
-    {
-      id: 'timer',
-      icon: <Clock size={24} color={colors.primary} />,
-      title: locale === 'ja' ? 'タイマー設定' : 'Timer Settings',
-      description: locale === 'ja' ? 'クイズの制限時間を設定' : 'Set quiz time limit',
-      onPress: () => navigate('/timer'),
     },
   ];
 

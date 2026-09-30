@@ -164,7 +164,7 @@ export default function TimerSettingsScreen() {
         </Text>
         <TouchableOpacity
           style={{ paddingVertical: 10, paddingHorizontal: 14,  }}
-          onPress={() => { SoundManager.play('decide'); navigate('/create'); }}
+          onPress={() => { SoundManager.play('decide'); navigate('/quiz'); }}
         >
           <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
             {locale === 'ja' ? '戻る' : 'Back'}

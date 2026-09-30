@@ -8,7 +8,7 @@ import LottieView from 'lottie-react-native';
 import successJson from '../src/assets/animations/success.json';
 import errorJson from '../src/assets/animations/error.json';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SoundManager } from './sound';
 import BackButton from './components/BackButton';
@@ -90,6 +90,7 @@ export const getCorrectIndices = (question: Question): number[] => {
 // ──────────────────────────────────────────────
 export default function QuizScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
   const screenType = useResponsive();
   const locale = useLocale();
@@ -278,6 +279,9 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     loadTimerSetting();
     loadTimerPresets();
     SoundManager.initialize();
+    // /timer 画面から戻ってきたときにプリセット・選択値を再読込する
+    // （画面遷移で /quiz が再マウントされないため location.key の変化で検知する）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     // 音声エンジン・VOICEVOX話者を読み込み
     AsyncStorage.getItem(STORAGE_KEYS.VOICE_ENGINE)
       .then(v => setVoiceEngine(v === 'voicevox' ? 'voicevox' : 'web'))
@@ -285,7 +289,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     AsyncStorage.getItem(STORAGE_KEYS.VOICEVOX_SPEAKER)
       .then(v => setVoicevoxSpeaker(v ? parseInt(v, 10) : 3))
       .catch(e => console.warn('Failed to load voicevox speaker:', e));
-  }, []);
+  }, [location.key]);
 
   // ──────────────────────────────────────────────
   // 自動再生停止関数
@@ -616,23 +620,23 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
   const loadTimerPresets = async () => {
     try {
-      const savedTimer = await AsyncStorage.getItem('quiz_active_timer');
-      if (savedTimer !== null) {
-        const parsed = parseInt(savedTimer, 10);
-        setPreTimerMinutes(isNaN(parsed) ? null : parsed);
-      } else {
-        const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
-        setPreTimerMinutes(timerVal ? parseInt(timerVal, 10) : 10);
-      }
+      // タイマーは APP_TIMER_SETTING を唯一のソースとする。
+      // 旧: quiz_active_timer は startQuiz が一時的に書き込んでいたため、
+      // 保存した設定と食い違い「10分固定」に見えていた。廃止して一本化する。
+      const timerVal = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
+      const parsed = timerVal !== null ? parseInt(timerVal, 10) : NaN;
+      // timer.tsx は「なし」を '0' で保存するため、0以下はすべて無制限扱いにする
+      const minutes = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      setPreTimerMinutes(minutes);
 
       const customRaw = await AsyncStorage.getItem('CUSTOM_TIMERS');
       const customTimers = customRaw ? JSON.parse(customRaw) : [];
       const presets: { label: string; value: number | null }[] = [
         { label: locale === 'ja' ? 'なし' : 'No limit', value: null },
-        { label: locale === 'ja' ? '小テスト用 (10分)' : 'Small Test (10min)', value: 10 },
-        { label: locale === 'ja' ? '試験用 (60分)' : 'Exam (60min)', value: 60 },
-        { label: locale === 'ja' ? '試験用 (90分)' : 'Exam (90min)', value: 90 },
-        { label: locale === 'ja' ? '試験用 (120分)' : 'Exam (120min)', value: 120 },
+        { label: locale === 'ja' ? '5分' : '5 min', value: 5 },
+        { label: locale === 'ja' ? '10分' : '10 min', value: 10 },
+        { label: locale === 'ja' ? '30分' : '30 min', value: 30 },
+        { label: locale === 'ja' ? '60分' : '60 min', value: 60 },
         ...customTimers.map((ct: any) => ({
           label: `${ct.name} (${ct.minutes}${locale === 'ja' ? '分' : 'min'})`,
           value: ct.minutes,
@@ -646,27 +650,22 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
   const loadTimerSetting = async () => {
     try {
-      let timerValue = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
-      let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
+      const timerValue = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
+      const storedMinutes = timerValue ? parseInt(timerValue, 10) : NaN;
 
-      if (storedMinutes === null) {
-        const oldTimerValue = await AsyncStorage.getItem('timerSetting');
-        if (oldTimerValue !== null) {
-          storedMinutes = parseInt(oldTimerValue, 10);
-          await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, storedMinutes.toString());
-          await AsyncStorage.removeItem('timerSetting');
-          console.log(`Migrated timer setting in Quiz screen: ${storedMinutes}`);
-        }
+      if (Number.isFinite(storedMinutes) && storedMinutes > 0) {
+        const seconds = storedMinutes * 60;
+        setTimerLimit(seconds);
+        setTimeLeft(seconds);
+      } else {
+        // 制限なし：既存の「preTimerMinutes が null のとき Number.MAX_VALUE」実装に合わせる
+        setTimerLimit(Number.MAX_VALUE);
+        setTimeLeft(Number.MAX_VALUE);
       }
-
-      const finalMinutes = (storedMinutes !== null && !isNaN(storedMinutes)) ? storedMinutes : 5;
-      const seconds = finalMinutes * 60;
-      setTimerLimit(seconds);
-      setTimeLeft(seconds);
     } catch (error) {
       console.error('Failed to load timer setting:', error);
-      setTimerLimit(300);
-      setTimeLeft(300);
+      setTimerLimit(Number.MAX_VALUE);
+      setTimeLeft(Number.MAX_VALUE);
     }
   };
 
@@ -790,11 +789,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       await AsyncStorage.setItem('challenge_bet', betAmount.toString());
     }
 
-    if (preTimerMinutes !== null) {
-      await AsyncStorage.setItem('quiz_active_timer', preTimerMinutes.toString());
-    } else {
-      await AsyncStorage.removeItem('quiz_active_timer');
-    }
+    // 旧: quiz_active_timer への一時書き込みを削除。
+    // タイマーの設定は timer.tsx が APP_TIMER_SETTING で一元管理する。
 
                 let shuffled = [...filtered].sort(() => Math.random() - 0.5);
     // クイックアクションから指定された問題数を優先（未指定時はスライダー値）
@@ -1329,6 +1325,31 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
               )}
             </View>
           )}
+
+          {/* 制限時間の設定（/timer へ誘導。タイマー設定は createHub からではなくここから開く） */}
+          <PressableButton
+            style={[{
+              backgroundColor: colors.card,
+              borderRadius: br,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 12,
+              marginBottom: 8,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }]}
+            onPress={() => { SoundManager.play('decide'); navigate('/timer'); }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }}>
+              制限時間: {preTimerMinutes === null
+                ? (locale === 'ja' ? 'なし' : 'No limit')
+                : `${preTimerMinutes}${locale === 'ja' ? '分' : ' min'}`}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>
+              {locale === 'ja' ? '変更 →' : 'Change →'}
+            </Text>
+          </PressableButton>
 
           <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

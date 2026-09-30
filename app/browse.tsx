@@ -97,6 +97,8 @@ export default function BrowseQuestionsScreen() {
 
   // タブ管理用 state
   const [activeTab, setActiveTab] = useState<'all' | 'folders'>('all');
+  // 表示モード: 'normal'（展開カード）/ 'compact'（問題＋答えのみ）
+  const [displayMode, setDisplayMode] = useState<'normal' | 'compact'>('normal');
   
   // 問題集閲覧関連 state
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
@@ -158,6 +160,20 @@ export default function BrowseQuestionsScreen() {
   }, [questions]);
 
   // tagMasterList は Context から取得するため、ローカルでのロードは不要
+
+  // 表示モードの復元（問題管理画面を再訪しても設定を保持する）
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEYS.BROWSE_DISPLAY_MODE)
+      .then(v => { if (v === 'compact') setDisplayMode('compact'); })
+      .catch(() => {});
+  }, []);
+
+  const toggleDisplayMode = async () => {
+    SoundManager.play('decide');
+    const next = displayMode === 'normal' ? 'compact' : 'normal';
+    setDisplayMode(next);
+    try { await AsyncStorage.setItem(STORAGE_KEYS.BROWSE_DISPLAY_MODE, next); } catch { /* 永続化失敗は無視 */ }
+  };
 
   // フォルダが更新されたら、選択中のフォルダとフォルダ質問を更新
   useEffect(() => {
@@ -275,7 +291,7 @@ export default function BrowseQuestionsScreen() {
 
   const confirmDelete = async (id: number) => {
     try {
-      // 1. 問題を削除（useQuestions フック経由）
+      // 1. 問題を削除（Context フック経由でフォルダの questionIds も同時掃除される）
       const updatedQuestions = await deleteQuestion(id);
       if (updatedQuestions.length === questions.length) {
         Alert.alert(
@@ -285,15 +301,9 @@ export default function BrowseQuestionsScreen() {
         return;
       }
 
-      // 2. フォルダからも該当IDを削除
-      const updatedFolders = folders.map(folder => ({
-        ...folder,
-        questionIds: folder.questionIds.filter(qid => qid !== id)
-      }));
-      await addQuestionsToFolder('', []); // ダミー呼び出し（folders stateは自動更新）
       setSelectedQuestionIds(prev => prev.filter(qid => qid !== id));
 
-      // 3. 現在表示中のフォルダ詳細があれば再読み込み
+      // 2. 現在表示中のフォルダ詳細があれば再読み込み
       if (selectedFolder) {
         const updatedFolder = { ...selectedFolder, questionIds: selectedFolder.questionIds.filter(qid => qid !== id) };
         setSelectedFolder(updatedFolder);
@@ -632,6 +642,32 @@ export default function BrowseQuestionsScreen() {
               {isSelectionMode ? t.cancelSelection : t.batchEdit}
             </Text>
           </PressableButton>
+
+          {/* 表示モード切替（簡易⇔通常）。スマホ幅で3要素が詰まらないよう narrow ではグリフのみ表示 */}
+          <PressableButton
+            style={[
+              styles.headerBtn,
+              {
+                borderColor: colors.primary,
+                backgroundColor: displayMode === 'compact' ? colors.primary : 'transparent',
+                paddingHorizontal: headerMetrics.btnPadX,
+                paddingVertical: headerMetrics.btnPadY,
+              },
+            ]}
+            onPress={toggleDisplayMode}
+            title={locale === 'ja' ? '表示を切り替え' : 'Toggle view'}
+          >
+            <Text
+              style={[
+                styles.headerBtnText,
+                { color: displayMode === 'compact' ? onPrimary : colors.primary, fontSize: headerMetrics.btnFontSize },
+              ]}
+            >
+              {screenType === 'mobile'
+                ? (displayMode === 'compact' ? '≡' : '≡≡')
+                : (displayMode === 'compact' ? (locale === 'ja' ? '通常' : 'Normal') : (locale === 'ja' ? '簡易' : 'Compact'))}
+            </Text>
+          </PressableButton>
         </View>
       </View>
 
@@ -715,6 +751,61 @@ export default function BrowseQuestionsScreen() {
         {activeTab === 'all' ? (
           <>
             {[...filteredQuestions].reverse().map((item) => (
+              displayMode === 'compact' ? (
+                /* 簡易モード：問題＋答えの2行のみ。展開アイコン・画像・タグ・カードアクションは非表示 */
+                <View
+                  key={item.id}
+                  style={[
+                    styles.compactCard,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                >
+                  {isSelectionMode && (
+                    <PressableButton
+                      onPress={() => {
+                        setSelectedQuestionIds(prev =>
+                          prev.includes(item.id)
+                            ? prev.filter(id => id !== item.id)
+                            : [...prev, item.id]
+                        );
+                      }}
+                      style={styles.checkbox}
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          {
+                            width: 24,
+                            height: 24,
+                            borderColor: selectedQuestionIds.includes(item.id) ? colors.primary : colors.border,
+                            backgroundColor: selectedQuestionIds.includes(item.id) ? colors.primary + '30' : 'transparent',
+                          },
+                        ]}
+                      >
+                        {selectedQuestionIds.includes(item.id) && (
+                          <Text style={{ color: getCheckboxTextColor(), fontSize: 14, fontWeight: 'bold' }}>✓</Text>
+                        )}
+                      </View>
+                    </PressableButton>
+                  )}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={2} style={[styles.compactQuestion, { color: colors.text }]}>
+                      {item.question}
+                    </Text>
+                    <Text numberOfLines={2} style={[styles.compactAnswer, { color: colors.primary }]}>
+                      {getAnswerText(item)}
+                    </Text>
+                  </View>
+                  <PressableButton
+                    onPress={() => requestDeleteQuestion(item.id)}
+                    style={styles.headerDeleteBtn}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Trash2 size={16} color={colors.error} />
+                  </PressableButton>
+                </View>
+              ) : (
+              /* 通常モード：従来の展開カード */
               <View
                 key={item.id}
                 style={[
@@ -826,6 +917,7 @@ export default function BrowseQuestionsScreen() {
                   </View>
                 )}
               </View>
+              )
             ))}
             {loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
@@ -1736,6 +1828,19 @@ const styles = StyleSheet.create({
   cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerDeleteBtn: { padding: 6, borderRadius: 20 },
   headerDeleteBtnText: { fontSize: 18 },
+  // 問題管理画面「簡易モード」のカード（問題＋答えの2行のみ）
+  compactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  compactQuestion: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  compactAnswer: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   questionPreview: { fontSize: 15, fontWeight: '500', flex: 1, lineHeight: 22 },
   expandIcon: { fontSize: 16, fontWeight: 'bold', paddingHorizontal: 8 },
   expandedContent: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#eee', gap: 12 },
