@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator, Animated, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SoundManager } from './sound';
@@ -16,13 +16,48 @@ import { useQuestionsContext } from './context/QuestionsContext';
 import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
 import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
 import { useResponsive } from './hooks/useResponsive';
+import { useTerminalEffects } from './hooks/useTerminalEffects';
 import './browse.css';
+
+/**
+ * 展開コンテンツのフェードイン。
+ * enabled=true のとき、マウント時に opacity 0→1（200ms）でフェードインする。
+ * enabled=false のときは即時表示（演出OFF用）。
+ * アンマウント時にアニメーションを停止する。
+ */
+function ExpandFade({
+  children,
+  enabled,
+}: {
+  children: React.ReactNode;
+  enabled: boolean;
+}) {
+  const opacity = useRef(new Animated.Value(enabled ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (!enabled) {
+      opacity.setValue(1);
+      return;
+    }
+    opacity.setValue(0);
+    const anim = Animated.timing(opacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [enabled, opacity]);
+
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+}
 
 export default function BrowseQuestionsScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { colors, onPrimary, isCyberpunk, br } = useTheme();
   const screenType = useResponsive();
+  const terminalEffects = useTerminalEffects();
   const locale = useLocale();
   const t = translations[locale];
   const { 
@@ -880,6 +915,7 @@ export default function BrowseQuestionsScreen() {
                 </View>
 
                 {expandedQuestionId === item.id && (
+                  <ExpandFade enabled={terminalEffects}>
                   <View style={styles.expandedContent}>
                     {item.isShared && <><Share2 size={14} color={colors.success} style={{ marginRight: 6 }} /><Text style={[{ fontSize: 12, color: colors.success, fontWeight: '700', marginBottom: 6 }]}>{locale === 'ja' ? '共有されて来た問題' : 'Shared Question'}</Text></>}
                     <Text style={[styles.fullQuestion, { color: colors.text }]}>{item.question}</Text>
@@ -915,6 +951,7 @@ export default function BrowseQuestionsScreen() {
                       </View>
                     )}
                   </View>
+                  </ExpandFade>
                 )}
               </View>
               )

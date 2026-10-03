@@ -50,6 +50,8 @@ import { useQuestionsContext } from './context/QuestionsContext';
 import { safeParse, safeParseArray } from './utils/storageUtils';
 import LottieView from 'lottie-react-native';
 import FireAnimation from '../src/assets/animations/Fire.json';
+import { useTerminalEffects } from './hooks/useTerminalEffects';
+import CountUpText from './components/CountUpText';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -110,6 +112,7 @@ const HomeScreen = React.memo(() => {
   const locale = useLocale();
   const [currentLocale, setCurrentLocale] = useState<'ja' | 'en'>(locale);
   const screenType = useResponsive();
+  const terminalEffects = useTerminalEffects();
   const { user } = useAuth();
     const { questions: questionsFromHook, loading: questionsLoading } = useQuestionsContext();
   const [userLevel, setUserLevel] = useState(1);
@@ -808,7 +811,15 @@ const HomeScreen = React.memo(() => {
         : `${weekly.thisWeek}${locale === 'ja' ? '' : ' '}${t.weeklyAnsweredUnit} ・ ${weekly.changePercent >= 0 ? '+' : ''}${weekly.changePercent}% ${t.vsLastWeek}`;
     const isWeeklyUp = weekly.changePercent >= 0;
 
-    const statItems: { key: string; icon: React.ReactNode; value: React.ReactNode; label: string }[] = [
+    const statItems: {
+      key: string;
+      icon: React.ReactNode;
+      value: number;
+      suffix?: string;
+      empty?: boolean;
+      emptyText?: string;
+      label: string;
+    }[] = [
       { key: 'total', icon: <ClipboardList size={18} color={colors.primary} />, value: totalQuestions, label: t.questionsCountLabel },
       { key: 'today', icon: <CheckCircle2 size={18} color={colors.success} />, value: todayCorrect, label: t.todayCorrectLabel },
       { key: 'streak', icon: <View style={{ position: 'relative', width: 18, height: 18 }}>
@@ -824,7 +835,7 @@ const HomeScreen = React.memo(() => {
             />
           )}
         </View>, value: streak, label: t.streakLabel },
-      { key: 'accuracy', icon: <Target size={18} color={colors.secondary} />, value: accuracy > 0 ? `${accuracy}%` : '--', label: t.accuracyLabel },
+      { key: 'accuracy', icon: <Target size={18} color={colors.secondary} />, value: accuracy, suffix: '%', empty: accuracy <= 0, emptyText: '--', label: t.accuracyLabel },
     ];
 
     return (
@@ -834,7 +845,14 @@ const HomeScreen = React.memo(() => {
           {statItems.map(item => (
             <View key={item.key} style={styles.statsTile}>
               {item.icon}
-              <Text style={[styles.statNumber, { color: colors.primary, fontSize: fs(20) }]}>{item.value}</Text>
+              <CountUpText
+                value={item.value}
+                suffix={item.suffix}
+                empty={item.empty}
+                emptyText={item.emptyText}
+                enabled={terminalEffects}
+                style={[styles.statNumber, { color: colors.primary, fontSize: fs(20) }]}
+              />
               <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: fontSize.small }]}>{item.label}</Text>
             </View>
           ))}

@@ -102,6 +102,37 @@ export default function OpponentCard({ uid, label, compact = false }: OpponentCa
     );
   }
 
+  // 開発用 Bot は Firestore 上に存在しない仮想ユーザーのため、専用表示にする
+  if (uid === 'dev-bot') {
+    if (compact) {
+      return (
+        <View style={[styles.compact, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.avatarPlaceholder, { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.warning + '30' }]}>
+            <Text style={{ color: colors.warning, fontWeight: 'bold', fontSize: 12 }}>BOT</Text>
+          </View>
+          <View style={styles.compactBody}>
+            <Text style={[styles.name, { color: colors.warning }]}>
+              {label}: DEV BOT
+            </Text>
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+              自動応答モード
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.warning }]}>
+        <View style={[styles.avatarPlaceholder, { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.warning + '30' }]}>
+          <Text style={{ color: colors.warning, fontWeight: 'bold', fontSize: 20 }}>BOT</Text>
+        </View>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[styles.name, { color: colors.warning }]}>DEV BOT</Text>
+        <Text style={[styles.meta, { color: colors.textSecondary }]}>自動応答モード</Text>
+      </View>
+    );
+  }
+
   const equipped = (profile as { equippedTitle?: string } | null)?.equippedTitle;
   const titleLabel = getTitleDisplay(equipped ?? profile?.currentTitle ?? 'apprentice', 'ja');
   // battleStats 未定義 (旧ドキュメント) は getBattleStats が 0 埋めで返す

@@ -484,6 +484,34 @@ async function syncLocalStorage(document: UserProgressDocument) {
   await AsyncStorage.multiSet(entries);
 }
 
+/**
+ * Firestore の transaction.set に渡す前に、無効な値を除去する。
+ * - undefined → フィールドごと削除（Firestore は undefined を拒否する）
+ * - NaN / Infinity → 0 に置換（Firestore は有限数のみ受け付ける）
+ * - ネストしたオブジェクト（battleStats など）にも再帰的に適用
+ * - 配列内の undefined / NaN / Infinity も除去
+ */
+function sanitizeForFirestore<T>(value: T): T {
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'number') {
+    return (Number.isFinite(value) ? value : 0) as T;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => sanitizeForFirestore(v))
+      .filter((v) => v !== undefined) as unknown as T;
+  }
+  if (typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      result[k] = sanitizeForFirestore(v);
+    }
+    return result as T;
+  }
+  return value;
+}
+
 async function updateProgressDocument(
   userId: string,
   mutator: (current: UserProgressDocument) => UserProgressDocument
@@ -503,8 +531,9 @@ async function updateProgressDocument(
       // ローカルキャッシュ由来の null / '' で Cloudinary URL を消してしまう。
       // 他のフィールド（XP・コイン・戦績など）は通常どおり更新する。
       const { profileImage: _preservedProfileImage, ...payloadWithoutImage } = finalResult.document;
-      console.log('updateProgressDocument payload:', payloadWithoutImage);
-      transaction.set(ref, payloadWithoutImage, { merge: true });
+      const sanitizedPayload = sanitizeForFirestore(payloadWithoutImage);
+      console.log('updateProgressDocument payload:', sanitizedPayload);
+      transaction.set(ref, sanitizedPayload, { merge: true });
       return finalResult;
     });
 
@@ -523,6 +552,33 @@ async function updateProgressDocument(
       const finalResult = applyLevelUps(mutated);
       await syncLocalStorage(finalResult.document);
       return finalResult;
+    }
+
+    // invalid-argument / 400 エラー時: 既存の巨大 profileImage が原因の可能性
+    // → profileImage を空文字で上書きして再試行する（1回だけ）
+    if (error.code === 'invalid-argument' || error.message?.includes('400')) {
+      console.warn(' Retrying after clearing profileImage (size limit workaround)');
+      try {
+        await runTransaction(db, async (transaction) => {
+          const snapshot = await transaction.get(ref);
+          const current = normalizeDocument(snapshot.exists() ? snapshot.data() : {});
+          const mutated = normalizeDocument(mutator(current));
+          const finalResult = applyLevelUps(mutated);
+          const { profileImage: _skip, ...payload } = finalResult.document;
+          const sanitized = sanitizeForFirestore({ ...payload, profileImage: '' });
+          transaction.set(ref, sanitized, { merge: true });
+        });
+        // 再試行成功時は、ローカルデータで結果を返す
+        const localData = await readLocalProgress();
+        const current = normalizeDocument(localData);
+        const mutated = normalizeDocument(mutator(current));
+        const finalResult = applyLevelUps(mutated);
+        await syncLocalStorage(finalResult.document);
+        return finalResult;
+      } catch (retryError) {
+        console.error(' Retry also failed:', retryError);
+        throw retryError;
+      }
     }
 
     throw error;
@@ -798,7 +854,7 @@ export async function recordBattleResult(
         losses: base.losses + (outcome === 'lose' ? 1 : 0),
         draws: base.draws + (outcome === 'draw' ? 1 : 0),
       };
-      transaction.set(ref, { battleStats: next }, { merge: true });
+      transaction.set(ref, sanitizeForFirestore({ battleStats: next }), { merge: true });
       return next;
     });
   } catch (error: any) {

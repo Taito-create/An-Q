@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './theme';
@@ -6,15 +6,42 @@ import { useLocale } from './hooks/useLocale';
 import { translations } from './translations';
 import { SoundManager } from './sound';
 import { loadStats, saveStats, loadProgress, saveProgress, DEFAULT_STATS, MISSIONS } from './missions';
+import { useRooms } from './context/RoomsContext';
+import { attachDevBotToRoom, isDevBotModeEnabled } from './utils/devBot';
+import { STORAGE_KEYS } from './constants/storageKeys';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench } from 'lucide-react';
+import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench, Bot } from 'lucide-react';
 
 export default function DevModeScreen() {
   const navigate = useNavigate();
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
+
+  // 開発者モードは localhost 限定。本番/プレビューに URL 直打ちで到達できないようにする
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hostname !== 'localhost') {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
   const [log, setLog] = useState<string[]>([]);
+
+  const { createRoom } = useRooms();
+  const [botMode, setBotMode] = useState(false);
+  const [creatingLimitSec, setCreatingLimitSec] = useState<number>(60);
+  const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      setBotMode(window.localStorage.getItem(STORAGE_KEYS.DEV_BATTLE_BOT) === 'true');
+      const limitRaw = window.localStorage.getItem(STORAGE_KEYS.DEV_CREATING_LIMIT_SEC);
+      const parsed = limitRaw ? parseInt(limitRaw, 10) : NaN;
+      if (Number.isFinite(parsed) && parsed > 0) setCreatingLimitSec(parsed);
+    } catch {}
+  }, []);
 
   const addLog = (msg: string) => setLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 19)]);
 
@@ -110,6 +137,51 @@ export default function DevModeScreen() {
     addLog(`本:${stats.totalBooks} クイズ:${stats.quizPlayed} 正解:${stats.correctAnswers} 作成:${stats.questionsCreated} スロット:${stats.questionSlots ?? 20} 機能:${(stats.unlockedFeatures ?? []).join(',') || 'なし'}`);
   };
 
+  const toggleBotMode = async (val: boolean) => {
+    setBotMode(val);
+    try {
+      if (val) {
+        window.localStorage.setItem(STORAGE_KEYS.DEV_BATTLE_BOT, 'true');
+      } else {
+        window.localStorage.removeItem(STORAGE_KEYS.DEV_BATTLE_BOT);
+      }
+    } catch {}
+    SoundManager.play('decide');
+    addLog(val ? 'Bot 対戦モードを ON' : 'Bot 対戦モードを OFF');
+  };
+
+  const changeCreatingLimit = async (sec: number) => {
+    const clamped = Math.max(3, Math.min(300, Math.floor(sec)));
+    setCreatingLimitSec(clamped);
+    try {
+      if (clamped === 60) {
+        window.localStorage.removeItem(STORAGE_KEYS.DEV_CREATING_LIMIT_SEC);
+      } else {
+        window.localStorage.setItem(STORAGE_KEYS.DEV_CREATING_LIMIT_SEC, String(clamped));
+      }
+    } catch {}
+    SoundManager.play('decide');
+    addLog(`制限時間を ${clamped}秒 に設定`);
+  };
+
+  const startBotBattle = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      SoundManager.play('decide');
+      const roomId = await createRoom();
+      await attachDevBotToRoom(roomId);
+      addLog(`Bot 対戦を開始: ルーム ${roomId.slice(0, 8)}...`);
+      navigate(`/battle/${roomId}`);
+    } catch (e: any) {
+      console.error('startBotBattle failed:', e);
+      addLog(`エラー: ${e?.message ?? 'Bot 対戦の開始に失敗'}`);
+      Alert.alert('エラー', e?.message ?? 'Bot 対戦の開始に失敗しました');
+    } finally {
+      setStarting(false);
+    }
+  };
+
   const buttons = [
     { label: '本を100冊付与', icon: BookOpen, action: () => giveBooks(100), color: colors.primary },
     { label: '本を1000冊付与', icon: BookOpen, action: () => giveBooks(1000), color: colors.primary },
@@ -151,6 +223,93 @@ export default function DevModeScreen() {
               </View>
             </TouchableOpacity>
           ))}
+        </View>
+
+        {/* Bot 対戦セクション */}
+        <View style={{ marginTop: 24, marginBottom: 20 }}>
+          <Text style={{ color: '#00FF41', fontWeight: 'bold', fontFamily: 'monospace', marginBottom: 12, fontSize: 14 }}>
+            <Bot size={18} color="#00FF41" style={{ marginRight: 6 }} />
+            Bot 対戦モード（1人で対戦テスト）
+          </Text>
+
+          {/* トグル */}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 14,
+              borderRadius: 8,
+              backgroundColor: botMode ? '#00FF41' : '#1A1A1A',
+              borderWidth: 1,
+              borderColor: '#00FF41',
+              marginBottom: 10,
+            }}
+            onPress={() => toggleBotMode(!botMode)}
+          >
+            <Text style={{ color: botMode ? '#000' : '#00FF41', fontWeight: 'bold', fontSize: 14 }}>
+              Bot 対戦: {botMode ? 'ON' : 'OFF'}
+            </Text>
+            <Text style={{ color: botMode ? '#000' : '#00FF41', fontSize: 12 }}>
+              {botMode ? '有効' : '無効'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* 制限時間 */}
+          <View style={{
+            padding: 14,
+            borderRadius: 8,
+            backgroundColor: '#1A1A1A',
+            borderWidth: 1,
+            borderColor: '#00FF41',
+            marginBottom: 10,
+          }}>
+            <Text style={{ color: '#00FF41', fontSize: 12, marginBottom: 8 }}>
+              問題作成の制限時間（現在: {creatingLimitSec}秒）
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {[5, 10, 30, 60].map((sec) => (
+                <TouchableOpacity
+                  key={sec}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: creatingLimitSec === sec ? '#00FF41' : '#333',
+                    backgroundColor: creatingLimitSec === sec ? '#00FF41' : 'transparent',
+                  }}
+                  onPress={() => changeCreatingLimit(sec)}
+                >
+                  <Text style={{ color: creatingLimitSec === sec ? '#000' : '#00FF41', fontSize: 12, fontWeight: 'bold' }}>
+                    {sec}秒
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* 開始ボタン */}
+          <TouchableOpacity
+            style={{
+              padding: 16,
+              borderRadius: 8,
+              backgroundColor: starting ? '#333' : '#00FF41',
+              alignItems: 'center',
+              opacity: starting ? 0.6 : 1,
+            }}
+            onPress={startBotBattle}
+            disabled={starting || !botMode}
+          >
+            <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 15 }}>
+              {starting ? '起動中...' : '▶ Bot 対戦を開始'}
+            </Text>
+          </TouchableOpacity>
+          {!botMode && (
+            <Text style={{ color: '#FF4444', fontSize: 11, marginTop: 6, textAlign: 'center' }}>
+              ※ Bot 対戦モードを ON にしてください
+            </Text>
+          )}
         </View>
 
         {/* Log */}
