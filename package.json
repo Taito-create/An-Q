@@ -6,7 +6,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "server": "node D:/voice-server/server.js",
+    "server": "node voice-server/server.js",
     "start": "concurrently -n \"An-Q,Voice\" -c \"cyan,magenta\" \"npm run dev\" \"npm run server\"",
     "build": "vite build",
     "preview": "vite preview",
