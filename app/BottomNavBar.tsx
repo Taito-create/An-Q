@@ -35,7 +35,7 @@ const TABS_SCREENS: Record<string, string[]> = {
   '/': ['/timer'],
   '/create': ['/browse'],
   '/multi': ['/inbox', '/battle'],
-  '/sub': ['/settings', '/music', '/appSettings', '/profile', '/missions', '/statistics', '/credits', '/shop', '/gacha', '/achievements', '/calendar'],
+  '/sub': ['/settings', '/music', '/appSettings', '/profile', '/missions', '/statistics', '/credits', '/shop', '/gacha', '/achievements', '/calendar', '/devmode'],
 };
 
 const BottomNavBar = () => {
