@@ -20,6 +20,8 @@ export type BattlePhase =
 export interface BattleQuestion {
   text: string;
   answer: string;
+  /** 時間切れで自動選出された（または白紙送信された）場合は true */
+  isTimeout?: boolean;
 }
 
 /** 回答者が送信する回答 + 送信時刻(速度判定用) */
@@ -75,6 +77,10 @@ export interface BattleRoom {
   hostJudgement: BattleJudgement | null;
   /** ゲストが下した判定 (hostAnswer に対する判定。未判定は null) */
   guestJudgement: BattleJudgement | null;
+  /** ホストが時間切れになったか（ライブラリ自動選出・白紙送信の両方で true） */
+  hostTimedOut?: boolean;
+  /** ゲストが時間切れになったか（ライブラリ自動選出・白紙送信の両方で true） */
+  guestTimedOut?: boolean;
   /** ホストの再戦希望フラグ (未定義時は false 扱い) */
   hostRematch?: boolean;
   /** ゲストの再戦希望フラグ (未定義時は false 扱い) */

@@ -32,6 +32,8 @@ export default function SettingsScreen() {
   const [hexInput, setHexInput] = useState(customColor || '');
   const [hexError, setHexError] = useState('');
   const [animationLevel, setAnimationLevel] = useState<AnimationLevel>('standard');
+  // ターミナル演出（タイピング/スクランブル/点滅/脈動）の ON/OFF。デフォルト ON。
+  const [terminalEffects, setTerminalEffects] = useState(true);
   const [dailyGoal, setDailyGoal] = useState(10);
   const [goalInput, setGoalInput] = useState('10');
   const [goalSaved, setGoalSaved] = useState(false);
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadAnimationSetting();
     loadDailyGoal();
+    loadTerminalEffects();
   }, []);
 
   const loadAnimationSetting = async () => {
@@ -50,6 +53,22 @@ export default function SettingsScreen() {
     } catch (e) {
       console.error('Failed to load animation setting:', e);
     }
+  };
+
+  const loadTerminalEffects = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEYS.TERMINAL_EFFECTS_ENABLED);
+      // 未設定時はデフォルト ON
+      setTerminalEffects(saved !== 'false');
+    } catch (e) {
+      console.error('Failed to load terminal effects setting:', e);
+    }
+  };
+
+  const handleTerminalEffectsChange = async (val: boolean) => {
+    setTerminalEffects(val);
+    await AsyncStorage.setItem(STORAGE_KEYS.TERMINAL_EFFECTS_ENABLED, val ? 'true' : 'false');
+    SoundManager.play('decide');
   };
 
   const loadDailyGoal = async () => {
@@ -247,6 +266,25 @@ export default function SettingsScreen() {
           <Switch
             value={animationLevel !== 'none'}
             onValueChange={(val) => handleAnimationLevelChange(val ? 'standard' : 'none')}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFF"
+          />
+        </View>
+
+        <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={[styles.settingLabel, { color: colors.text, fontSize: Math.round(16 * scale) }]}>
+              {ja ? 'ターミナル演出' : 'Terminal Effects'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: Math.round(11 * scale), marginTop: 2 }}>
+              {ja
+                ? 'タイピング表示・点滅・スクランブルなどの演出'
+                : 'Typing, blinking, scramble effects'}
+            </Text>
+          </View>
+          <Switch
+            value={terminalEffects}
+            onValueChange={handleTerminalEffectsChange}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFF"
           />

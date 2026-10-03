@@ -1,15 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, ActivityIndicator, Alert, Modal, StyleSheet,
+  Animated, Platform,
 } from 'react-native';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from './theme';
 import { useRoom, useRooms } from './context/RoomsContext';
 import { useAuth } from './auth/AuthContext';
+import { useQuestionsContext } from './context/QuestionsContext';
 import OpponentCard from './components/OpponentCard';
+import { convertToBattleAnswer } from './utils/questionToBattle';
 import { awardQuizCompletion, recordBattleResult } from '../src/utils/userProgress';
 import PressableButton from './components/PressableButton';
 import BackButton from './components/BackButton';
+import TypedText from './components/TypedText';
+import { useScramble } from './hooks/useScramble';
+import { useTerminalEffects } from './hooks/useTerminalEffects';
+import {
+  isDevBotModeEnabled,
+  getDevCreatingLimitSec,
+  devBotSubmitQuestion,
+  devBotSubmitAnswer,
+  devBotSubmitJudgement,
+  DEV_BOT_UID,
+  DEV_BOT_DEFAULT_QUESTION,
+  DEV_BOT_DEFAULT_ANSWER,
+  DEV_BOT_DEFAULT_RESPONSE,
+} from './utils/devBot';
 import { SoundManager } from './sound';
 import type { BattleRoom } from './types/battle';
 
@@ -19,7 +36,7 @@ import type { BattleRoom } from './types/battle';
 // useRoom(roomId) の room.status でフェーズ分岐する
 // ─────────────────────────────────────────────
 
-const CREATING_LIMIT_SEC = 60;
+const CREATING_LIMIT_SEC_DEFAULT = 60;
 /** 1回の変更でこの文字数以上増えたらペーストとみなす (手入力の閾値) */
 const PASTE_JUMP_THRESHOLD = 4;
 const CHEAT_WARNING = '不正行為は禁止です: ペーストは使用できません';
@@ -124,7 +141,7 @@ function WaitingView({ room }: { room: BattleRoom }) {
 function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const { colors, onPrimary } = useTheme();
   const { user } = useAuth();
-  const { submitQuestion } = useRooms();
+  const { submitQuestion, submitTimeout } = useRooms();
   const isHost = room.hostId === user?.uid;
   const opponentUid = getOpponentUid(room, user?.uid);
   const myQuestion = isHost ? room.hostQuestion : room.guestQuestion;
@@ -134,11 +151,39 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const [answer, setAnswer] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState(CREATING_LIMIT_SEC);
+  const [remaining, setRemaining] = useState(() => getDevCreatingLimitSec(CREATING_LIMIT_SEC_DEFAULT));
+  const [timedOutLocally, setTimedOutLocally] = useState(false);
   const sentRef = useRef(false);
   const pasteBlocker = usePasteBlocker(notifyPaste);
+  const { questions: myQuestions } = useQuestionsContext();
+  const terminalEffects = useTerminalEffects();
 
   const ready = question.trim().length > 0 && answer.trim().length > 0;
+
+  // 残り10秒以下でタイマー数字をわずかに脈動させる（強度5%・600ms周期の例外ループ）
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!terminalEffects || remaining > 10 || myQuestion) {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.08,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.0,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [remaining, myQuestion, pulseAnim, terminalEffects]);
 
   const doSubmit = async (q: string, a: string) => {
     if (sentRef.current || sending) return;
@@ -159,7 +204,39 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
     }
   };
 
-  // 60秒カウントダウン。0秒で自動送信 (未入力ならエラー表示)
+  // 時間切れ: ライブラリから1問選ぶ（あれば）。無ければ白紙送信。
+  const handleTimeout = async () => {
+    if (sentRef.current) return;
+    sentRef.current = true;
+
+    const available = myQuestions.filter((q) => q.enabled !== false);
+    const shuffled = [...available].sort(() => Math.random() - 0.5);
+    let picked: { text: string; answer: string } | undefined;
+    for (const q of shuffled) {
+      const text = q.question?.trim();
+      const answer = convertToBattleAnswer(q).trim();
+      if (text && answer) {
+        picked = { text, answer };
+        break;
+      }
+    }
+
+    setSending(true);
+    setTimedOutLocally(true);
+    try {
+      SoundManager.play('wrong');
+      await submitTimeout(roomId, picked);
+    } catch (e: any) {
+      sentRef.current = false;
+      const msg = e?.message ?? '送信に失敗しました';
+      setError(msg);
+      Alert.alert('エラー', msg);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // 60秒カウントダウン。0秒で自動送信 (未入力なら時間切れ処理)
   useEffect(() => {
     if (myQuestion) return;
     const t = setInterval(() => {
@@ -170,7 +247,8 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
             if (question.trim() && answer.trim()) {
               void doSubmit(question, answer);
             } else {
-              setError('時間切れです。問題文と正解を入力してください');
+              // 時間切れ: ライブラリ自動選出 or 白紙送信
+              void handleTimeout();
             }
           }
           return 0;
@@ -187,7 +265,23 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
       <View style={styles.phaseBox}>
         {/* 相手 = 自分がホストならゲスト / 自分がゲストならホスト (自分自身は絶対に渡さない) */}
         <OpponentCard uid={opponentUid} label={isHost ? 'ゲスト' : 'ホスト'} compact />
-        <Text style={[styles.message, { color: colors.text }]}>準備完了しました</Text>
+        {myQuestion.isTimeout ? (
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <TypedText
+              text="TIME OUT"
+              speed={40}
+              enabled={terminalEffects}
+              style={{ color: colors.warning, fontSize: 18, fontWeight: 'bold', letterSpacing: 2 }}
+            />
+            <Text style={[styles.subMessage, { color: colors.textSecondary }]}>
+              {myQuestion.text
+                ? '（時間切れ: ライブラリから自動選出しました）'
+                : '（時間切れ: 出題できませんでした）'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.message, { color: colors.text }]}>準備完了しました</Text>
+        )}
         <Text style={[styles.subMessage, { color: colors.textSecondary }]}>
           {peerReady ? '相手の準備も完了しました。まもなく回答フェーズへ進みます'
             : '相手の準備を待っています...'}
@@ -200,9 +294,17 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   return (
     <View style={styles.phaseBox}>
       <OpponentCard uid={opponentUid} label={isHost ? 'ゲスト' : 'ホスト'} compact />
-      <Text style={[styles.timer, { color: remaining <= 10 ? colors.error : colors.primary }]}>
+      <Animated.Text
+        style={[
+          styles.timer,
+          {
+            color: remaining <= 10 ? colors.error : colors.primary,
+            transform: [{ scale: pulseAnim }],
+          },
+        ]}
+      >
         残り {remaining} 秒
-      </Text>
+      </Animated.Text>
       <Text style={[styles.label, { color: colors.text }]}>問題文</Text>
       <TextInput
         value={question}
@@ -241,7 +343,12 @@ function CreatingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
         style={[styles.primaryBtn, { backgroundColor: ready && !sending ? colors.primary : colors.border }]}
       >
         {sending
-          ? <ActivityIndicator size="small" color={colors.textSecondary} />
+          ? <TypedText
+              text={timedOutLocally ? 'TIMEOUT...' : 'TRANSMITTING...'}
+              speed={50}
+              enabled={terminalEffects}
+              style={{ color: onPrimary, fontSize: 18, fontWeight: 'bold', letterSpacing: 1 }}
+            />
           : <Text style={[styles.primaryBtnText, { color: onPrimary }]}>準備完了</Text>}
       </PressableButton>
     </View>
@@ -265,6 +372,7 @@ function AnsweringView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pasteBlocker = usePasteBlocker(notifyPaste);
+  const terminalEffects = useTerminalEffects();
 
   const handleSubmit = async () => {
     if (!answer.trim() || sending) return;
@@ -331,7 +439,12 @@ function AnsweringView({ room, roomId }: { room: BattleRoom; roomId: string }) {
         }]}
       >
         {sending
-          ? <ActivityIndicator size="small" color={colors.textSecondary} />
+          ? <TypedText
+              text="TRANSMITTING..."
+              speed={50}
+              enabled={terminalEffects}
+              style={{ color: onPrimary, fontSize: 18, fontWeight: 'bold', letterSpacing: 1 }}
+            />
           : <Text style={[styles.primaryBtnText, { color: onPrimary }]}>回答する</Text>}
       </PressableButton>
     </View>
@@ -354,6 +467,33 @@ function JudgingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
 
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const terminalEffects = useTerminalEffects();
+
+  // 判定待ちのカーソル点滅（500ms周期の例外ループ）
+  const cursorOpacity = useRef(new Animated.Value(1)).current;
+  const waiting = myJudgement !== null && !peerJudgement;
+  useEffect(() => {
+    if (!terminalEffects || !waiting) {
+      cursorOpacity.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cursorOpacity, {
+          toValue: 0.2,
+          duration: 450,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(cursorOpacity, {
+          toValue: 1.0,
+          duration: 450,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [waiting, cursorOpacity, terminalEffects]);
 
   const handleJudge = async (judgement: 'correct' | 'incorrect') => {
     if (sending) return;
@@ -412,9 +552,19 @@ function JudgingView({ room, roomId }: { room: BattleRoom; roomId: string }) {
         </PressableButton>
       </View>
       {myJudgement !== null && !peerJudgement && (
-        <Text style={[styles.subMessage, { color: colors.textSecondary }]}>
-          相手の判定を待っています...
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <Text style={[styles.subMessage, { color: colors.textSecondary }]}>
+            相手の判定を待っています
+          </Text>
+          <Animated.Text
+            style={[
+              { color: colors.primary, fontFamily: 'monospace', fontSize: 14, fontWeight: 'bold' },
+              { opacity: cursorOpacity },
+            ]}
+          >
+            █
+          </Animated.Text>
+        </View>
       )}
     </View>
   );
@@ -437,6 +587,12 @@ function formatSubmitTime(t: { toMillis?: () => number } | null | undefined): st
 
 /** 勝敗: 両正解→早い方 / 片方のみ正解→その人 / 両不正解→引分 */
 function decideOutcome(room: BattleRoom, isHost: boolean): 'win' | 'lose' | 'draw' {
+  // 時間切れで白紙送信された側は自動敗北
+  const hostBlank = (room.hostTimedOut ?? false) && (!room.hostQuestion || !room.hostQuestion.text.trim());
+  const guestBlank = (room.guestTimedOut ?? false) && (!room.guestQuestion || !room.guestQuestion.text.trim());
+  if (hostBlank && !guestBlank) return isHost ? 'lose' : 'win';
+  if (!hostBlank && guestBlank) return isHost ? 'win' : 'lose';
+  if (hostBlank && guestBlank) return 'draw';
   // hostJudgement = guestAnswer への判定 / guestJudgement = hostAnswer への判定
   const hostCorrect = room.guestJudgement === 'correct';
   const guestCorrect = room.hostJudgement === 'correct';
@@ -459,6 +615,7 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const { colors, onPrimary } = useTheme();
   const { user } = useAuth();
   const { requestRematch, cancelRematch } = useRooms();
+  const terminalEffects = useTerminalEffects();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rewardText, setRewardText] = useState<string | null>(null);
@@ -477,6 +634,24 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const headline = outcome === 'win' ? '勝利' : outcome === 'lose' ? '敗北' : '引き分け';
   const headlineColor = outcome === 'win' ? colors.success
     : outcome === 'lose' ? colors.error : colors.warning;
+
+  // 勝敗表示のスクランブル（700ms で確定）
+  const scrambledHeadline = useScramble(headline, {
+    duration: 700,
+    interval: 40,
+    enabled: terminalEffects,
+  });
+
+  // マウント時に勝敗に応じたSEを1回だけ再生する
+  const soundFiredRef = useRef(false);
+  useEffect(() => {
+    if (soundFiredRef.current) return;
+    soundFiredRef.current = true;
+    if (outcome === 'win') SoundManager.play('correct');
+    else if (outcome === 'lose') SoundManager.play('wrong');
+    else SoundManager.play('decide');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 両者同意で新ルームへ自動遷移
   useEffect(() => {
@@ -503,28 +678,41 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
       // noop
     }
     const correctCount = myCorrect ? 1 : 0;
-    const bonusXP = outcome === 'win' ? 50 : outcome === 'draw' ? 20 : 10;
-    const bonusCoins = outcome === 'win' ? 30 : outcome === 'draw' ? 10 : 5;
-    void awardQuizCompletion(uid, {
-      correctCount,
-      questionCount: 1,
-      bonusXP,
-      bonusCoins,
-    })
-      .then((result) => {
+    // 時間切れ: 0.5× / 非時間切れ: 1.5×
+    const myTimedOut = isHost ? (room.hostTimedOut ?? false) : (room.guestTimedOut ?? false);
+    const multiplier = myTimedOut ? 0.5 : 1.5;
+    const baseXP = outcome === 'win' ? 50 : outcome === 'draw' ? 20 : 10;
+    const baseCoins = outcome === 'win' ? 30 : outcome === 'draw' ? 10 : 5;
+    const bonusXP = Math.round(baseXP * multiplier);
+    const bonusCoins = Math.round(baseCoins * multiplier);
+    void (async () => {
+      // まず報酬付与（XP/コイン）を完了させる
+      try {
+        const result = await awardQuizCompletion(uid, {
+          correctCount,
+          questionCount: 1,
+          bonusXP,
+          bonusCoins,
+        });
         const levelText = result.leveledUp > 0 ? ` / Lv.UP! Lv.${result.document.level}` : '';
-        setRewardText(`報酬: +${bonusCoins}コイン / +${bonusXP}XP${levelText}`);
-      })
-      .catch((e) => console.warn('battle reward failed:', e));
+        const multiplierLabel = myTimedOut
+          ? ' (×0.5 時間切れ)'
+          : ' (×1.5 ボーナス)';
+        setRewardText(`報酬: +${bonusCoins}コイン / +${bonusXP}XP${multiplierLabel}${levelText}`);
+      } catch (e) {
+        console.warn('battle reward failed:', e);
+      }
 
-    // 対戦戦績 (対戦数/勝敗/引分) をインクリメント (重複加算防止は上記キーで担保)
-    void recordBattleResult(uid, outcome)
-      .then((stats) => {
+      // 報酬の完了を待ってから戦績を記録する（Firestore トランザクション競合の回避）
+      try {
+        const stats = await recordBattleResult(uid, outcome);
         if (stats) {
           setStatsText(`戦績: ${stats.totalBattles}戦 ${stats.wins}勝 ${stats.losses}敗 ${stats.draws}分`);
         }
-      })
-      .catch((e) => console.warn('battle stats update failed:', e));
+      } catch (e) {
+        console.warn('battle stats update failed:', e);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
@@ -558,7 +746,16 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
 
   return (
     <View style={styles.phaseBox}>
-      <Text style={[styles.resultHeadline, { color: headlineColor }]}>{headline}</Text>
+      <Text style={[styles.resultHeadline, { color: headlineColor }]}>{scrambledHeadline}</Text>
+      {(() => {
+        const peerTimedOut = isHost ? (room.guestTimedOut ?? false) : (room.hostTimedOut ?? false);
+        if (!peerTimedOut) return null;
+        return (
+          <Text style={[styles.subMessage, { color: colors.warning }]}>
+            相手は時間切れでした
+          </Text>
+        );
+      })()}
       <OpponentCard uid={opponentUid} label={isHost ? 'ゲスト' : 'ホスト'} />
       {rewardText ? (
         <Text style={[styles.toast, { color: colors.success }]}>{rewardText}</Text>
@@ -586,7 +783,7 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
       }]}>
         <Text style={[styles.answerLabel, { color: colors.textSecondary }]}>【出題された問題】</Text>
         <Text style={[styles.quoteText, { color: colors.text }]}>
-          {myQuestion?.text ?? '(問題データがありません)'}
+          {myQuestion?.text || '(相手は時間切れで出題できませんでした)'}
         </Text>
         <Text style={[styles.answerLabel, { color: colors.textSecondary }]}>
           あなたの回答: {myAnswerText}
@@ -677,6 +874,53 @@ export default function BattleScreen() {
   const uidRef = useRef<string | null>(null);
   useEffect(() => { roomRef.current = room; }, [room]);
   useEffect(() => { uidRef.current = user?.uid ?? null; }, [user]);
+
+  // 開発用 Bot: ユーザーがホストで、ゲストが dev-bot のとき自動応答する
+  const devBotEnabled = isDevBotModeEnabled();
+  useEffect(() => {
+    if (!devBotEnabled || !room || !user || !roomId) return;
+    if (room.hostId !== user.uid) return;
+    if (room.guestId !== DEV_BOT_UID) return;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const DELAY = 2000;
+
+    if (room.status === 'creating' && room.guestQuestion === null) {
+      timers.push(setTimeout(() => {
+        void devBotSubmitQuestion(roomId, DEV_BOT_DEFAULT_QUESTION, DEV_BOT_DEFAULT_ANSWER)
+          .catch((e) => console.warn('devBot question failed:', e));
+      }, DELAY));
+    }
+
+    if (room.status === 'answering' && room.guestAnswer === null) {
+      timers.push(setTimeout(() => {
+        void devBotSubmitAnswer(roomId, DEV_BOT_DEFAULT_RESPONSE)
+          .catch((e) => console.warn('devBot answer failed:', e));
+      }, DELAY));
+    }
+
+    if (room.status === 'judging' && room.guestJudgement === null) {
+      timers.push(setTimeout(() => {
+        void devBotSubmitJudgement(roomId, 'correct')
+          .catch((e) => console.warn('devBot judgement failed:', e));
+      }, DELAY));
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [
+    devBotEnabled,
+    room?.status,
+    room?.hostId,
+    room?.guestId,
+    room?.hostQuestion,
+    room?.guestQuestion,
+    room?.hostAnswer,
+    room?.guestAnswer,
+    room?.hostJudgement,
+    room?.guestJudgement,
+    user?.uid,
+    roomId,
+  ]);
 
   // unmount時の自動退出 (finished / abandoned は除外、best-effort)
   useEffect(() => {

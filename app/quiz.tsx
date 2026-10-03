@@ -18,6 +18,7 @@ import { recordQuizAnswers, recordQuizStat, consumeQuickQuizCountCache } from '.
 import { translations } from './translations';
 import { useLocale } from './hooks/useLocale';
 import { useResponsive } from './hooks/useResponsive';
+import { useTerminalEffects } from './hooks/useTerminalEffects';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
@@ -100,6 +101,7 @@ export default function QuizScreen() {
   const location = useLocation();
   const { colors, onPrimary, isCyberpunk, currentTheme, br } = useTheme();
   const screenType = useResponsive();
+  const terminalEffects = useTerminalEffects();
   const locale = useLocale();
   const t = translations[locale];
     const { questions: allQuestionsFromHook, folders, loading: questionsLoading } = useQuestionsContext();
@@ -248,6 +250,57 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // ○×ボタンのバネアニメーション
   const trueBtnAnim = useRef(new Animated.Value(0)).current;
   const falseBtnAnim = useRef(new Animated.Value(0)).current;
+
+  // 残り60秒以下の脈動（battle の残り10秒と同じ強度・同じ言語）
+  // 制限時間が60秒以下の場合は、制限時間の半分を閾値にする（極端に短い設定への配慮）
+  const timerPulseAnim = useRef(new Animated.Value(1)).current;
+  // 進捗バーの幅遷移用（300ms のスムーズな伸び）
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
+  useEffect(() => {
+    const safeLimit = Number.isFinite(timerLimit) && timerLimit > 0 ? timerLimit : 0;
+    const threshold = safeLimit > 120 ? 60 : Math.floor(safeLimit * 0.5);
+    const shouldPulse =
+      terminalEffects &&
+      isTimerActive &&
+      preTimerMinutes !== null &&
+      timeLeft > 0 &&
+      threshold > 0 &&
+      timeLeft <= threshold;
+    if (!shouldPulse) {
+      timerPulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(timerPulseAnim, {
+          toValue: 1.08,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(timerPulseAnim, {
+          toValue: 1.0,
+          duration: 400,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [terminalEffects, isTimerActive, preTimerMinutes, timerLimit, timeLeft, timerPulseAnim]);
+
+  // 進捗バーをスムーズに伸ばす（演出OFF時は即時反映）
+  useEffect(() => {
+    if (!terminalEffects) {
+      progressAnim.setValue(progressPercent);
+      return;
+    }
+    Animated.timing(progressAnim, {
+      toValue: progressPercent,
+      duration: 300,
+      useNativeDriver: false, // width は nativeDriver 非対応（Web では情報警告のみ）
+    }).start();
+  }, [progressPercent, terminalEffects, progressAnim]);
 
   const animateButton = (anim: Animated.Value, toValue: number) => {
     Animated.spring(anim, {
@@ -1243,7 +1296,6 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   };
 
   const timerColor = timeLeft > timerLimit * 0.4 ? colors.success : timeLeft > timerLimit * 0.2 ? colors.warning : colors.error;
-  const progressPercent = shuffledQuestions.length > 0 ? Math.round(((currentIndex) / shuffledQuestions.length) * 100) : 0;
   const timeMin = Math.floor(timeLeft / 60);
   const timeSec = timeLeft % 60;
 
@@ -1397,30 +1449,39 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             </View>
           )}
 
-          {/* 制限時間の設定（/timer へ誘導。タイマー設定は createHub からではなくここから開く） */}
-          <PressableButton
-            style={[{
-              backgroundColor: colors.card,
-              borderRadius: br,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: 12,
-              marginBottom: 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }]}
-            onPress={() => { SoundManager.play('decide'); navigate('/timer'); }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }}>
-              制限時間: {preTimerMinutes === null
-                ? (locale === 'ja' ? 'なし' : 'No limit')
-                : `${preTimerMinutes}${locale === 'ja' ? '分' : ' min'}`}
+          {/* 制限時間の設定（/timer へ誘導） */}
+          <View style={{
+            backgroundColor: colors.card,
+            borderRadius: br,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: 12,
+            marginBottom: 8,
+          }}>
+            <PressableButton
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+              onPress={() => { SoundManager.play('decide'); navigate('/timer'); }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.text }}>
+                制限時間: {preTimerMinutes === null
+                  ? (locale === 'ja' ? 'なし' : 'No limit')
+                  : `${preTimerMinutes}${locale === 'ja' ? '分' : ' min'}`}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>
+                {locale === 'ja' ? '変更 →' : 'Change →'}
+              </Text>
+            </PressableButton>
+            {/* 問題数に応じた推奨時間の目安（1問あたり60秒を標準とする） */}
+            <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6, lineHeight: 16 }}>
+              {locale === 'ja'
+                ? `目安: ${preQuestionCount}問 → ${Math.round(preQuestionCount * 0.5)}〜${Math.round(preQuestionCount * 1.5)}分（1問あたり30〜90秒）`
+                : `Guide: ${preQuestionCount}Q → ${Math.round(preQuestionCount * 0.5)}-${Math.round(preQuestionCount * 1.5)} min (30-90s per Q)`}
             </Text>
-            <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>
-              {locale === 'ja' ? '変更 →' : 'Change →'}
-            </Text>
-          </PressableButton>
+          </View>
 
           <View style={[{ backgroundColor: colors.card, borderRadius: br, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1720,14 +1781,19 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
     <View style={[styles.quizContainer, { backgroundColor: colors.background, flex: 1 }]}>
       {!autoPlayMode && (
         <View style={[styles.topBar, { gap: topBarMetrics.gap }]}>
-          <Text
+          <Animated.Text
             style={[
               styles.timer,
-              { color: timerColor, letterSpacing: 1, fontSize: topBarMetrics.timerFontSize },
+              {
+                color: timerColor,
+                letterSpacing: 1,
+                fontSize: topBarMetrics.timerFontSize,
+                transform: [{ scale: timerPulseAnim }],
+              },
             ]}
           >
             制限時間: {preTimerMinutes === null ? (locale === 'ja' ? 'なし' : 'No limit') : `${timeMin}:${String(timeSec).padStart(2, '0')}`}
-          </Text>
+          </Animated.Text>
 
           <Pressable
             style={({ pressed }) => [
@@ -1778,7 +1844,19 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
       <View style={styles.progressArea}>
         <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-          <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
+          <Animated.View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%'],
+                      extrapolate: 'clamp',
+                    }),
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              />
         </View>
         {!autoPlayMode && (
           <View style={styles.progressMetaRow}>

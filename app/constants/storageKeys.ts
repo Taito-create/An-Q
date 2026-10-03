@@ -87,6 +87,14 @@ export const STORAGE_KEYS = {
   // 問題管理画面の表示モード
   BROWSE_DISPLAY_MODE: 'browse_display_mode',
 
+  // ターミナル風演出のON/OFF（タイピング/スクランブル/点滅/脈動）
+  TERMINAL_EFFECTS_ENABLED: 'terminal_effects_enabled',
+
+  // 開発用: Bot 対戦モードの ON/OFF（localhost のみ有効）
+  DEV_BATTLE_BOT: 'dev_battle_bot',
+  // 開発用: 問題作成フェーズの制限時間（秒）上書き（localhost のみ有効）
+  DEV_CREATING_LIMIT_SEC: 'dev_creating_limit_sec',
+
   // マイグレーション
   DB_VERSION: 'db_version',
 } as const;

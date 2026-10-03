@@ -11,7 +11,7 @@ import {
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { BATTLE_ROOMS_COLLECTION } from '../types/battle';
-import type { BattleJudgement, BattleRoom } from '../types/battle';
+import type { BattleJudgement, BattleQuestion, BattleRoom } from '../types/battle';
 
 // ─────────────────────────────────────────────
 // RoomsContext: リアルタイム対戦ルームの操作 + 購読
@@ -24,6 +24,10 @@ interface RoomsContextType {
   createRoom: () => Promise<string>;
   joinRoom: (roomId: string) => Promise<void>;
   submitQuestion: (roomId: string, question: string, answer: string) => Promise<void>;
+  submitTimeout: (
+    roomId: string,
+    pickedQuestion?: { text: string; answer: string },
+  ) => Promise<void>;
   submitAnswer: (roomId: string, answer: string) => Promise<void>;
   submitJudgement: (roomId: string, judgement: BattleJudgement) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
@@ -63,6 +67,8 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       guestAnswer: null,
       hostJudgement: null,
       guestJudgement: null,
+      hostTimedOut: false,
+      guestTimedOut: false,
     });
     return ref.id;
   }, [user]);
@@ -103,7 +109,57 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const other = role === 'host' ? room.guestQuestion : room.hostQuestion;
         tx.update(roomRef, { [field]: { text: question, answer } });
         if (other !== null && room.status === 'creating') {
-          tx.update(roomRef, { status: 'answering', timerStartAt: serverTimestamp() });
+          // 両者 ready。どちらかが空（時間切れの白紙）なら answering をスキップして finished へ
+          const bothReal = question.trim().length > 0 && other.text.trim().length > 0;
+          if (bothReal) {
+            tx.update(roomRef, { status: 'answering', timerStartAt: serverTimestamp() });
+          } else {
+            tx.update(roomRef, { status: 'finished' });
+          }
+        }
+      });
+    },
+    [user],
+  );
+
+  // ── 時間切れ時の送信 ──
+  // pickedQuestion があればライブラリからの自動選出として登録し、
+  // 無ければ白紙送信として扱う。どちらの場合も hostTimedOut / guestTimedOut を立てる。
+  // 相手も登録済みなら。両者とも問題のときだけ answering へ進む。
+  // うち一方でも白紙なら answering をスキップして finished へ直行する。
+  const submitTimeout = useCallback(
+    async (
+      roomId: string,
+      pickedQuestion?: { text: string; answer: string },
+    ): Promise<void> => {
+      const uid = requireUid();
+      const roomRef = doc(db, BATTLE_ROOMS_COLLECTION, roomId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(roomRef);
+        if (!snap.exists()) throw new Error('ルームが存在しません');
+        const room = { id: snap.id, ...(snap.data() as Omit<BattleRoom, 'id'>) };
+        const role = resolveRole(room, uid);
+        const questionField = role === 'host' ? 'hostQuestion' : 'guestQuestion';
+        const timeoutField = role === 'host' ? 'hostTimedOut' : 'guestTimedOut';
+        const otherQuestion = role === 'host' ? room.guestQuestion : room.hostQuestion;
+
+        const questionObj: BattleQuestion = pickedQuestion
+          ? { text: pickedQuestion.text, answer: pickedQuestion.answer, isTimeout: true }
+          : { text: '', answer: '', isTimeout: true };
+
+        tx.update(roomRef, {
+          [timeoutField]: true,
+          [questionField]: questionObj,
+        });
+
+        if (otherQuestion !== null && room.status === 'creating') {
+          const bothReal =
+            questionObj.text.trim().length > 0 && otherQuestion.text.trim().length > 0;
+          if (bothReal) {
+            tx.update(roomRef, { status: 'answering', timerStartAt: serverTimestamp() });
+          } else {
+            tx.update(roomRef, { status: 'finished' });
+          }
         }
       });
     },
@@ -217,6 +273,8 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           guestAnswer: null,
           hostJudgement: null,
           guestJudgement: null,
+          hostTimedOut: false,
+          guestTimedOut: false,
           hostRematch: false,
           guestRematch: false,
           rematchRoomId: null,
@@ -255,6 +313,7 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     createRoom,
     joinRoom,
     submitQuestion,
+    submitTimeout,
     submitAnswer,
     submitJudgement,
     leaveRoom,
