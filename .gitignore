@@ -1,5 +1,5 @@
 .vercel
 .env*.local
 node_modules/
-voice-server/voice-cache/
+voice-server/voice-cache*/
 dist/
