@@ -623,6 +623,9 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const isHost = room.hostId === user?.uid;
   const opponentUid = getOpponentUid(room, user?.uid);
   const outcome = decideOutcome(room, isHost);
+  // 開発用 Bot との対戦では再戦（両者同意の成立待ち）が成立しないため非表示
+  const isDevBotMatch = room.guestId === DEV_BOT_UID
+    || room.hostId === DEV_BOT_UID;
 
   const myCorrect = isHost ? room.guestJudgement === 'correct' : room.hostJudgement === 'correct';
   const peerCorrect = isHost ? room.hostJudgement === 'correct' : room.guestJudgement === 'correct';
@@ -801,24 +804,30 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
       >
         <Text style={[styles.primaryBtnText, { color: onPrimary }]}>ホームに戻る</Text>
       </PressableButton>
-      {peerWant && !myWant ? (
-        <Text style={[styles.message, { color: colors.warning }]}>相手が再戦を希望しています</Text>
-      ) : null}
-      {myWant && !room.rematchRoomId ? (
-        <Text style={[styles.message, { color: colors.textSecondary }]}>相手の応答を待っています...</Text>
-      ) : null}
+      {!isDevBotMatch && (
+        <>
+          {peerWant && !myWant ? (
+            <Text style={[styles.message, { color: colors.warning }]}>相手が再戦を希望しています</Text>
+          ) : null}
+          {myWant && !room.rematchRoomId ? (
+            <Text style={[styles.message, { color: colors.textSecondary }]}>相手の応答を待っています...</Text>
+          ) : null}
+        </>
+      )}
       {error ? <Text style={[styles.error, { color: colors.error }]}>{error}</Text> : null}
-      <PressableButton
-        onPress={() => void handleRequest()}
-        disabled={myWant || sending}
-        style={[styles.secondaryBtn, { borderColor: colors.border, opacity: myWant || sending ? 0.5 : 1 }]}
-      >
-        {sending
-          ? <ActivityIndicator size="small" color={colors.textSecondary} />
-          : <Text style={[styles.secondaryBtnText, { color: colors.text }]}>
-              {peerWant ? '再戦する' : myWant ? '申込中...' : '再戦を申し込む'}
-            </Text>}
-      </PressableButton>
+      {!isDevBotMatch && (
+        <PressableButton
+          onPress={() => void handleRequest()}
+          disabled={myWant || sending}
+          style={[styles.secondaryBtn, { borderColor: colors.border, opacity: myWant || sending ? 0.5 : 1 }]}
+        >
+          {sending
+            ? <ActivityIndicator size="small" color={colors.textSecondary} />
+            : <Text style={[styles.secondaryBtnText, { color: colors.text }]}>
+                {peerWant ? '再戦する' : myWant ? '申込中...' : '再戦を申し込む'}
+              </Text>}
+        </PressableButton>
+      )}
       <PressableButton
         onPress={() => void handleCancel()}
         style={[styles.secondaryBtn, { borderColor: colors.border }]}
