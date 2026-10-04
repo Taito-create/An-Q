@@ -13,8 +13,8 @@ import { Question, Folder, ImageAnnotation } from './types/question';
 import { getAnswerText, showAnswerAlert, getAnswerGroups, normalizeMultipleChoice } from './utils/answerUtils';
 import { uploadImageToCloudinary } from '../src/utils/userProgress';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speechUtils';
-import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
+import { speak as speakText, stopSpeech } from './utils/speechUtils';
+import { Trash2, Folder as FolderIcon, Share2, Volume2, Tag, X } from 'lucide-react';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
 import { getSrsStatus } from './utils/srs';
@@ -116,6 +116,10 @@ export default function BrowseQuestionsScreen() {
   // 回答表示用 state
   const [showAnswerId, setShowAnswerId] = useState<number | null>(null);
   const [showFolderAnswerId, setShowFolderAnswerId] = useState<number | null>(null);
+  // 読み上げ丸ボタンの再生中問題ID
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
+  // 画像拡大モーダル表示中の問題ID
+  const [showImageId, setShowImageId] = useState<number | null>(null);
 
   // アコーディオン用 state
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
@@ -175,11 +179,6 @@ export default function BrowseQuestionsScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuestionFull, setEditingQuestionFull] = useState<Question | null>(null);
 
-  // 共有用 state
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareTarget, setShareTarget] = useState<Question | Folder | null>(null);
-  const [shareEmail, setShareEmail] = useState('');
-  const [isSharing, setIsSharing] = useState(false);
   const [editQuestionText, setEditQuestionText] = useState('');
   const [editAnswerGroups, setEditAnswerGroups] = useState<string[][]>([['']]);
   const [editTrueFalseAnswer, setEditTrueFalseAnswer] = useState(true);
@@ -376,50 +375,22 @@ export default function BrowseQuestionsScreen() {
     Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました' : 'Tags updated');
   };
 
-  const openShareModal = (item: Question | Folder) => {
-    setShareTarget(item);
-    setShareEmail('');
-    setShowShareModal(true);
-  };
-
-  const handleShare = async () => {
-    if (!shareTarget || !shareEmail.trim()) return;
-
-    setIsSharing(true);
+  // 問題の読み上げ（同じ問題を再タップで停止）
+  const handleSpeak = async (item: Question) => {
+    if (speakingId === item.id) {
+      stopSpeech();
+      setSpeakingId(null);
+      return;
+    }
+    SoundManager.play('decide');
+    setSpeakingId(item.id);
     try {
-      const targetUid = shareEmail.trim();
-
-      if ('question' in shareTarget) {
-        // Question の場合
-        const updatedQuestion = {
-          ...shareTarget,
-          sharedWith: [...new Set([...(shareTarget.sharedWith || []), targetUid])]
-        };
-        await updateQuestion(updatedQuestion);
-      } else {
-        // Folder の場合
-        const updatedFolder = {
-          ...shareTarget,
-          sharedWith: [...new Set([...(shareTarget.sharedWith || []), targetUid])]
-        };
-        await updateFolder(updatedFolder);
-      }
-
-      Alert.alert(
-        locale === 'ja' ? '成功' : 'Success',
-        locale === 'ja' ? '共有しました！' : 'Shared successfully!'
-      );
-      setShowShareModal(false);
-      setShareEmail('');
-      setShareTarget(null);
-    } catch (error) {
-      console.error('Share error:', error);
-      Alert.alert(
-        locale === 'ja' ? 'エラー' : 'Error',
-        locale === 'ja' ? '共有に失敗しました' : 'Failed to share'
-      );
+      const textToSpeak = item.reading || item.question;
+      await speakText(textToSpeak);
+    } catch (e) {
+      console.warn('speak failed:', e);
     } finally {
-      setIsSharing(false);
+      setSpeakingId(null);
     }
   };
 
@@ -897,6 +868,23 @@ export default function BrowseQuestionsScreen() {
                     </View>
                   </PressableButton>
                   <View style={styles.cardHeaderRight}>
+                    <PressableButton
+                      style={[{
+                        width: 36, height: 36, borderRadius: 18,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: speakingId === item.id ? colors.primary : colors.primary + '20',
+                        borderWidth: 1,
+                        borderColor: colors.primary + '40',
+                      }]}
+                      onPress={() => handleSpeak(item)}
+                      title={locale === 'ja' ? '問題を読み上げ' : 'Read aloud'}
+                      minTouchTarget={false}
+                    >
+                      <Volume2
+                        size={18}
+                        color={speakingId === item.id ? onPrimary : colors.primary}
+                      />
+                    </PressableButton>
                     {(() => {
                       const status = getSrsStatus(item.srs);
                       if (!status) return null;
@@ -960,26 +948,22 @@ export default function BrowseQuestionsScreen() {
                         ))}
                       </View>
                     )}
-                    <View style={{ gap: 8 }}>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <PressableButton
-                          style={{ flex: 1 }}
-                          onPress={() => {
-                            const textToSpeak = item.reading || item.question;
-                            speakText(textToSpeak);
-                          }}
-                        >
-                          <><Volume2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.speakBtnText, { color: colors.primary }]}>読み上げ</Text></>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <PressableButton style={{ flex: 1 }} onPress={() => startEditQuestion(item)}>
+                        <Text style={[styles.answerBtnText, { color: colors.primary }]}>編集</Text>
+                      </PressableButton>
+                      {item.image && (
+                        <PressableButton style={{ flex: 1 }} onPress={() => setShowImageId(item.id)}>
+                          <Text style={[styles.answerBtnText, { color: colors.primary }]}>
+                            {locale === 'ja' ? '画像を表示' : 'Show Image'}
+                          </Text>
                         </PressableButton>
-                        <PressableButton style={{ flex: 1 }} onPress={() => startEditQuestion(item)}><><PenSquare size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.editTagBtnText, { color: colors.primary }]}>編集</Text></></PressableButton>
-                        <PressableButton style={{ flex: 1 }} onPress={() => openShareModal(item)}><><Share2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.shareBtnText, { color: colors.primary }]}>共有</Text></></PressableButton>
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <PressableButton style={{ flex: 1 }} onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
-                          <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
-                        </PressableButton>
-                        <PressableButton style={{ flex: 1 }} onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></PressableButton>
-                      </View>
+                      )}
+                      <PressableButton style={{ flex: 1 }} onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
+                        <Text style={[styles.answerBtnText, { color: colors.primary }]}>
+                          {showAnswerId === item.id ? t.hide : t.showAnswer}
+                        </Text>
+                      </PressableButton>
                     </View>
                     {showAnswerId === item.id && (
                       <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
@@ -1764,51 +1748,40 @@ export default function BrowseQuestionsScreen() {
         </View>
       </Modal>
 
-      {/* 共有モーダル */}
-      <Modal visible={showShareModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-               {locale === 'ja' ? '共有' : 'Share'}
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
-              {locale === 'ja'
-                ? '共有する相手のユーザーIDを入力してください'
-                : 'Enter the UID of the user to share with'}
-            </Text>
-            <TextInput
-              style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]}
-              placeholder={locale === 'ja' ? 'ユーザーID' : 'User ID'}
-              placeholderTextColor={colors.textSecondary}
-              value={shareEmail}
-              onChangeText={setShareEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <View style={styles.modalButtons}>
-              <PressableButton
-                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
-                onPress={() => {
-                  setShowShareModal(false);
-                  setShareTarget(null);
-                  setShareEmail('');
+      {/* 画像拡大モーダル */}
+      <Modal
+        visible={showImageId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowImageId(null)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.9)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}>
+          <PressableButton
+            style={{ position: 'absolute', top: 40, right: 20, padding: 12, zIndex: 10 }}
+            onPress={() => setShowImageId(null)}
+          >
+            <X size={28} color="#fff" />
+          </PressableButton>
+          {showImageId !== null && (() => {
+            const target = questions.find(q => q.id === showImageId);
+            return target?.image ? (
+              <img
+                src={target.image}
+                alt=""
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '80%',
+                  objectFit: 'contain',
                 }}
-              >
-                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>
-                  {locale === 'ja' ? 'キャンセル' : 'Cancel'}
-                </Text>
-              </PressableButton>
-              <PressableButton
-                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
-                onPress={handleShare}
-                disabled={isSharing || !shareEmail.trim()}
-              >
-                <Text style={styles.modalSaveText}>
-                  {isSharing ? <Loader2 size={16} color="#fff" /> : (locale === 'ja' ? '共有' : 'Share')}
-                </Text>
-              </PressableButton>
-            </View>
-          </View>
+              />
+            ) : null;
+          })()}
         </View>
       </Modal>
 
