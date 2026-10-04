@@ -20,6 +20,7 @@ import { useLocale } from './hooks/useLocale';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
 import { useQuestionsContext } from './context/QuestionsContext';
+import { updateSrsState } from './utils/srs';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
@@ -104,7 +105,7 @@ export default function QuizScreen() {
   const terminalEffects = useTerminalEffects();
   const locale = useLocale();
   const t = translations[locale];
-    const { questions: allQuestionsFromHook, folders, loading: questionsLoading } = useQuestionsContext();
+    const { questions: allQuestionsFromHook, folders, loading: questionsLoading, applyQuestionsChange } = useQuestionsContext();
   const { user } = useAuth();
   const screenWidth = Dimensions.get('window').width;
 
@@ -1172,6 +1173,20 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       score: finalScore,
       timestamp: Date.now()
     }));
+
+    // SRS（間隔反復学習）: 回答済みの問題の学習状態を更新する
+// ※ 失敗してもクイズ結果画面は表示するため try/catch で囲む
+    try {
+      await applyQuestionsChange(current =>
+        current.map(q => {
+          const result = finalResults.find(r => r.questionId === q.id);
+          if (!result) return q; // 出題されていない問題は変更しない
+          return { ...q, srs: updateSrsState(q.srs, result.isCorrect) };
+        })
+      );
+    } catch (e) {
+      console.warn('SRS update failed:', e);
+    }
 
     try {
       const answers = finalResults.map(r => ({

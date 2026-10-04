@@ -502,6 +502,16 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (q.sharedWith !== undefined) {
           sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
         }
+//  SRS（間隔反復学習）を保持
+        if (q.srs) {
+          sanitized.srs = {
+            memoryStrength: q.srs.memoryStrength,
+            nextReviewAt: q.srs.nextReviewAt,
+            lastReviewedAt: q.srs.lastReviewedAt,
+            reviewCount: q.srs.reviewCount,
+            correctStreak: q.srs.correctStreak,
+          };
+        }
         
         return sanitized;
       });
@@ -641,6 +651,16 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         //  sharedWith を保持（ACL共有用）
         if (q.sharedWith !== undefined) {
           sanitized.sharedWith = Array.isArray(q.sharedWith) ? q.sharedWith : [];
+        }
+//  SRS（間隔反復学習）を保持
+        if (q.srs) {
+          sanitized.srs = {
+            memoryStrength: q.srs.memoryStrength,
+            nextReviewAt: q.srs.nextReviewAt,
+            lastReviewedAt: q.srs.lastReviewedAt,
+            reviewCount: q.srs.reviewCount,
+            correctStreak: q.srs.correctStreak,
+          };
         }
         return sanitized;
       });
