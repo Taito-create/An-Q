@@ -107,10 +107,6 @@ export default function BrowseQuestionsScreen() {
     return luminance > 150 ? '#1A1A1A' : '#FFFFFF';
   };
 
-  // タグ編集用 state
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [editTags, setEditTags] = useState<string[]>([]);
-  const [showTagModal, setShowTagModal] = useState(false);
   // tagMasterList は Context から取得（デバイス間同期対応）
 
   // 回答表示用 state
@@ -178,6 +174,12 @@ export default function BrowseQuestionsScreen() {
   // 問題編集用 state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuestionFull, setEditingQuestionFull] = useState<Question | null>(null);
+  // 編集モーダルで選択中の回答形式
+  const [editAnswerType, setEditAnswerType] = useState<'descriptive' | 'truefalse' | 'multiple'>('descriptive');
+  // 編集モーダルで選択中のタグ
+  const [editTags, setEditTags] = useState<string[]>([]);
+  // 編集モーダルの解説（truefalse / multiple のみ使用）
+  const [editExplanation, setEditExplanation] = useState('');
 
   const [editQuestionText, setEditQuestionText] = useState('');
   const [editAnswerGroups, setEditAnswerGroups] = useState<string[][]>([['']]);
@@ -355,26 +357,6 @@ export default function BrowseQuestionsScreen() {
     }
   };
 
-  const startEditTags = (question: Question) => {
-    setEditingQuestion(question);
-    setEditTags(question.tags || []);
-    // tagMasterList は Context から取得済み（ロード不要）
-    setShowTagModal(true);
-  };
-
-  const saveEditedTags = async () => {
-    if (!editingQuestion) return;
-    const updatedQuestion = { ...editingQuestion, tags: editTags };
-    await updateQuestion(updatedQuestion);
-    setShowTagModal(false);
-    setEditingQuestion(null);
-    if (selectedFilterTag && !editTags.includes(selectedFilterTag)) {
-      setSelectedFilterTag(null);
-    }
-    SoundManager.play('complete');
-    Alert.alert(t.success, locale === 'ja' ? 'タグを更新しました' : 'Tags updated');
-  };
-
   // 問題の読み上げ（同じ問題を再タップで停止）
   const handleSpeak = async (item: Question) => {
     if (speakingId === item.id) {
@@ -398,6 +380,9 @@ export default function BrowseQuestionsScreen() {
     
     setEditingQuestionFull(question);
     setEditQuestionText(question.question || '');
+    setEditAnswerType(question.answerType);
+    setEditTags(question.tags || []);
+    setEditExplanation(question.explanation || '');
     
     if (question.answerType === 'descriptive') {
       // Safely get answer groups
@@ -448,17 +433,32 @@ export default function BrowseQuestionsScreen() {
   const saveEditedQuestion = async () => {
     if (!editingQuestionFull || !editQuestionText.trim()) return;
 
-    let updatedDescriptiveAnswerGroups = editingQuestionFull.descriptiveAnswerGroups;
-    let updatedDescriptiveAnswer = editingQuestionFull.descriptiveAnswer;
-    let updatedMatchMode = editingQuestionFull.matchMode;
-    if (editingQuestionFull.answerType === 'descriptive') {
+    // 選択中の回答形式に応じて、不要なフィールドは undefined にする
+    let updatedDescriptiveAnswerGroups: string[][] | undefined;
+    let updatedDescriptiveAnswer: string | string[] | undefined;
+    let updatedMatchMode: 'any' | 'all' | undefined;
+    let updatedTrueFalseAnswer: boolean | undefined;
+    let updatedMultipleChoice: Question['multipleChoice'];
+
+    if (editAnswerType === 'descriptive') {
       const cleanedGroups = editAnswerGroups
         .map(group => group.map(a => a.trim()).filter(Boolean))
         .filter(group => group.length > 0);
       updatedDescriptiveAnswerGroups = cleanedGroups.length > 0 ? cleanedGroups : undefined;
+      updatedDescriptiveAnswer = editingQuestionFull.descriptiveAnswer;
       //  descriptiveAnswer は descriptiveAnswerGroups と重複するため保存しない
       //    （Firestore でフィールド型の競合エラーを避けるため）
       updatedMatchMode = cleanedGroups.length > 1 ? 'all' : 'any';
+    } else if (editAnswerType === 'truefalse') {
+      updatedTrueFalseAnswer = editTrueFalseAnswer;
+    } else {
+      updatedMultipleChoice = {
+        options: editMultipleOptions,
+        correctAnswers: editMultipleAllowMultiple
+          ? editMultipleCorrectAnswers
+          : editMultipleCorrectAnswers.slice(0, 1),
+        allowMultiple: editMultipleAllowMultiple,
+      };
     }
 
     // 画像が Base64 の場合は Cloudinary にアップロードして URL 化する
@@ -473,22 +473,24 @@ export default function BrowseQuestionsScreen() {
       }
     }
 
+    // 編集中のタグで選択フィルタが外れた場合は解除する
+    if (selectedFilterTag && !editTags.includes(selectedFilterTag)) {
+      setSelectedFilterTag(null);
+    }
+
     const updated: Question = {
       ...editingQuestionFull,
       question: editQuestionText.trim(),
+      answerType: editAnswerType,
+      tags: editTags,
       descriptiveAnswerGroups: updatedDescriptiveAnswerGroups,
       descriptiveAnswer: updatedDescriptiveAnswer,
       matchMode: updatedMatchMode,
-      trueFalseAnswer: editingQuestionFull.answerType === 'truefalse' ? editTrueFalseAnswer : editingQuestionFull.trueFalseAnswer,
-      multipleChoice: editingQuestionFull.answerType === 'multiple'
-        ? {
-            options: editMultipleOptions,
-            correctAnswers: editMultipleAllowMultiple
-              ? editMultipleCorrectAnswers
-              : editMultipleCorrectAnswers.slice(0, 1),
-            allowMultiple: editMultipleAllowMultiple,
-          }
-        : editingQuestionFull.multipleChoice,
+      trueFalseAnswer: updatedTrueFalseAnswer,
+      multipleChoice: updatedMultipleChoice,
+      explanation: (editAnswerType === 'truefalse' || editAnswerType === 'multiple')
+        ? (editExplanation.trim() || undefined)
+        : undefined,
       image: updatedImage,
       reading: editReading.trim() || undefined,
     };
@@ -1157,7 +1159,50 @@ export default function BrowseQuestionsScreen() {
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: 'top' }]} value={editQuestionText} onChangeText={setEditQuestionText} placeholder="問題文を入力" placeholderTextColor={colors.textSecondary} multiline />
             <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6, marginTop: 12 }]}> {locale === 'ja' ? '読み仮名（任意）' : 'Reading (optional)'}</Text>
             <TextInput style={[styles.modalInput, { borderColor: colors.border, color: colors.text }]} value={editReading} onChangeText={setEditReading} placeholder={locale === 'ja' ? '例: もり おうがい' : 'e.g., mori ougai'} placeholderTextColor={colors.textSecondary} />
-{editingQuestionFull?.answerType === 'descriptive' && (
+<View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br, padding: 12, marginBottom: 16 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 14, fontWeight: 'bold', marginBottom: 10 }]}>
+                {locale === 'ja' ? '回答形式' : 'Answer Type'}
+              </Text>
+              <View style={styles.answerTypeContainer}>
+                {[
+                  { id: 'descriptive', label: t.descriptive },
+                  { id: 'truefalse', label: t.truefalse },
+                  { id: 'multiple', label: t.multiple },
+                ].map((type) => (
+                  <PressableButton
+                    key={type.id}
+                    style={[
+                      styles.answerTypeButton,
+                      {
+                        backgroundColor: colors.background,
+                        borderRadius: br,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                      },
+                      editAnswerType === type.id && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                    onPress={() => {
+                      SoundManager.play('select');
+                      setEditAnswerType(type.id as 'descriptive' | 'truefalse' | 'multiple');
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.answerTypeText,
+                        { color: colors.textSecondary },
+                        editAnswerType === type.id && { color: onPrimary },
+                      ]}
+                    >
+                      {type.label}
+                    </Text>
+                  </PressableButton>
+                ))}
+              </View>
+            </View>
+            {editAnswerType === 'descriptive' && (
   <>
     <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 6 }]}>回答</Text>
     {editAnswerGroups.map((group, groupIndex) => (
@@ -1267,7 +1312,7 @@ export default function BrowseQuestionsScreen() {
     </PressableButton>
   </>
 )}
-            {editingQuestionFull?.answerType === 'truefalse' && (
+            {editAnswerType === 'truefalse' && (
               <>
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>回答</Text>
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
@@ -1280,7 +1325,7 @@ export default function BrowseQuestionsScreen() {
                 </View>
               </>
             )}
-            {editingQuestionFull?.answerType === 'multiple' && (
+            {editAnswerType === 'multiple' && (
               <>
                 <Text style={[{ fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 8 }]}>選択肢</Text>
                 {editMultipleOptions.map((opt, i) => {
@@ -1330,101 +1375,85 @@ export default function BrowseQuestionsScreen() {
                 </View>
               </>
             )}
+            {/* 解説（truefalse / multiple のみ） */}
+            {(editAnswerType === 'truefalse' || editAnswerType === 'multiple') && (
+              <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br, padding: 12, marginBottom: 16 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 14, fontWeight: 'bold', marginBottom: 10 }]}>
+                  {locale === 'ja' ? '解説（任意）' : 'Explanation (optional)'}
+                </Text>
+                <TextInput
+                  style={[styles.modalInput, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]}
+                  value={editExplanation}
+                  onChangeText={setEditExplanation}
+                  placeholder={locale === 'ja' ? '解説を入力' : 'Enter explanation'}
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                />
+              </View>
+            )}
+            {/* タグ */}
+            {tagMasterList.length > 0 && (
+              <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br, padding: 12, marginBottom: 16 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 14, fontWeight: 'bold', marginBottom: 10 }]}>
+                  {locale === 'ja' ? 'タグ' : 'Tags'}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+                    {tagMasterList.map((tag) => {
+                      const isSelected = editTags.includes(tag);
+                      return (
+                        <PressableButton
+                          key={tag}
+                          style={[styles.tagChip, {
+                            backgroundColor: isSelected ? colors.primary : colors.primary + '20',
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          }]}
+                          onPress={() => {
+                            SoundManager.play('select');
+                            setEditTags(prev =>
+                              prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                            );
+                          }}
+                          onLongPress={() => {
+                            Alert.alert(
+                              locale === 'ja' ? 'タグを削除' : 'Delete Tag',
+                              locale === 'ja'
+                                ? `「${tag}」を全ての問題から削除しますか？`
+                                : `Delete "${tag}" from all questions?`,
+                              [
+                                { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
+                                {
+                                  text: locale === 'ja' ? '削除' : 'Delete',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    await removeTagFromAllQuestions(tag);
+                                    await removeTag(tag);
+                                    setEditTags(prev => prev.filter(t => t !== tag));
+                                    SoundManager.play('delete');
+                                  },
+                                },
+                              ]
+                            );
+                          }}
+                        >
+                          <Text style={[styles.tagChipText, {
+                            color: isSelected ? onPrimary : colors.primary,
+                            fontWeight: isSelected ? 'bold' : '500',
+                          }]}>
+                            {tag}
+                          </Text>
+                        </PressableButton>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
             <View style={styles.modalButtons}>
               <PressableButton style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => { setShowEditModal(false); setEditingQuestionFull(null); }}><Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>キャンセル</Text></PressableButton>
               <PressableButton style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]} onPress={saveEditedQuestion}><Text style={styles.modalSaveText}>保存</Text></PressableButton>
             </View>
           </ScrollView>
-        </View>
-      </Modal>
-
-      {/* タグ編集モーダル */}
-      <Modal visible={showTagModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-               {locale === 'ja' ? 'タグを選択' : 'Select Tags'}
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>
-              {locale === 'ja' ? 'タグをタップして選択/解除' : 'Tap to select/deselect tags'}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4, paddingHorizontal: 4 }}>
-                {tagMasterList.map((tag) => {
-                  const isSelected = editTags.includes(tag);
-                  return (
-                    <PressableButton
-                      key={tag}
-                      style={[
-                        styles.tagButton,
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.primary + '20',
-                          borderColor: isSelected ? colors.primary : colors.border,
-                          borderWidth: 2,
-                          borderRadius: 20,
-                          paddingHorizontal: 14,
-                          paddingVertical: 8,
-                        },
-                      ]}
-                      onPress={() => {
-                        setEditTags((prev) =>
-                          isSelected
-                            ? prev.filter((t) => t !== tag)
-                            : [...prev, tag]
-                        );
-                      }}
-                      onLongPress={() => {
-                        Alert.alert(
-                          locale === 'ja' ? 'タグを削除' : 'Delete Tag',
-                          locale === 'ja'
-                            ? `「${tag}」を全ての問題から削除しますか？`
-                            : `Delete "${tag}" from all questions?`,
-                          [
-                            { text: locale === 'ja' ? 'キャンセル' : 'Cancel', style: 'cancel' },
-                            {
-                              text: locale === 'ja' ? '削除' : 'Delete',
-                              style: 'destructive',
-                              onPress: async () => {
-                                await removeTagFromAllQuestions(tag);
-                                await removeTag(tag);
-                                setEditTags((prev) => prev.filter((t) => t !== tag));
-                                SoundManager.play('delete');
-                              },
-                            },
-                          ]
-                        );
-                      }}
-                    >
-                      <Text style={[
-                        styles.tagButtonText,
-                        {
-                          color: isSelected ? onPrimary : colors.primary,
-                          fontWeight: isSelected ? 'bold' : '500',
-                          fontSize: 13,
-                        }
-                      ]}>
-                        {isSelected ? ' ' : ''}{tag}
-                      </Text>
-                    </PressableButton>
-                  );
-                })}
-              </View>
-            </ScrollView>
-            
-            {/* 空の場合のメッセージ */}
-            {tagMasterList.length === 0 && (
-              <Text style={{ color: colors.textSecondary, textAlign: 'center', paddingVertical: 20 }}>
-                {locale === 'ja' ? 'タグがありません。問題作成画面で作成してください。' : 'No tags. Create them in the create screen.'}
-              </Text>
-            )}
-            
-            <PressableButton
-              style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
-              onPress={saveEditedTags}
-            >
-              <Text style={styles.modalSaveText}>{t.saveTags}</Text>
-            </PressableButton>
-          </View>
         </View>
       </Modal>
 
@@ -1993,6 +2022,17 @@ const styles = StyleSheet.create({
   modalListContent: { paddingHorizontal: 2, paddingBottom: 8 },
   tagButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   tagButtonText: { fontSize: 13, fontWeight: 'bold' },
+  // ── create.tsx と統一した編集モーダル用スタイル ──
+  section: { padding: 12, borderRadius: 12, borderWidth: 1 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold' },
+  answerTypeContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
+  answerTypeButton: { padding: 10, minWidth: 80, alignItems: 'center' },
+  answerTypeText: { fontWeight: 'bold', fontSize: 12 },
+  answerGroupCard: { padding: 14, borderWidth: 2, borderRadius: 12, marginBottom: 14 },
+  answerGroupHeader: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
+  answerGroupHeaderText: { fontWeight: 'bold', fontSize: 13 },
+  tagChip: { paddingHorizontal: 14, paddingVertical: 10, minHeight: 40, borderRadius: 20, borderWidth: 2, marginRight: 8 },
+  tagChipText: { fontSize: 13 },
   speakBtnText: {
     fontWeight: 'bold',
     fontSize: 13,

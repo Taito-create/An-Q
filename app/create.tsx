@@ -24,7 +24,7 @@ import { useAuth } from './auth/AuthContext';
 import { awardQuestionCreation, incrementXP, uploadImageToCloudinary } from '../src/utils/userProgress';
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
-import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare, ScanText } from 'lucide-react';
+import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare } from 'lucide-react';
 import './create.css';
 
 export default function CreateQuestionScreen() {
@@ -896,14 +896,12 @@ export default function CreateQuestionScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
           {!showCropUI && (
             <PressableButton
-              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8 }]}
               onPress={() => handleOcrExtract({ type: 'question' })}
               disabled={ocrLoading}
+              title={locale === 'ja' ? '写真や画像で入力' : 'Scan image'}
             >
-              <ScanText size={16} color={onPrimary} />
-              <Text style={{ color: onPrimary, fontWeight: '600', fontSize: 13 }}>
-                {locale === 'ja' ? '写真や画像で入力' : 'Scan image'}
-              </Text>
+              <Camera size={20} color={onPrimary} />
             </PressableButton>
           )}
         </View>
