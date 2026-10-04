@@ -17,7 +17,7 @@ import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speec
 import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
-import { getSrsFilledDots } from './utils/srs';
+import { getSrsStatus } from './utils/srs';
 import './browse.css';
 
 /**
@@ -897,16 +897,37 @@ export default function BrowseQuestionsScreen() {
                     </View>
                   </PressableButton>
                   <View style={styles.cardHeaderRight}>
-                    {item.srs && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 4 }}>
-                        <Text style={[styles.srsDots, { color: colors.primary }]}>
-                          {'●'.repeat(getSrsFilledDots(item.srs))}
-                        </Text>
-                        <Text style={[styles.srsDots, { color: colors.border }]}>
-                          {'○'.repeat(5 - getSrsFilledDots(item.srs))}
-                        </Text>
-                      </View>
-                    )}
+                    {(() => {
+                      const status = getSrsStatus(item.srs);
+                      if (!status) return null;
+                      const strength = item.srs?.memoryStrength ?? 0;
+                      const barColor = status === 'review' ? colors.error
+                        : status === 'learning' ? colors.warning
+                        : colors.success;
+                      const label = locale === 'ja'
+                        ? (status === 'review' ? '要復習' : status === 'learning' ? '学習中' : '定着')
+                        : (status === 'review' ? 'Review' : status === 'learning' ? 'Learning' : 'Stable');
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 4 }}>
+                          <View style={{
+                            width: 60,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: colors.border,
+                            overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              width: `${strength}%`,
+                              height: '100%',
+                              backgroundColor: barColor,
+                            }} />
+                          </View>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: barColor }} numberOfLines={1}>
+                            {label}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                     {item.image && (
                       <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
                         <img src={item.image} alt='' className='browse-thumbnail' />
@@ -939,21 +960,26 @@ export default function BrowseQuestionsScreen() {
                         ))}
                       </View>
                     )}
-                    <View style={styles.cardActions}>
-                      <PressableButton
-                        onPress={() => {
-                          const textToSpeak = item.reading || item.question;
-                          speakText(textToSpeak);
-                        }}
-                      >
-                        <><Volume2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.speakBtnText, { color: colors.primary }]}>読み上げ</Text></>
-                      </PressableButton>
-                      <PressableButton onPress={() => startEditQuestion(item)}><><PenSquare size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.editTagBtnText, { color: colors.primary }]}>編集</Text></></PressableButton>
-                      <PressableButton onPress={() => openShareModal(item)}><><Share2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.shareBtnText, { color: colors.primary }]}>共有</Text></></PressableButton>
-                      <PressableButton onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
-                        <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
-                      </PressableButton>
-                      <PressableButton onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></PressableButton>
+                    <View style={{ gap: 8 }}>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <PressableButton
+                          style={{ flex: 1 }}
+                          onPress={() => {
+                            const textToSpeak = item.reading || item.question;
+                            speakText(textToSpeak);
+                          }}
+                        >
+                          <><Volume2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.speakBtnText, { color: colors.primary }]}>読み上げ</Text></>
+                        </PressableButton>
+                        <PressableButton style={{ flex: 1 }} onPress={() => startEditQuestion(item)}><><PenSquare size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.editTagBtnText, { color: colors.primary }]}>編集</Text></></PressableButton>
+                        <PressableButton style={{ flex: 1 }} onPress={() => openShareModal(item)}><><Share2 size={14} color={colors.primary} style={{ marginRight: 4 }} /><Text style={[styles.shareBtnText, { color: colors.primary }]}>共有</Text></></PressableButton>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <PressableButton style={{ flex: 1 }} onPress={() => { setShowAnswerId(showAnswerId === item.id ? null : item.id); }}>
+                          <Text style={[styles.answerBtnText, { color: colors.primary }]}>{showAnswerId === item.id ? t.hide : t.showAnswer}</Text>
+                        </PressableButton>
+                        <PressableButton style={{ flex: 1 }} onPress={() => startEditTags(item)}><Text style={[styles.editTagBtnText, { color: colors.primary }]}>{t.editTags}</Text></PressableButton>
+                      </View>
                     </View>
                     {showAnswerId === item.id && (
                       <View style={[styles.answerBox, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
@@ -1874,7 +1900,6 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  srsDots: { fontSize: 12, letterSpacing: 1.5, lineHeight: 16 },
   headerDeleteBtn: { padding: 6, borderRadius: 20 },
   headerDeleteBtnText: { fontSize: 18 },
   // 問題管理画面「簡易モード」のカード（問題＋答えの2行のみ）
@@ -1895,7 +1920,6 @@ const styles = StyleSheet.create({
   expandedContent: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#eee', gap: 12 },
   fullQuestion: { fontSize: 16, fontWeight: '500', lineHeight: 24 },
   typeBadge: { fontSize: 12, fontWeight: 'bold', backgroundColor: '#E1EFFF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, alignSelf: 'flex-start' },
-  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8, marginLeft: 'auto', flexWrap: 'wrap', rowGap: 10 },
   deleteText: { color: '#FF3B30', fontWeight: 'bold' },
   answerBtnText: { fontWeight: 'bold' },
   editTagBtnText: { fontWeight: 'bold' },
