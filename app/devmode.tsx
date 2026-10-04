@@ -7,10 +7,11 @@ import { translations } from './translations';
 import { SoundManager } from './sound';
 import { loadStats, saveStats, saveProgress, DEFAULT_STATS, MISSIONS } from './missions';
 import { useRooms } from './context/RoomsContext';
+import { useQuestionsContext } from './context/QuestionsContext';
 import { attachDevBotToRoom } from './utils/devBot';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench, Bot } from 'lucide-react';
+import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench, Bot, Calendar } from 'lucide-react';
 
 export default function DevModeScreen() {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ export default function DevModeScreen() {
   const [log, setLog] = useState<string[]>([]);
 
   const { createRoom } = useRooms();
+  const { applyQuestionsChange } = useQuestionsContext();
   const [botMode, setBotMode] = useState(false);
   const [creatingLimitSec, setCreatingLimitSec] = useState<number>(60);
   const [starting, setStarting] = useState(false);
@@ -182,6 +184,32 @@ export default function DevModeScreen() {
     }
   };
 
+  // SRS テスト用: 復習履歴のある問題の復習期限を「今」にリセットする
+  const forceAllDueForReview = async () => {
+    confirm('復習履歴のある問題の復習期限を「今」にしますか？', async () => {
+      try {
+        await applyQuestionsChange(current =>
+          current.map(q => {
+            if (!q.srs) return q; // SRS 未学習の問題は対象外
+            return {
+              ...q,
+              srs: {
+                ...q.srs,
+                nextReviewAt: Date.now() - 1000, // 1秒前 = 期限切れ
+              },
+            };
+          })
+        );
+        addLog('復習期限を今に更新');
+        SoundManager.play('complete');
+      } catch (e: any) {
+        console.error('forceAllDueForReview failed:', e);
+        addLog(`エラー: ${e?.message ?? '復習期限の更新に失敗'}`);
+        Alert.alert('エラー', e?.message ?? '復習期限の更新に失敗しました');
+      }
+    });
+  };
+
   const buttons = [
     { label: '本を100冊付与', icon: BookOpen, action: () => giveBooks(100), color: colors.primary },
     { label: '本を1000冊付与', icon: BookOpen, action: () => giveBooks(1000), color: colors.primary },
@@ -190,6 +218,7 @@ export default function DevModeScreen() {
     { label: '問題スロット999', icon: Pencil, action: maxQuestionSlots, color: colors.success },
     { label: '全機能解放（最大値）', icon: Lock, action: unlockAll, color: '#9C27B0' },
     { label: '現在の統計を表示', icon: BarChart3, action: showStats, color: colors.warning },
+    { label: '復習期限を今にする', icon: Calendar, action: forceAllDueForReview, color: '#FF9800' },
     { label: '全データリセット', icon: Trash2, action: resetAll, color: colors.error },
   ];
 
