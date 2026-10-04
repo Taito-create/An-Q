@@ -62,6 +62,33 @@ export function updateSrsState(
   };
 }
 
+/**
+ * 記憶強度を5段階のドット文字列に変換する。
+ * undefined の場合は null を返す（未学習として非表示扱い）。
+ *
+ * memoryStrength === 0 でも1ドット塗りにするのは、
+ * 「0 = 不正解で記憶強度が下がった状態」であり
+ * 「未学習（srs undefined）」と区別するため。
+ */
+export function getSrsDotString(srs: SrsState | undefined): string | null {
+  if (!srs) return null;
+  const strength = srs.memoryStrength;
+  let filled = 0;
+  if (strength <= 20) filled = 1;
+  else if (strength <= 40) filled = 2;
+  else if (strength <= 60) filled = 3;
+  else if (strength <= 80) filled = 4;
+  else filled = 5;
+  return '●'.repeat(filled) + '○'.repeat(5 - filled);
+}
+
+/** 塗られたドットの個数（0〜5）。未学習は 0 */
+export function getSrsFilledDots(srs: SrsState | undefined): number {
+  const dotStr = getSrsDotString(srs);
+  if (!dotStr) return 0;
+  return (dotStr.match(/●/g) || []).length;
+}
+
 /** 指定時刻までに復習期限が来ている問題か */
 export function isDueForReview(srs: SrsState | undefined, now: number = Date.now()): boolean {
   // 復習履歴が無い問題は「期限切れ（＝出題候補）」として扱う

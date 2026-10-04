@@ -17,6 +17,7 @@ import { speak as speakText, stopSpeech, isSpeechSupported } from './utils/speec
 import { Trash2, Folder as FolderIcon, Share2, Volume2, PenSquare, Tag, Loader2, X } from 'lucide-react';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
+import { getSrsFilledDots } from './utils/srs';
 import './browse.css';
 
 /**
@@ -896,6 +897,16 @@ export default function BrowseQuestionsScreen() {
                     </View>
                   </PressableButton>
                   <View style={styles.cardHeaderRight}>
+                    {item.srs && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 4 }}>
+                        <Text style={[styles.srsDots, { color: colors.primary }]}>
+                          {'●'.repeat(getSrsFilledDots(item.srs))}
+                        </Text>
+                        <Text style={[styles.srsDots, { color: colors.border }]}>
+                          {'○'.repeat(5 - getSrsFilledDots(item.srs))}
+                        </Text>
+                      </View>
+                    )}
                     {item.image && (
                       <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
                         <img src={item.image} alt='' className='browse-thumbnail' />
@@ -1863,6 +1874,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   cardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  srsDots: { fontSize: 12, letterSpacing: 1.5, lineHeight: 16 },
   headerDeleteBtn: { padding: 6, borderRadius: 20 },
   headerDeleteBtnText: { fontSize: 18 },
   // 問題管理画面「簡易モード」のカード（問題＋答えの2行のみ）
