@@ -12,7 +12,6 @@ import { STORAGE_KEYS } from './constants/storageKeys';
 import { useQuestions } from './hooks/useQuestions';
 import { safeParseArray } from './utils/storageUtils';
 import { loadStats, UserStats } from './missions';
-import LottieView from 'lottie-react-native';
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -198,21 +197,6 @@ export default function StatisticsScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Lottieテスト表示 */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {locale === 'ja' ? 'Lottie テスト表示' : 'Lottie Test'}
-          </Text>
-          <View style={{ width: 150, height: 150, justifyContent: 'center', alignItems: 'center' }}>
-            <LottieView
-              source={{ uri: 'https://assets10.lottiefiles.com/packages/lf20_yr6g3xnn.json' }}
-              autoPlay
-              loop
-              style={{ width: 150, height: 150 }}
-            />
-          </View>
-        </View>
-
         {/* Lifetime Summary */}
         {lifetimeStats && (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
