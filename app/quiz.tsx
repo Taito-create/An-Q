@@ -20,7 +20,7 @@ import { useLocale } from './hooks/useLocale';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { updateSrsState } from './utils/srs';
+import { updateSrsState, isDueForReview } from './utils/srs';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
@@ -861,9 +861,38 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // ──────────────────────────────────────────────
   // クイズ開始
   // ──────────────────────────────────────────────
+  // 復習モード（quiz_mode === 'review'）かどうかを判定する
+  const isReviewMode = async (): Promise<boolean> => {
+    const mode = await AsyncStorage.getItem('quiz_mode');
+    return mode === 'review';
+  };
+
   const startQuiz = async (overrideCount?: number) => {
     console.log('[AutoPlay] startQuiz called, quizStarted will be true');
     let filtered = getFilteredQuestions();
+
+    // 復習モード: 復習タイミング済みの問題（srs ありかつ nextReviewAt <= now）だけを出題する
+    if (await isReviewMode()) {
+      const dueQuestions = allQuestionsFromHook.filter(
+        (q: any) => q.srs !== undefined && isDueForReview(q.srs)
+      );
+      if (dueQuestions.length === 0) {
+        SoundManager.play('select');
+        Alert.alert(
+          locale === 'ja' ? '復習対象なし' : 'No Review Due',
+          locale === 'ja'
+            ? '復習タイミングの問題はありません。'
+            : 'No questions are due for review.'
+        );
+        await AsyncStorage.removeItem('quiz_mode');
+        navigate('/');
+        return;
+      }
+      filtered = dueQuestions;
+      setPreQuestionCount(dueQuestions.length);
+      // 復習モードでは事前設定画面をスキップして出題する
+      setShowPreSettings(false);
+    }
 
     if (filtered.length === 0) {
       SoundManager.play('select');
@@ -1221,7 +1250,9 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
 
       const quizMode = await AsyncStorage.getItem('quiz_mode');
       const isBossMode = quizMode === 'weak';
-      if (isBossMode) {
+      const isReview = quizMode === 'review';
+      if (isBossMode || isReview) {
+        // 復習モードも weak モード同理で XP を1.5倍にする
         totalXPReward = Math.floor(totalXPReward * 1.5);
         await AsyncStorage.removeItem('quiz_mode');
       }

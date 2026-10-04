@@ -52,6 +52,7 @@ import LottieView from 'lottie-react-native';
 import FireAnimation from '../src/assets/animations/Fire.json';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
 import CountUpText from './components/CountUpText';
+import { isDueForReview } from './utils/srs';
 
 // レスポンシブ判定用フック
 const useResponsive = () => {
@@ -258,6 +259,7 @@ const HomeScreen = React.memo(() => {
   const [displayTimer, setDisplayTimer] = useState<string | null>(null);
   const [todayQuestion, setTodayQuestion] = useState<any | null>(null);
   const [weakQuestionCount, setWeakQuestionCount] = useState(0);
+  const [reviewDueCount, setReviewDueCount] = useState(0);
   const [dailyQuests, setDailyQuests] = useState<Mission[]>([]);
   const [questProgress, setQuestProgress] = useState<{ current: number; completed: boolean }[]>([]);
   // 最終アクション時刻（STATUS: STANDBY (nH nM SINCE LAST TRANSFER) 用）
@@ -336,6 +338,11 @@ const HomeScreen = React.memo(() => {
       // 苦手問題も更新
       const weak = questionsFromHook.filter((q: any) => (q.mistakeCount ?? 0) > 0);
       setWeakQuestionCount(weak.length);
+      // 復習タイミングの問題も更新（未学習(srsなし)は除外する）
+      const learnedDue = questionsFromHook.filter(
+        (q: any) => q.srs !== undefined && isDueForReview(q.srs)
+      );
+      setReviewDueCount(learnedDue.length);
     }
   }, [questionsFromHook, pickTodayQuestion]);
 
@@ -985,6 +992,39 @@ const HomeScreen = React.memo(() => {
     );
   };
 
+  // ── 今日の復習カード（SRS） ──
+  const renderReviewCard = () => {
+    if (reviewDueCount <= 0) return null;
+    return (
+      <PressableButton
+        style={[styles.reviewCard, cardPadding[screenType], {
+          backgroundColor: colors.success + '15',
+          borderColor: colors.success,
+          borderRadius: br,
+          borderWidth: 1,
+        }]}
+        onPress={async () => {
+          SoundManager.play('decide');
+          await AsyncStorage.setItem('quiz_mode', 'review');
+          navigateWithAnimation('/quiz');
+        }}
+      >
+        <Calendar size={20} color={colors.success} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.reviewLabel, { color: colors.success, fontSize: fontSize.body }]}>
+            {locale === 'ja' ? '今日の復習' : "Today's Review"}
+          </Text>
+          <Text style={[styles.reviewDesc, { color: colors.textSecondary, fontSize: fontSize.small }]}>
+            {locale === 'ja'
+              ? `${reviewDueCount}問の復習タイミングです`
+              : `${reviewDueCount} questions ready for review`}
+          </Text>
+        </View>
+        <ChevronRight size={16} color={colors.success} />
+      </PressableButton>
+    );
+  };
+
   // ─────────────────────────────────────────────
   // 転送モード選択カード（RAPID / DAILY / DEEP）
   // ─────────────────────────────────────────────
@@ -1496,6 +1536,7 @@ const HomeScreen = React.memo(() => {
             <View style={mainContentStyle[screenType]}>
               {renderTransferSelector()}
               {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
+              {renderReviewCard()}
               {renderWeakCard()}
               {renderDailyQuests()}
               <TerminalLog
@@ -1611,6 +1652,18 @@ const styles = StyleSheet.create({
   weakEmoji: { fontSize: 20 },
   weakLabel: { fontWeight: 'bold', marginBottom: 2 },
   weakDesc: {},
+  reviewCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    boxShadow: '0px 3px 8px rgba(0,0,0,0.05)',
+    elevation: 3,
+  },
+  reviewLabel: { fontWeight: 'bold', marginBottom: 2 },
+  reviewDesc: {},
   motivationalContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
