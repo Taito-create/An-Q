@@ -19,10 +19,10 @@ export const DEFAULT_SRS_STATE: SrsState = {
  * 誤答タイプを判定する。
  * - 1 unknown: 初回誤答（過去に正解歴なし）
  * - 2 confused: 過去に正解歴あり（定着不足）
- * - 3 careless: 過去正解あり + 回答が極端に速い
+ * - 3 careless: 過去正解あり + 直近3日以内に復習 + 10秒未満
  * - 4 guess: 過去正解なし + 回答が極端に速い（勘）
  *
- * ※ 閾値（3秒 / 10秒）は暫定。実データを貯めて Phase B/C で調整する。
+ * ※ 閾値（3秒 / 10秒 / 3日）は暫定。実データを貯めて Phase B/C で調整する。
  */
 export function classifyError(
   previous: SrsState | undefined,
@@ -30,13 +30,21 @@ export function classifyError(
 ): ErrorType {
   const correctStreak = previous?.correctStreak ?? 0;
 
+  // 記述式: タイピングに最低3秒以上かかるため、推測判定をスキップ。
+  // 「過去正解あり → 混同 / 過去正解なし → 無知」の2択のみ。
+  if (result.answerType === 'descriptive') {
+    return correctStreak > 0 ? 2 : 1;
+  }
+
   // 推測: 極端に速い（3秒未満）＋過去正解歴なし
   if (result.timeSpent < 3 && correctStreak === 0) return 4;
 
-  // ケアレス: 過去正解あり + 通常より速い（10秒未満）
-  if (correctStreak > 0 && result.timeSpent < 10) return 3;
+  // ケアレス: 過去正解あり + 直近3日以内に復習 + 10秒未満
+  const lastReviewedAt = previous?.lastReviewedAt ?? 0;
+  const daysSinceReview = (Date.now() - lastReviewedAt) / (1000 * 60 * 60 * 24);
+  if (correctStreak > 0 && daysSinceReview < 3 && result.timeSpent < 10) return 3;
 
-  // 混同: 過去正解あり（correctStreak > 0）だが時間が通常
+  // 混同: 過去正解あり
   if (correctStreak > 0) return 2;
 
   // 無知: 初回誤答

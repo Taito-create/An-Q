@@ -48,8 +48,6 @@ interface QuizResult {
   correctAnswer: boolean | number | string;
   isCorrect: boolean;
   timeSpent: number;
-  /** 複数選択問題で選択した選択肢のインデックス配列（単一選択も [n]） */
-  selectedIndices?: number[];
   /** 回答形式（判定ロジックで使用） */
   answerType?: 'descriptive' | 'truefalse' | 'multiple';
 }
@@ -1082,7 +1080,6 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       correctAnswer: actualCorrectAnswer,
       isCorrect: correct,
       timeSpent: elapsed,
-      selectedIndices: Array.isArray(answer) ? [...answer] : undefined,
       answerType: currentQuestion.answerType,
     };
 
