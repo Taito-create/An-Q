@@ -20,7 +20,7 @@ import { useLocale } from './hooks/useLocale';
 import { useResponsive } from './hooks/useResponsive';
 import { useTerminalEffects } from './hooks/useTerminalEffects';
 import { useQuestionsContext } from './context/QuestionsContext';
-import { updateSrsState, isDueForReview } from './utils/srs';
+import { updateSrsState, isDueForReview, classifyError } from './utils/srs';
 import { checkDescriptiveAnswer, getAnswerText, getAnswerGroups } from './utils/answerUtils';
 import { useMemo } from 'react';
 import { STORAGE_KEYS } from './constants/storageKeys';
@@ -48,6 +48,10 @@ interface QuizResult {
   correctAnswer: boolean | number | string;
   isCorrect: boolean;
   timeSpent: number;
+  /** 複数選択問題で選択した選択肢のインデックス配列（単一選択も [n]） */
+  selectedIndices?: number[];
+  /** 回答形式（判定ロジックで使用） */
+  answerType?: 'descriptive' | 'truefalse' | 'multiple';
 }
 
 interface UserAnswer {
@@ -1078,6 +1082,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       correctAnswer: actualCorrectAnswer,
       isCorrect: correct,
       timeSpent: elapsed,
+      selectedIndices: Array.isArray(answer) ? [...answer] : undefined,
+      answerType: currentQuestion.answerType,
     };
 
     if (suddenDeathMode && !correct) {
@@ -1210,7 +1216,24 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
         current.map(q => {
           const result = finalResults.find(r => r.questionId === q.id);
           if (!result) return q; // 出題されていない問題は変更しない
-          return { ...q, srs: updateSrsState(q.srs, result.isCorrect) };
+
+          const newSrs = updateSrsState(q.srs, result.isCorrect);
+
+          if (!result.isCorrect) {
+            const errorType = classifyError(q.srs, {
+              isCorrect: false,
+              timeSpent: result.timeSpent,
+              answerType: result.answerType,
+            });
+            const prevHistory = q.srs?.errorHistory ?? [];
+            // 最新10件のみ保持
+            newSrs.errorHistory = [errorType, ...prevHistory].slice(0, 10);
+          } else {
+            // 正解時は前回の errorHistory を引き継ぐ
+            newSrs.errorHistory = q.srs?.errorHistory;
+          }
+
+          return { ...q, srs: newSrs };
         })
       );
     } catch (e) {

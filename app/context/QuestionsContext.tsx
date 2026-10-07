@@ -511,6 +511,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             reviewCount: q.srs.reviewCount,
             correctStreak: q.srs.correctStreak,
           };
+          // errorHistory は数値のフラット配列（Firestore制約OK）
+          if (Array.isArray(q.srs.errorHistory)) {
+            sanitized.srs.errorHistory = q.srs.errorHistory
+              .filter((n: any) => typeof n === 'number')
+              .slice(0, 10);
+          }
         }
         
         return sanitized;
@@ -661,6 +667,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             reviewCount: q.srs.reviewCount,
             correctStreak: q.srs.correctStreak,
           };
+          // errorHistory は数値のフラット配列（Firestore制約OK）
+          if (Array.isArray(q.srs.errorHistory)) {
+            sanitized.srs.errorHistory = q.srs.errorHistory
+              .filter((n: any) => typeof n === 'number')
+              .slice(0, 10);
+          }
         }
         return sanitized;
       });

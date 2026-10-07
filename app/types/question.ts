@@ -37,6 +37,12 @@ export interface SrsState {
   reviewCount: number;
   /** 連続正解数 */
   correctStreak: number;
+  /**
+   * 誤答タイプの履歴（新しい順、最大10件）。
+   * 1 = unknown / 2 = confused / 3 = careless / 4 = guess
+   * 数値のフラット配列（Firestore のネスト配列制約を回避）
+   */
+  errorHistory?: number[];
 }
 
 export interface Question {

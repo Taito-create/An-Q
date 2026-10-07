@@ -1,5 +1,8 @@
 import type { SrsState } from '../types/question';
 
+/** 誤答タイプ: 1 = unknown / 2 = confused / 3 = careless / 4 = guess */
+export type ErrorType = 1 | 2 | 3 | 4;
+
 /** 1日 (ms) */
 export const ONE_DAY_MS = 86_400_000;
 
@@ -11,6 +14,34 @@ export const DEFAULT_SRS_STATE: SrsState = {
   reviewCount: 0,
   correctStreak: 0,
 };
+
+/**
+ * 誤答タイプを判定する。
+ * - 1 unknown: 初回誤答（過去に正解歴なし）
+ * - 2 confused: 過去に正解歴あり（定着不足）
+ * - 3 careless: 過去正解あり + 回答が極端に速い
+ * - 4 guess: 過去正解なし + 回答が極端に速い（勘）
+ *
+ * ※ 閾値（3秒 / 10秒）は暫定。実データを貯めて Phase B/C で調整する。
+ */
+export function classifyError(
+  previous: SrsState | undefined,
+  result: { isCorrect: boolean; timeSpent: number; answerType?: string },
+): ErrorType {
+  const correctStreak = previous?.correctStreak ?? 0;
+
+  // 推測: 極端に速い（3秒未満）＋過去正解歴なし
+  if (result.timeSpent < 3 && correctStreak === 0) return 4;
+
+  // ケアレス: 過去正解あり + 通常より速い（10秒未満）
+  if (correctStreak > 0 && result.timeSpent < 10) return 3;
+
+  // 混同: 過去正解あり（correctStreak > 0）だが時間が通常
+  if (correctStreak > 0) return 2;
+
+  // 無知: 初回誤答
+  return 1;
+}
 
 /**
  * 記憶強度から次回までの復習間隔 (ms) を返す。
