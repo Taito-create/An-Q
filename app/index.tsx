@@ -216,8 +216,8 @@ const HomeScreen = React.memo(() => {
       maxWidth: 1200,
       marginLeft: 'auto' as const,
       marginRight: 'auto' as const,
-      padding: 32,
-      paddingTop: 32,
+      padding: 40,
+      paddingTop: 40,
     },
   };
 
@@ -226,19 +226,19 @@ const HomeScreen = React.memo(() => {
   const cardPadding = {
     mobile: { padding: 12 },
     tablet: { padding: 14 },
-    desktop: { padding: 16 },
+    desktop: { padding: 20 },
   };
 
   const buttonPadding = {
     mobile: { paddingVertical: 14, paddingHorizontal: 12 },
     tablet: { paddingVertical: 15, paddingHorizontal: 14 },
-    desktop: { paddingVertical: 18, paddingHorizontal: 16 },
+    desktop: { paddingVertical: 22, paddingHorizontal: 20 },
   };
 
   const fontSize = {
-    title: screenType === 'desktop' ? 18 : screenType === 'tablet' ? 16 : 15,
-    body: screenType === 'desktop' ? 15 : screenType === 'tablet' ? 14 : 13,
-    small: screenType === 'desktop' ? 12 : screenType === 'tablet' ? 12 : 12,
+    title: screenType === 'desktop' ? 22 : screenType === 'tablet' ? 16 : 15,
+    body: screenType === 'desktop' ? 17 : screenType === 'tablet' ? 14 : 13,
+    small: screenType === 'desktop' ? 13 : screenType === 'tablet' ? 12 : 12,
   };
 
   const t = translations[currentLocale];
@@ -743,9 +743,9 @@ const HomeScreen = React.memo(() => {
     tablet: { flexDirection: 'column' as const, gap: 12, width: '100%' as const },
     desktop: {
       flexDirection: 'column' as const,
-      gap: 16,
+      gap: 20,
       width: '100%' as const,
-      maxWidth: 1000,
+      maxWidth: 1100,
       marginLeft: 'auto' as const,
       marginRight: 'auto' as const,
     },
@@ -1127,7 +1127,8 @@ const HomeScreen = React.memo(() => {
             { backgroundColor: colors.primary },
             // スマホ縦画面で窮屈にならないよう高さと余白を縮め、幅広は maxWidth で抑える
             screenType === 'mobile' && { height: 68, paddingVertical: 20 },
-            screenType !== 'mobile' && { height: 80, paddingVertical: 28, maxWidth: 520 },
+            screenType === 'tablet' && { height: 80, paddingVertical: 28, maxWidth: 520 },
+            screenType === 'desktop' && { height: 96, paddingVertical: 32, maxWidth: 600 },
           ]}
           onPress={handleInitiateTransfer}
         >
