@@ -50,6 +50,8 @@ interface QuizResult {
   timeSpent: number;
   /** 回答形式（判定ロジックで使用） */
   answerType?: 'descriptive' | 'truefalse' | 'multiple';
+  /** 自信判断（1=自信あった, 2=自信なかった）。未回答時は undefined */
+  confidence?: number;
 }
 
 interface UserAnswer {
@@ -994,6 +996,20 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // 回答処理
   // ──────────────────────────────────────────────
   const isSubmittingRef = useRef(false);
+  // Phase B: 誤答時の自信チェック用
+  const [showConfidencePrompt, setShowConfidencePrompt] = useState(false);
+  const confidenceRef = useRef<number | undefined>(undefined);
+  const pendingAdvanceRef = useRef<(() => void) | null>(null);
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Phase B: feedbackMessage 自動クリアのタイマー管理（前問のタイマーが次問のメッセージを消さないよう追跡する）
+  const feedbackClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Phase B: 自信判断の選択ハンドラ
+  const handleConfidence = (value: 1 | 2) => {
+    SoundManager.play('decide');
+    confidenceRef.current = value;
+    pendingAdvanceRef.current?.();
+  };
   useEffect(() => {
     isSubmittingRef.current = answered;
   }, [answered]);
@@ -1063,7 +1079,16 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
         break;
     }
 
-    setTimeout(() => setFeedbackMessage(''), 3000);
+    // Phase B: feedbackMessage の自動クリアを 4000ms に延長。
+    // 自信チェックのフォールバック（4000ms）と合わせることで、モーダルが
+    // 先に消える不整合を防ぐ。前問のタイマーが残っていたら先に破棄する。
+    if (feedbackClearTimeoutRef.current) {
+      clearTimeout(feedbackClearTimeoutRef.current);
+    }
+    feedbackClearTimeoutRef.current = setTimeout(() => {
+      feedbackClearTimeoutRef.current = null;
+      setFeedbackMessage('');
+    }, 4000);
 
     SoundManager.play(correct ? 'correct' : 'wrong');
 
@@ -1161,19 +1186,20 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
         }
       }, 3000);
     } else {
-      const delay = correct ? 1000 : 2500;
-
-      setTimeout(async () => {
-        const finalResults = [...results, newResult];
+      // Phase B: advance 処理を関数化して通常フローと自信チェックフローで共有する
+      const performAdvance = async (resultToRecord: QuizResult) => {
+        const finalResults = [...results, resultToRecord];
         setResults(finalResults);
 
         if (currentIndex + 1 >= shuffledQuestions.length) {
           setIsTimerActive(false);
           setAnswered(false);
+          setShowConfidencePrompt(false);
           setShowFeedback(false);
           await finishQuizWithResults(finalResults);
         } else {
           setCurrentIndex(prev => prev + 1);
+          setShowConfidencePrompt(false);
           setShowFeedback(false);
           setAnswered(false);
           setUserDescriptiveAnswer('');
@@ -1183,6 +1209,39 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
           }
           SoundManager.play('question');
         }
+      };
+
+      // Phase B: 誤答かつ通常モード（自動再生でない）: 自信チェック
+      if (!correct && !autoPlayMode) {
+        setShowConfidencePrompt(true);
+        confidenceRef.current = undefined;
+
+        const advance = () => {
+          if (advanceTimeoutRef.current) {
+            clearTimeout(advanceTimeoutRef.current);
+            advanceTimeoutRef.current = null;
+          }
+          // 二重実行ガード（タップとフォールバックの両方が発火しても1回のみ）
+          const pending = pendingAdvanceRef.current;
+          pendingAdvanceRef.current = null;
+          if (!pending) return;
+          const finalResult = confidenceRef.current !== undefined
+            ? { ...newResult, confidence: confidenceRef.current }
+            : newResult;
+          confidenceRef.current = undefined;
+          performAdvance(finalResult);
+        };
+        pendingAdvanceRef.current = advance;
+        // フォールバック: 4000ms 後に自動で進む
+        advanceTimeoutRef.current = setTimeout(advance, 4000);
+        return; // 通常の setTimeout をスキップ
+      }
+
+      // 既存のフロー（正解 or 自動再生の誤答）はそのまま
+      const delay = correct ? 1000 : 2500;
+
+      setTimeout(async () => {
+        await performAdvance(newResult);
       }, delay);
     }
   };
@@ -1225,9 +1284,20 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             const prevHistory = q.srs?.errorHistory ?? [];
             // 最新10件のみ保持
             newSrs.errorHistory = [errorType, ...prevHistory].slice(0, 10);
+
+            // Phase B: 自信判断を保存
+            if (typeof result.confidence === 'number') {
+              const prevConfidence = q.srs?.confidenceHistory ?? [];
+              newSrs.confidenceHistory = [result.confidence, ...prevConfidence].slice(0, 10);
+            } else {
+              // タップされなかった場合は既存を引き継ぐ
+              newSrs.confidenceHistory = q.srs?.confidenceHistory;
+            }
           } else {
             // 正解時は前回の errorHistory を引き継ぐ
             newSrs.errorHistory = q.srs?.errorHistory;
+            // 正解時は自信判断も引き継ぐ
+            newSrs.confidenceHistory = q.srs?.confidenceHistory;
           }
 
           return { ...q, srs: newSrs };
@@ -2460,9 +2530,49 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
               </ScrollView>
             </View>
             
-            <Text style={[styles.fullScreenTimer, { color: colors.textSecondary }]}>
-              {locale === 'ja' ? '次の問題へ...' : 'Next question...'}
-            </Text>
+            {showConfidencePrompt ? (
+              <View style={{ marginTop: 16, width: '100%' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 }}>
+                  {locale === 'ja' ? '答えに自信はありましたか？' : 'Were you confident?'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <PressableButton
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => handleConfidence(1)}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
+                      {locale === 'ja' ? '自信あった' : 'Confident'}
+                    </Text>
+                  </PressableButton>
+                  <PressableButton
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => handleConfidence(2)}
+                  >
+                    <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 14 }}>
+                      {locale === 'ja' ? '自信なかった' : 'Unsure'}
+                    </Text>
+                  </PressableButton>
+                </View>
+              </View>
+            ) : (
+              <Text style={[styles.fullScreenTimer, { color: colors.textSecondary }]}>
+                {locale === 'ja' ? '次の問題へ...' : 'Next question...'}
+              </Text>
+            )}
           </View>
           
         </View>

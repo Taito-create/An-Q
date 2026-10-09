@@ -43,6 +43,12 @@ export interface SrsState {
    * 数値のフラット配列（Firestore のネスト配列制約を回避）
    */
   errorHistory?: number[];
+  /**
+   * 自信判断の履歴（新しい順、最大10件）。
+   * 1 = 自信あった / 2 = 自信なかった
+   * errorHistory と並列（同じインデックスが同じ誤答イベントを指す）
+   */
+  confidenceHistory?: number[];
 }
 
 export interface Question {

@@ -517,6 +517,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               .filter((n: any) => typeof n === 'number')
               .slice(0, 10);
           }
+          // Phase B: 自信判断履歴（1=自信あった / 2=自信なかった）
+          if (Array.isArray(q.srs.confidenceHistory)) {
+            sanitized.srs.confidenceHistory = q.srs.confidenceHistory
+              .filter((n: any) => typeof n === 'number' && (n === 1 || n === 2))
+              .slice(0, 10);
+          }
         }
         
         return sanitized;
@@ -671,6 +677,12 @@ export const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (Array.isArray(q.srs.errorHistory)) {
             sanitized.srs.errorHistory = q.srs.errorHistory
               .filter((n: any) => typeof n === 'number')
+              .slice(0, 10);
+          }
+          // Phase B: 自信判断履歴（1=自信あった / 2=自信なかった）
+          if (Array.isArray(q.srs.confidenceHistory)) {
+            sanitized.srs.confidenceHistory = q.srs.confidenceHistory
+              .filter((n: any) => typeof n === 'number' && (n === 1 || n === 2))
               .slice(0, 10);
           }
         }
