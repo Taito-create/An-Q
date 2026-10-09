@@ -1036,7 +1036,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
         correct = answer === currentQuestion.trueFalseAnswer;
         actualCorrectAnswer = currentQuestion.trueFalseAnswer ?? false;
         if (!correct) {
-          setFeedbackMessage(actualCorrectAnswer ? '○' : '');
+          setFeedbackMessage(actualCorrectAnswer ? '○' : '×');
         } else {
           setFeedbackMessage('');
         }
