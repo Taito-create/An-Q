@@ -745,7 +745,7 @@ const HomeScreen = React.memo(() => {
       flexDirection: 'column' as const,
       gap: 16,
       width: '100%' as const,
-      maxWidth: 720,
+      maxWidth: 1000,
       marginLeft: 'auto' as const,
       marginRight: 'auto' as const,
     },
@@ -1535,7 +1535,7 @@ const HomeScreen = React.memo(() => {
             /* モバイル／タブレット／デスクトップ：1カラムレイアウト（PCの視覚順序に統一） */
             <View style={mainContentStyle[screenType]}>
               {renderTransferSelector()}
-              {totalQuestions === 0 || todayCorrect === 0 ? renderEmptyStats() : renderStatsCard()}
+              {totalQuestions === 0 ? renderEmptyStats() : renderStatsCard()}
               {renderReviewCard()}
               {renderWeakCard()}
               {renderDailyQuests()}
