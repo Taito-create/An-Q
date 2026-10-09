@@ -887,37 +887,6 @@ export default function BrowseQuestionsScreen() {
                         color={speakingId === item.id ? onPrimary : colors.primary}
                       />
                     </PressableButton>
-                    {(() => {
-                      const status = getSrsStatus(item.srs);
-                      if (!status) return null;
-                      const strength = item.srs?.memoryStrength ?? 0;
-                      const barColor = status === 'review' ? colors.error
-                        : status === 'learning' ? colors.warning
-                        : colors.success;
-                      const label = locale === 'ja'
-                        ? (status === 'review' ? '要復習' : status === 'learning' ? '学習中' : '定着')
-                        : (status === 'review' ? 'Review' : status === 'learning' ? 'Learning' : 'Stable');
-                      return (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 4 }}>
-                          <View style={{
-                            width: 60,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: colors.border,
-                            overflow: 'hidden',
-                          }}>
-                            <View style={{
-                              width: `${strength}%`,
-                              height: '100%',
-                              backgroundColor: barColor,
-                            }} />
-                          </View>
-                          <Text style={{ fontSize: 11, fontWeight: '600', color: barColor }} numberOfLines={1}>
-                            {label}
-                          </Text>
-                        </View>
-                      );
-                    })()}
                     {item.image && (
                       <View style={[{ borderRadius: 6, overflow: 'hidden', width: 40, height: 40 }]}>
                         <img src={item.image} alt='' className='browse-thumbnail' />
@@ -935,7 +904,37 @@ export default function BrowseQuestionsScreen() {
                     </PressableButton>
                   </View>
                 </View>
-
+                {(() => {
+                  const status = getSrsStatus(item.srs);
+                  if (!status) return null;
+                  const strength = item.srs?.memoryStrength ?? 0;
+                  const barColor = status === 'review' ? colors.error
+                    : status === 'learning' ? colors.warning
+                    : colors.success;
+                  const label = locale === 'ja'
+                    ? (status === 'review' ? '要復習' : status === 'learning' ? '学習中' : '定着')
+                    : (status === 'review' ? 'Review' : status === 'learning' ? 'Learning' : 'Stable');
+                  return (
+                    <View style={{ paddingHorizontal: 12, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{
+                        width: 80,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: colors.border,
+                        overflow: 'hidden',
+                      }}>
+                        <View style={{
+                          width: `${strength}%`,
+                          height: '100%',
+                          backgroundColor: barColor,
+                        }} />
+                      </View>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: barColor }} numberOfLines={1}>
+                        {label}
+                      </Text>
+                    </View>
+                  );
+                })()}
                 {expandedQuestionId === item.id && (
                   <ExpandFade enabled={terminalEffects}>
                   <View style={styles.expandedContent}>
