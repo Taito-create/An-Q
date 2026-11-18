@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /**
  * AsyncStorage キー管理
@@ -7,124 +7,124 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const STORAGE_KEYS = {
   // ユーザー設定
-  USER_LANGUAGE: 'user_language',
-  SELECTED_THEME: 'selected_theme',
-  
+  USER_LANGUAGE: "user_language",
+  SELECTED_THEME: "selected_theme",
+
   // クイズ設定
-  APP_TIMER_SETTING: 'APP_TIMER_SETTING',
-  QUIZ_QUESTIONS: 'quiz_questions',
-  QUESTION_FOLDERS: 'question_folders',
-  INBOX_ITEMS: 'inbox_items',
-  TIMER: 'APP_TIMER_SETTING',
-  STATS: 'quiz_stats',
-  LANGUAGE: 'user_language',
-  
+  APP_TIMER_SETTING: "APP_TIMER_SETTING",
+  QUIZ_QUESTIONS: "quiz_questions",
+  QUESTION_FOLDERS: "question_folders",
+  INBOX_ITEMS: "inbox_items",
+  TIMER: "APP_TIMER_SETTING",
+  STATS: "quiz_stats",
+  LANGUAGE: "user_language",
+
   // 音楽設定
-  BGM_PRESET: 'bgm_preset',
-  SE_TYPE: 'se_type',
-  BGM_ENABLED: 'bgm_enabled',
-  MUSIC_UNLOCKED: 'music_unlocked',
-  BGM_SETTINGS: 'bgm_settings',
-  
+  BGM_PRESET: "bgm_preset",
+  SE_TYPE: "se_type",
+  BGM_ENABLED: "bgm_enabled",
+  MUSIC_UNLOCKED: "music_unlocked",
+  BGM_SETTINGS: "bgm_settings",
+
   // ホーム画面設定
-  HOME_LAYOUT_MODE: 'home_layout_mode',
-  HOME_CARD_ORDER: 'home_card_order',
-  HOME_NAV_MODE: 'home_nav_mode',
-  
+  HOME_LAYOUT_MODE: "home_layout_mode",
+  HOME_CARD_ORDER: "home_card_order",
+  HOME_NAV_MODE: "home_nav_mode",
+
   // 統計情報
-  USER_STATS: 'user_stats',
-  TOTAL_QUESTIONS_ANSWERED: 'total_questions_answered',
-  CORRECT_ANSWERS: 'correct_answers',
-  
+  USER_STATS: "user_stats",
+  TOTAL_QUESTIONS_ANSWERED: "total_questions_answered",
+  CORRECT_ANSWERS: "correct_answers",
+
   // ミッション・ショップ
-  MISSION_PROGRESS: 'mission_progress',
-  SHOP_ITEMS: 'shop_items',
-  UNLOCKED_FEATURES: 'unlocked_features',
-  
+  MISSION_PROGRESS: "mission_progress",
+  SHOP_ITEMS: "shop_items",
+  UNLOCKED_FEATURES: "unlocked_features",
+
   // カレンダー
-  EXAM_DATES: 'EXAM_DATES',
-  
+  EXAM_DATES: "EXAM_DATES",
+
   // 称号
-  USER_TITLES: 'user_titles',
-  CURRENT_TITLE: 'current_title',
+  USER_TITLES: "user_titles",
+  CURRENT_TITLE: "current_title",
 
   // クイズ結果・履歴
-  QUIZ_RESULTS: 'quiz_results',
-  QUIZ_HISTORY: 'quiz_history',
+  QUIZ_RESULTS: "quiz_results",
+  QUIZ_HISTORY: "quiz_history",
 
   // ユーザー進捗
-  USER_XP: 'user_xp',
-  USER_COINS: 'user_coins',
-  USER_LEVEL: 'user_level',
-  STREAK_COUNT: 'streakCount',
-  LAST_STUDY_DATE: 'lastStudyDate',
-  USER_USERNAME: 'user_username',
-  USER_BIO: 'user_bio',
-  USER_PROFILE_IMAGE: 'user_profile_image',
-  USER_CURRENT_TITLE: 'user_current_title',
-  USER_UNLOCKED_TITLES: 'user_unlocked_titles',
-  USER_BOOKS: 'user_books',
-  JOIN_DATE: 'join_date',
-  LAST_LOGIN_DATE: 'lastLoginDate',
-  DAILY_GOAL: 'daily_goal',
+  USER_XP: "user_xp",
+  USER_COINS: "user_coins",
+  USER_LEVEL: "user_level",
+  STREAK_COUNT: "streakCount",
+  LAST_STUDY_DATE: "lastStudyDate",
+  USER_USERNAME: "user_username",
+  USER_BIO: "user_bio",
+  USER_PROFILE_IMAGE: "user_profile_image",
+  USER_CURRENT_TITLE: "user_current_title",
+  USER_UNLOCKED_TITLES: "user_unlocked_titles",
+  USER_BOOKS: "user_books",
+  JOIN_DATE: "join_date",
+  LAST_LOGIN_DATE: "lastLoginDate",
+  DAILY_GOAL: "daily_goal",
 
   // アプリ設定
-  DEV_MODE_ENABLED: 'dev_mode_enabled',
-  SE_ENABLED: 'se_enabled',
-  EXTERNAL_AUDIO_DETECTION_ENABLED: 'external_audio_detection_enabled',
-  VOICE_PRESET: 'voice_preset',
-  USE_SERVER_VOICE: 'use_server_voice',
-  VOICE_ENGINE: 'voice_engine',
-  VOICEVOX_SPEAKER: 'voicevox_speaker',
+  DEV_MODE_ENABLED: "dev_mode_enabled",
+  SE_ENABLED: "se_enabled",
+  EXTERNAL_AUDIO_DETECTION_ENABLED: "external_audio_detection_enabled",
+  VOICE_PRESET: "voice_preset",
+  USE_SERVER_VOICE: "use_server_voice",
+  VOICE_ENGINE: "voice_engine",
+  VOICEVOX_SPEAKER: "voicevox_speaker",
 
   // スクリーンタイム
-  WEEKLY_SCREEN_TIME: 'weekly_screen_time_minutes',
-  CUSTOM_TIMERS: 'CUSTOM_TIMERS',
-  ANIMATION_LEVEL: 'animation_level',
-  ACTIVE_TIMER_MINUTES: 'active_timer_minutes',
-  ACTIVE_TIMER_LABEL: 'active_timer_label',
+  WEEKLY_SCREEN_TIME: "weekly_screen_time_minutes",
+  CUSTOM_TIMERS: "CUSTOM_TIMERS",
+  ANIMATION_LEVEL: "animation_level",
+  ACTIVE_TIMER_MINUTES: "active_timer_minutes",
+  ACTIVE_TIMER_LABEL: "active_timer_label",
 
   // タグ管理
-  TAG_MASTER_LIST: 'tag_master_list',
+  TAG_MASTER_LIST: "tag_master_list",
 
   // 問題管理画面の表示モード
-  BROWSE_DISPLAY_MODE: 'browse_display_mode',
+  BROWSE_DISPLAY_MODE: "browse_display_mode",
 
   // ターミナル風演出のON/OFF（タイピング/スクランブル/点滅/脈動）
-  TERMINAL_EFFECTS_ENABLED: 'terminal_effects_enabled',
+  TERMINAL_EFFECTS_ENABLED: "terminal_effects_enabled",
 
   // 開発用: Bot 対戦モードの ON/OFF（localhost のみ有効）
-  DEV_BATTLE_BOT: 'dev_battle_bot',
+  DEV_BATTLE_BOT: "dev_battle_bot",
+
   // 開発用: 問題作成フェーズの制限時間（秒）上書き（localhost のみ有効）
-  DEV_CREATING_LIMIT_SEC: 'dev_creating_limit_sec',
+  DEV_CREATING_LIMIT_SEC: "dev_creating_limit_sec",
 
   // マイグレーション
-  DB_VERSION: 'db_version',
+  DB_VERSION: "db_version",
 
- // クイズ関連
- QUIZ_MODE: 'quiz_mode',
- QUIZ_RESULTS: 'quiz_results',
- QUIZ_HISTORY: 'quiz_history',
+  // クイズ関連
+  QUIZ_MODE: "quiz_mode",
+  QUIZ_RESULTS: "quiz_results",
+  QUIZ_HISTORY: "quiz_history",
 
- // カレンダー関連
- CALENDAR_EVENTS: 'calendar_events',
+  // カレンダー関連
+  CALENDAR_EVENTS: "calendar_events",
 
- // ユーザー認証・プロファイル関連
- USERNAME: 'user_username',
- USER_BIO: 'user_bio',
- JOIN_DATE: 'join_date',
- LAST_LOGIN_DATE: 'lastLoginDate',
+  // ユーザー認証・プロファイル関連
+  USERNAME: "user_username",
+  USER_BIO: "user_bio",
+  JOIN_DATE: "join_date",
+  LAST_LOGIN_DATE: "lastLoginDate",
 
- // ユーザー進捗
- USER_BOOKS: 'user_books',
+  // ユーザー進捗
+  USER_BOOKS: "user_books",
+} as const;
 
 /**
  * ストレージ操作のヘルパー関数
  */
 export class StorageHelper {
-  /**
-   * 文字列をストレージに保存
-   */
+  /** 文字列をストレージに保存 */
   static async setString(key: string, value: string): Promise<boolean> {
     try {
       await AsyncStorage.setItem(key, value);
@@ -135,10 +135,8 @@ export class StorageHelper {
     }
   }
 
-  /**
-   * 文字列をストレージから取得
-   */
-  static async getString(key: string, defaultValue: string = ''): Promise<string> {
+  /** 文字列をストレージから取得 */
+  static async getString(key: string, defaultValue: string = ""): Promise<string> {
     try {
       const value = await AsyncStorage.getItem(key);
       return value !== null ? value : defaultValue;
@@ -148,9 +146,7 @@ export class StorageHelper {
     }
   }
 
-  /**
-   * オブジェクトをストレージに保存
-   */
+  /** オブジェクトをストレージに保存 */
   static async setObject<T>(key: string, value: T): Promise<boolean> {
     try {
       const jsonString = JSON.stringify(value);
@@ -162,9 +158,7 @@ export class StorageHelper {
     }
   }
 
-  /**
-   * オブジェクトをストレージから取得
-   */
+  /** オブジェクトをストレージから取得 */
   static async getObject<T>(key: string, defaultValue: T): Promise<T> {
     try {
       const jsonString = await AsyncStorage.getItem(key);
@@ -175,9 +169,7 @@ export class StorageHelper {
     }
   }
 
-  /**
-   * ストレージからキーを削除
-   */
+  /** ストレージからキーを削除 */
   static async remove(key: string): Promise<boolean> {
     try {
       await AsyncStorage.removeItem(key);
@@ -188,15 +180,13 @@ export class StorageHelper {
     }
   }
 
-  /**
-   * すべてのストレージをクリア
-   */
+  /** すべてのストレージをクリア */
   static async clear(): Promise<boolean> {
     try {
       await AsyncStorage.clear();
       return true;
     } catch (error) {
-      console.error('Failed to clear storage:', error);
+      console.error("Failed to clear storage:", error);
       return false;
     }
   }
