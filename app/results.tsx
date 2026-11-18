@@ -14,6 +14,7 @@ import { BarChart3 } from 'lucide-react';
 import { safeParse, safeParseArray } from './utils/storageUtils';
 import LottieView from 'lottie-react-native';
 import congratulation from '../src/assets/animations/congratulation.json';
+import LevelUpOverlay from './components/LevelUpOverlay';
 
 // Type definitions
 interface QuizResult {
@@ -46,6 +47,10 @@ export default function ResultsScreen() {
   const [showCelebration, setShowCelebration] = useState(false);
   // スコア0%時のグリッチ演出（赤フラッシュ300ms）
   const [showGlitch, setShowGlitch] = useState(false);
+  // レベルアップ演出（rewardResult 由来・1回限り）
+  const [levelUp, setLevelUp] = useState<{ fromLevel: number; toLevel: number } | null>(null);
+  const [levelUpVisible, setLevelUpVisible] = useState(false);
+  const levelUpShownRef = React.useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,6 +62,24 @@ export default function ResultsScreen() {
         await loadData();
         const loaded = await loadStats();
         if (isMounted) setStats(loaded);
+        // 報酬結果（quiz.tsx から navigation.state 経由）からレベルアップ演出を1回だけ出す
+        // 報酬付与自体は quiz.tsx で確定済みのため、ここでは表示のみ行う
+        const reward = location.state?.rewardResult as
+          | { leveledUp?: number; document?: { level?: number } }
+          | null
+          | undefined;
+        const leveledUp = reward && typeof reward.leveledUp === 'number' ? reward.leveledUp : 0;
+        const toLevel = reward?.document && typeof reward.document.level === 'number' ? reward.document.level : 0;
+        if (isMounted && leveledUp > 0 && toLevel > 0 && !levelUpShownRef.current) {
+          levelUpShownRef.current = true;
+          setLevelUp({ fromLevel: toLevel - leveledUp, toLevel });
+          try {
+            const savedAnim = await AsyncStorage.getItem('animation_level');
+            if (savedAnim !== 'none') setLevelUpVisible(true);
+          } catch {
+            setLevelUpVisible(true);
+          }
+        }
       } finally {
         // 一瞬表示防止
         setTimeout(() => {
@@ -201,8 +224,8 @@ export default function ResultsScreen() {
 
   return (
     <>
-      {/* Celebration Animation Overlay */}
-      {showCelebration && (
+      {/* 100%正答時の既存演出とレベルアップ演出は重ねず、レベルアップを優先する */}
+      {showCelebration && !levelUpVisible && (
         <View style={styles.celebrationOverlay}>
           <LottieView
             source={congratulation}
@@ -213,19 +236,28 @@ export default function ResultsScreen() {
           />
         </View>
       )}
+      {levelUp && (
+        <LevelUpOverlay
+          visible={levelUpVisible}
+          fromLevel={levelUp.fromLevel}
+          toLevel={levelUp.toLevel}
+          onDone={() => setLevelUpVisible(false)}
+        />
+      )}
+
 
       {/* グリッチ演出（スコア0%時の赤フラッシュ 300ms） */}
       {showGlitch && <View style={styles.glitchOverlay} />}
       
       <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       <Text style={[styles.headerTitle, { color: colors.text, letterSpacing: 2 }]} numberOfLines={1}>
-        学習結果
+        {t.learningResults}
       </Text>
 
       {/* Score Card */}
       <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.summaryLabel, { color: colors.textSecondary, letterSpacing: 2 }]} numberOfLines={1}>
-          結果サマリー
+          {t.resultSummary}
         </Text>
         <View style={styles.bigScore}>
           <Text style={[styles.bigScoreNum, { color: colors.primary }]}>{correctCount}</Text>
@@ -233,7 +265,7 @@ export default function ResultsScreen() {
           <Text style={[styles.bigScoreTotal, { color: colors.textSecondary }]}>{total}</Text>
         </View>
         <Text style={[styles.pctText, { color: colors.text,  }]} numberOfLines={1}>
-          正答率: {pct}%
+          {t.accuracyRate} {pct}%
         </Text>
         <Text style={[styles.gradeText, { color: grade.color }]}>{grade.label}</Text>
         {pct > 0 && pct < 100 && (
@@ -302,7 +334,7 @@ export default function ResultsScreen() {
           }}
         >
           <Text style={[styles.primaryBtnText, { color: onPrimary, letterSpacing: 1 }]} numberOfLines={1}>
-            もう一度学習する
+            {t.retakeQuiz}
           </Text>
         </TouchableOpacity>
         

@@ -32,23 +32,398 @@ service cloud.firestore {
     // コレクション: battleRooms/{roomId}
     // ─────────────────────────────────────────────
     match /battleRooms/{roomId} {
-      // 参加者 (host / guest) のみ購読・取得可
-      allow read: if request.auth != null
-        && (request.auth.uid == resource.data.hostId
-          || request.auth.uid == resource.data.guestId);
+      // ── 共通ヘルパー ──
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function callerUid() {
+        return request.auth.uid;
+      }
+      function oldData() {
+        return resource.data;
+      }
+      function newData() {
+        return request.resource.data;
+      }
+      function isHostCaller() {
+        return isSignedIn() && callerUid() == oldData().hostId;
+      }
+      function isGuestCaller() {
+        return isSignedIn() && oldData().guestId != null && callerUid() == oldData().guestId;
+      }
+      function isParticipant() {
+        return isHostCaller() || isGuestCaller();
+      }
+      function baseUnchanged() {
+        return newData().hostId == oldData().hostId
+          && newData().createdAt == oldData().createdAt;
+      }
+      function changedKeys() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
 
-      // 認証済みなら誰でも作成可 (hostId の偽装は create 時の検証で防止)
-      // 通常ルーム: guestId == null && status == 'waiting'
-      // 再戦ルーム (requestRematch): 両者確定済みのため guestId 引継ぎ + status == 'creating' を許可
-      allow create: if request.auth != null
-        && request.resource.data.hostId == request.auth.uid
-        && ((request.resource.data.guestId == null && request.resource.data.status == 'waiting')
-          || (request.resource.data.status == 'creating'));
+      // ── 作成時の初期形 ──
+      // 通常 (createRoom): guestId=null, status=waiting。作成者=host のみ。
+      // 再戦 (requestRematch): guestId=相手UID, status=creating。host/guest のどちらが
+      // 作成してもよいが新ルームの参加者であること (別室参照は不可のため同意自体は検証不可)。
+      function validInitial() {
+        return isSignedIn()
+          && newData().hostId is string
+          && (newData().guestId == null
+            || (newData().guestId is string && newData().guestId != newData().hostId))
+          && (newData().status == 'waiting' || newData().status == 'creating')
+          && newData().createdAt == request.time
+          && newData().get('timerStartAt', null) == null
+          && newData().get('hostQuestion', null) == null
+          && newData().get('guestQuestion', null) == null
+          && newData().get('hostAnswer', null) == null
+          && newData().get('guestAnswer', null) == null
+          && newData().get('hostJudgement', null) == null
+          && newData().get('guestJudgement', null) == null
+          && newData().get('hostTimedOut', false) == false
+          && newData().get('guestTimedOut', false) == false
+          && newData().get('hostRematch', false) == false
+          && newData().get('guestRematch', false) == false
+          && newData().get('rematchRoomId', null) == null
+          && ((newData().guestId == null && newData().status == 'waiting'
+              && newData().hostId == callerUid())
+            || (newData().guestId != null && newData().status == 'creating'
+              && (newData().hostId == callerUid() || newData().guestId == callerUid())))
+          && newData().keys().hasOnly([
+            'hostId', 'guestId', 'status', 'createdAt', 'timerStartAt',
+            'hostQuestion', 'guestQuestion', 'hostAnswer', 'guestAnswer',
+            'hostJudgement', 'guestJudgement', 'hostTimedOut', 'guestTimedOut',
+            'hostRematch', 'guestRematch', 'rematchRoomId'
+          ]);
+      }
 
-      // 参加者のみ更新可 (退出・進行の詳細はクライアントの transaction で担保)
-      allow update: if request.auth != null
-        && (request.auth.uid == resource.data.hostId
-          || request.auth.uid == resource.data.guestId);
+      // ── 参加 (joinRoom): 非参加者が waiting + guestId==null のみ ──
+      function joinUpdate() {
+        return isSignedIn()
+          && oldData().status == 'waiting'
+          && oldData().guestId == null
+          && oldData().hostId != callerUid()
+          && newData().guestId == callerUid()
+          && newData().status == 'creating'
+          && baseUnchanged()
+          && changedKeys().hasOnly(['guestId', 'status']);
+      }
+
+      // ── 問題の形: 通常提出と時間切れ提出を区別 ──
+      // 通常 (submitQuestion): {text, answer} のみ。両方とも空白以外の文字を含むこと。
+      // 時間切れ (submitTimeout): {text, answer, isTimeout:true} のみ。
+      // 白紙形式または両方とも空白以外の文字を含む形式だけ許可し、片方だけ空は不可。
+      // 前後の空白を除いた後の長さで判定する (rules.String.trim() を使用)。
+      function hasVisibleChar(s) {
+        return s is string && s.trim().size() >= 1;
+      }
+      function validNormalQuestion(q) {
+        return q is map
+          && q.keys().hasOnly(['text', 'answer'])
+          && hasVisibleChar(q.text) && q.text.size() <= 2000
+          && hasVisibleChar(q.answer) && q.answer.size() <= 2000;
+      }
+      function validNonBlankTimeoutQuestion(q) {
+        return q is map
+          && q.keys().hasOnly(['text', 'answer', 'isTimeout'])
+          && q.isTimeout == true
+          && hasVisibleChar(q.text) && q.text.size() <= 2000
+          && hasVisibleChar(q.answer) && q.answer.size() <= 2000;
+      }
+      function validBlankTimeoutQuestion(q) {
+        return q is map
+          && q.keys().hasOnly(['text', 'answer', 'isTimeout'])
+          && q.isTimeout == true
+          && q.text == '' && q.answer == '';
+      }
+      function validTimeoutQuestion(q) {
+        return validBlankTimeoutQuestion(q) || validNonBlankTimeoutQuestion(q);
+      }
+
+      // 相手側の白紙時間切れ: 正規の白紙形式かつ相手側の TimedOut が true。
+      function isBlankTimeoutQuestion(q, timedOut) {
+        return timedOut == true && validBlankTimeoutQuestion(q);
+      }
+
+      // 参加者は単件取得・購読可。waiting (guest未参加) はID指定の取得のみ可。一覧は禁止。
+      allow get: if isSignedIn()
+        && (callerUid() == resource.data.hostId
+          || (resource.data.guestId != null && callerUid() == resource.data.guestId)
+          || (resource.data.status == 'waiting' && resource.data.guestId == null));
+      allow list: if false;
+
+      // 認証済みなら参加者として作成可。初期形は validInitial で固定。
+      allow create: if validInitial();
+
+      // ── 問題提出: creating のみ、自分の問題は1回、相手側は不変 ──
+      // 通常 (submitQuestion): 問題データが validNormalQuestion かつ TimedOut 不変。
+      //   単独提出は creating 維持、両者非空のみ answering へ。
+      //   相手が白紙時間切れ済みの場合のみ finished へ (白紙後の通常提出フロー用)。
+      // 時間切れ (submitTimeout): 問題データが validTimeoutQuestion かつ
+      //   本人の TimedOut が false->true。ライブラリ選出 (非空) と白紙 (空) を両方許容。
+      //   単独提出は creating 維持、両者非空のみ answering へ、片方空なら finished へ。
+      function hostQuestionUpdate() {
+        return isHostCaller()
+          && oldData().status == 'creating'
+          && oldData().get('hostQuestion', null) == null
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().guestQuestion == oldData().get('guestQuestion', null)
+          && (
+            (
+              validNormalQuestion(newData().hostQuestion)
+              && newData().get('hostTimedOut', false) == oldData().get('hostTimedOut', false)
+              && (
+                (newData().status == 'creating' && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+                || (newData().status == 'answering'
+                  && oldData().get('guestQuestion', null) != null
+                  && hasVisibleChar(oldData().guestQuestion.text)
+                  && hasVisibleChar(newData().hostQuestion.text)
+                  && oldData().get('timerStartAt', null) == null && newData().timerStartAt == request.time)
+                || (newData().status == 'finished'
+                  && isBlankTimeoutQuestion(
+                    oldData().get('guestQuestion', null), oldData().get('guestTimedOut', false))
+                  && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+              )
+            )
+            || (
+              validTimeoutQuestion(newData().hostQuestion)
+              && oldData().get('hostTimedOut', false) == false && newData().get('hostTimedOut', false) == true
+              && (
+                (newData().status == 'creating' && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+                || (newData().status == 'answering'
+                  && oldData().get('guestQuestion', null) != null
+                  && hasVisibleChar(oldData().guestQuestion.text)
+                  && hasVisibleChar(newData().hostQuestion.text)
+                  && oldData().get('timerStartAt', null) == null && newData().timerStartAt == request.time)
+                || (newData().status == 'finished'
+                  && oldData().get('guestQuestion', null) != null
+                  && (validBlankTimeoutQuestion(newData().hostQuestion) || validBlankTimeoutQuestion(oldData().guestQuestion))
+                  && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+              )
+            )
+          )
+          && changedKeys().hasOnly(['hostQuestion', 'hostTimedOut', 'status', 'timerStartAt']);
+      }
+      function guestQuestionUpdate() {
+        return isGuestCaller()
+          && oldData().status == 'creating'
+          && oldData().get('guestQuestion', null) == null
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().hostQuestion == oldData().get('hostQuestion', null)
+          && (
+            (
+              validNormalQuestion(newData().guestQuestion)
+              && newData().get('guestTimedOut', false) == oldData().get('guestTimedOut', false)
+              && (
+                (newData().status == 'creating' && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+                || (newData().status == 'answering'
+                  && oldData().get('hostQuestion', null) != null
+                  && hasVisibleChar(oldData().hostQuestion.text)
+                  && hasVisibleChar(newData().guestQuestion.text)
+                  && oldData().get('timerStartAt', null) == null && newData().timerStartAt == request.time)
+                || (newData().status == 'finished'
+                  && isBlankTimeoutQuestion(
+                    oldData().get('hostQuestion', null), oldData().get('hostTimedOut', false))
+                  && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+              )
+            )
+            || (
+              validTimeoutQuestion(newData().guestQuestion)
+              && oldData().get('guestTimedOut', false) == false && newData().get('guestTimedOut', false) == true
+              && (
+                (newData().status == 'creating' && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+                || (newData().status == 'answering'
+                  && oldData().get('hostQuestion', null) != null
+                  && hasVisibleChar(oldData().hostQuestion.text)
+                  && hasVisibleChar(newData().guestQuestion.text)
+                  && oldData().get('timerStartAt', null) == null && newData().timerStartAt == request.time)
+                || (newData().status == 'finished'
+                  && oldData().get('hostQuestion', null) != null
+                  && (validBlankTimeoutQuestion(newData().guestQuestion) || validBlankTimeoutQuestion(oldData().hostQuestion))
+                  && newData().get('timerStartAt', null) == oldData().get('timerStartAt', null))
+              )
+            )
+          )
+          && changedKeys().hasOnly(['guestQuestion', 'guestTimedOut', 'status', 'timerStartAt']);
+      }
+
+      // ── 回答: answering のみ、自分の回答は1回、submittedAt はサーバ時刻 ──
+      function hostAnswerUpdate() {
+        return isHostCaller()
+          && oldData().status == 'answering'
+          && oldData().get('hostAnswer', null) == null
+          && newData().hostAnswer is map
+          && newData().hostAnswer.text is string
+          && newData().hostAnswer.text.size() >= 1 && newData().hostAnswer.text.size() <= 1000
+          && newData().hostAnswer.keys().hasOnly(['text', 'submittedAt'])
+          && newData().hostAnswer.submittedAt == request.time
+          && newData().get('guestAnswer', null) == oldData().get('guestAnswer', null)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && (
+            newData().status == 'answering'
+            || (newData().status == 'judging' && oldData().get('guestAnswer', null) != null)
+          )
+          && changedKeys().hasOnly(['hostAnswer', 'status']);
+      }
+      function guestAnswerUpdate() {
+        return isGuestCaller()
+          && oldData().status == 'answering'
+          && oldData().get('guestAnswer', null) == null
+          && newData().guestAnswer is map
+          && newData().guestAnswer.text is string
+          && newData().guestAnswer.text.size() >= 1 && newData().guestAnswer.text.size() <= 1000
+          && newData().guestAnswer.keys().hasOnly(['text', 'submittedAt'])
+          && newData().guestAnswer.submittedAt == request.time
+          && newData().get('hostAnswer', null) == oldData().get('hostAnswer', null)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && (
+            newData().status == 'answering'
+            || (newData().status == 'judging' && oldData().get('hostAnswer', null) != null)
+          )
+          && changedKeys().hasOnly(['guestAnswer', 'status']);
+      }
+
+      // ── 判定: judging のみ、自分の判定は1回、値は correct/incorrect ──
+      function hostJudgementUpdate() {
+        return isHostCaller()
+          && oldData().status == 'judging'
+          && oldData().get('hostJudgement', null) == null
+          && (newData().hostJudgement == 'correct' || newData().hostJudgement == 'incorrect')
+          && newData().get('guestJudgement', null) == oldData().get('guestJudgement', null)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && (newData().status == 'judging'
+            || (newData().status == 'finished' && oldData().get('guestJudgement', null) != null))
+          && changedKeys().hasOnly(['hostJudgement', 'status']);
+      }
+      function guestJudgementUpdate() {
+        return isGuestCaller()
+          && oldData().status == 'judging'
+          && oldData().get('guestJudgement', null) == null
+          && (newData().guestJudgement == 'correct' || newData().guestJudgement == 'incorrect')
+          && newData().get('hostJudgement', null) == oldData().get('hostJudgement', null)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && (newData().status == 'judging'
+            || (newData().status == 'finished' && oldData().get('hostJudgement', null) != null))
+          && changedKeys().hasOnly(['guestJudgement', 'status']);
+      }
+
+      // ── 退出 (leaveRoom): ホストは abandoned のみ / ゲストは待機戻しのみ ──
+      function hostLeaveUpdate() {
+        return isHostCaller()
+          && oldData().status != 'finished' && oldData().status != 'abandoned'
+          && newData().status == 'abandoned'
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && changedKeys().hasOnly(['status']);
+      }
+      function guestLeaveUpdate() {
+        return isGuestCaller()
+          && oldData().status != 'finished' && oldData().status != 'abandoned'
+          && newData().guestId == null
+          && newData().status == 'waiting'
+          && newData().get('hostQuestion', null) == null
+          && newData().get('guestQuestion', null) == null
+          && newData().get('hostAnswer', null) == null
+          && newData().get('guestAnswer', null) == null
+          && newData().get('hostJudgement', null) == null
+          && newData().get('guestJudgement', null) == null
+          && newData().get('timerStartAt', null) == null
+          && newData().get('hostTimedOut', false) == false
+          && newData().get('guestTimedOut', false) == false
+          && baseUnchanged()
+          && changedKeys().hasOnly(['guestId', 'status',
+            'hostQuestion', 'guestQuestion', 'hostAnswer', 'guestAnswer',
+            'hostJudgement', 'guestJudgement', 'timerStartAt',
+            'hostTimedOut', 'guestTimedOut']);
+      }
+
+      // ── 再戦フラグ: finished のみ、自分のフラグのみ ──
+      function hostRematchOn() {
+        return isHostCaller()
+          && oldData().status == 'finished'
+          && oldData().get('rematchRoomId', null) == null
+          && newData().get('rematchRoomId', null) == null
+          && oldData().get('hostRematch', false) == false
+          && newData().get('hostRematch', false) == true
+          && newData().get('guestRematch', false) == oldData().get('guestRematch', false)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().status == oldData().status
+          && changedKeys().hasOnly(['hostRematch']);
+      }
+      function guestRematchOn() {
+        return isGuestCaller()
+          && oldData().status == 'finished'
+          && oldData().get('rematchRoomId', null) == null
+          && newData().get('rematchRoomId', null) == null
+          && oldData().get('hostRematch', false) == false
+          && newData().get('hostRematch', false) == oldData().get('hostRematch', false)
+          && oldData().get('guestRematch', false) == false
+          && newData().get('guestRematch', false) == true
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().status == oldData().status
+          && changedKeys().hasOnly(['guestRematch']);
+      }
+      function hostRematchOff() {
+        return isHostCaller()
+          && oldData().status == 'finished'
+          && oldData().get('rematchRoomId', null) == null
+          && newData().get('rematchRoomId', null) == null
+          && oldData().get('hostRematch', false) == true
+          && newData().get('hostRematch', false) == false
+          && newData().get('guestRematch', false) == oldData().get('guestRematch', false)
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().status == oldData().status
+          && changedKeys().hasOnly(['hostRematch']);
+      }
+      function guestRematchOff() {
+        return isGuestCaller()
+          && oldData().status == 'finished'
+          && oldData().get('rematchRoomId', null) == null
+          && newData().get('rematchRoomId', null) == null
+          && oldData().get('hostRematch', false) == false
+          && newData().get('hostRematch', false) == oldData().get('hostRematch', false)
+          && oldData().get('guestRematch', false) == true
+          && newData().get('guestRematch', false) == false
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && newData().status == oldData().status
+          && changedKeys().hasOnly(['guestRematch']);
+      }
+      // 両者同意後の紐付け (第3tx): rematchRoomId null -> 新ID のみ
+      function rematchLinkUpdate() {
+        return isParticipant()
+          && oldData().status == 'finished'
+          && oldData().get('hostRematch', false) == true
+          && oldData().get('guestRematch', false) == true
+          && oldData().get('rematchRoomId', null) == null
+          && newData().get('rematchRoomId', null) is string
+          && newData().get('rematchRoomId', null).size() >= 1
+          && newData().get('rematchRoomId', null).size() <= 100
+          && newData().status == oldData().status
+          && baseUnchanged()
+          && newData().guestId == oldData().guestId
+          && changedKeys().hasOnly(['rematchRoomId']);
+      }
+
+      // 参加者のみ更新可: 各操作の担当項目 + 正規遷移に限定
+      allow update: if isSignedIn()
+        && (joinUpdate()
+          || hostQuestionUpdate() || guestQuestionUpdate()
+          || hostAnswerUpdate() || guestAnswerUpdate()
+          || hostJudgementUpdate() || guestJudgementUpdate()
+          || hostLeaveUpdate() || guestLeaveUpdate()
+          || hostRematchOn() || guestRematchOn()
+          || hostRematchOff() || guestRematchOff()
+          || rematchLinkUpdate());
 
       // クライアントからの削除は禁止 (status: finished / abandoned で対応)
       allow delete: if false;

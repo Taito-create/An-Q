@@ -130,7 +130,7 @@ export default function SettingsScreen() {
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10 }]}>
         <BackButton to="/sub" />
         <Text style={[styles.headerTitle, { color: colors.text, fontSize: Math.round(22 * scale), flex: 1 }]}>
-          <Palette size={24} color={colors.primary} style={{ marginRight: 8 }} />{ja ? 'インターフェース設定' : 'Interface Settings'}
+          <Palette size={24} color={colors.primary} style={{ marginRight: 8 }} />{t.interfaceSettings}
         </Text>
       </View>
 

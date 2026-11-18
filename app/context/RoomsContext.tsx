@@ -213,7 +213,8 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
   // ── ルームから退出する ──
   // ホスト: status を 'abandoned' にして対戦を破棄する
-  // ゲスト: guestId を null に戻し、status を 'waiting' に戻す (ホスト再待機用)
+  // ゲスト: guestId を null に戻し、status を 'waiting' に戻し、
+  // 前対戦の host/guest 問題・回答・判定・timerStartAt・TimedOut を初期値へ戻す (ホスト再待機用)
   // finished 済みは何もしない。観戦者(非参加者)も何もしない
   const leaveRoom = useCallback(
     async (roomId: string): Promise<void> => {
@@ -229,7 +230,19 @@ export const RoomsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return;
         }
         if (room.guestId === uid) {
-          tx.update(roomRef, { guestId: null, status: 'waiting' });
+          tx.update(roomRef, {
+            guestId: null,
+            status: 'waiting',
+            hostQuestion: null,
+            guestQuestion: null,
+            hostAnswer: null,
+            guestAnswer: null,
+            hostJudgement: null,
+            guestJudgement: null,
+            timerStartAt: null,
+            hostTimedOut: false,
+            guestTimedOut: false,
+          });
         }
       });
     },

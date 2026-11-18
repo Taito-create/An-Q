@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { useNavigate } from 'react-router-dom';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,7 +9,7 @@ import { useLocale } from './hooks/useLocale';
 import { SoundManager } from './sound';
 import { Clock, TrendingUp, Target, Award } from 'lucide-react';
 import { STORAGE_KEYS } from './constants/storageKeys';
-import { useQuestions } from './hooks/useQuestions';
+import { useQuestionsContext } from './context/QuestionsContext';
 import { safeParseArray } from './utils/storageUtils';
 import { loadStats, UserStats } from './missions';
 import {
@@ -22,7 +22,12 @@ export default function StatisticsScreen() {
   const { colors, onPrimary, isCyberpunk } = useTheme();
   const locale = useLocale();
   const t = translations[locale];
-  const { questions: allQuestions } = useQuestions();
+  const { questions: allQuestions } = useQuestionsContext();
+  const allQuestionsRef = useRef(allQuestions);
+
+  useEffect(() => {
+    allQuestionsRef.current = allQuestions;
+  }, [allQuestions]);
 
   const [stats, setStats] = useState({
     screenTime: 0,
@@ -83,7 +88,7 @@ export default function StatisticsScreen() {
       const screenTime = screenTimeRaw ? parseInt(screenTimeRaw, 10) : 0;
 
       const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      const questionsCreated = allQuestions.filter(q => (q.createdAt ?? 0) > weekAgo).length;
+      const questionsCreated = allQuestionsRef.current.filter(q => (q.createdAt ?? 0) > weekAgo).length;
 
       const historyRaw = await AsyncStorage.getItem(STORAGE_KEYS.QUIZ_HISTORY);
       const history = safeParseArray(historyRaw, []);
@@ -127,7 +132,7 @@ export default function StatisticsScreen() {
         date.setDate(date.getDate() - i);
         const dateStart = date.getTime();
         const dateEnd = dateStart + 86400000;
-        const count = allQuestions.filter(q => (q.createdAt ?? 0) >= dateStart && (q.createdAt ?? 0) < dateEnd).length;
+        const count = allQuestionsRef.current.filter(q => (q.createdAt ?? 0) >= dateStart && (q.createdAt ?? 0) < dateEnd).length;
         days.push(count);
       }
       setQuestionsCreatedData(days);

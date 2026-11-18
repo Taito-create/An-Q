@@ -12,6 +12,7 @@ import RomeaSpeechBubble from './components/RomeaSpeechBubble';
 import TerminalLog, { TerminalLogHandle } from './components/TerminalLog';
 import PatternBackground from './patternBackground';
 import { IMAGES } from './constants/images';
+import { STORAGE_KEYS } from './constants/storageKeys';
 import { Platform } from 'react-native';
 import { Svg, Circle } from 'react-native-svg';
 import { translations } from './translations';
@@ -682,14 +683,14 @@ const HomeScreen = React.memo(() => {
 
   const loadTimerSetting = async () => {
     try {
-      let timerValue = await AsyncStorage.getItem('APP_TIMER_SETTING');
+      let timerValue = await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING);
       let storedMinutes = timerValue ? parseInt(timerValue, 10) : null;
 
       if (storedMinutes === null) {
         const oldTimerValue = await AsyncStorage.getItem('timerSetting');
         if (oldTimerValue !== null) {
           storedMinutes = parseInt(oldTimerValue, 10);
-          await AsyncStorage.setItem('APP_TIMER_SETTING', storedMinutes.toString());
+          await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, storedMinutes.toString());
           await AsyncStorage.removeItem('timerSetting');
         }
       }
@@ -723,7 +724,7 @@ const HomeScreen = React.memo(() => {
   const saveTimer = async (minutes: number) => {
     try {
       setTimerMinutes(minutes);
-      await AsyncStorage.setItem('APP_TIMER_SETTING', minutes.toString());
+      await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, minutes.toString());
       SoundManager.play('complete');
     } catch (error) {
       console.error('Failed to save timer settings:', error);
@@ -1161,6 +1162,75 @@ const HomeScreen = React.memo(() => {
 
   // renderMainActions / renderQuickActions は renderTransferSelector に統合・置き換え済み
 
+  const renderTodayGoal = () => {
+    const goal = dailyGoal ?? 10;
+    const solved = todayCorrect ?? 0;
+    const progress = goal > 0 ? Math.min(solved / goal, 1) : 0;
+    return (
+      <View style={[
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 },
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 },
+      ]}>
+        <View style={[
+          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+        ]}>
+          <Text style={[
+            { fontSize: 12, fontWeight: '600', color: colors.text },
+            { fontSize: 12, fontWeight: '600', color: colors.text },
+          ]}>
+            {t.dailyGoalLabel}
+          </Text>
+          <View style={[
+            { height: 6, borderRadius: 3, overflow: 'hidden', marginHorizontal: 8, flex: 1, backgroundColor: colors.textSecondary },  // track,
+            { height: 6, borderRadius: 3, overflow: 'hidden', marginHorizontal: 8, width: `${progress * 100}%`, backgroundColor: colors.primary },
+          ]}></View>
+          <Text style={[
+            { fontSize: 12, color: colors.textSecondary },
+            { fontSize: 12, color: colors.textSecondary },
+          ]}>
+            {`${solved}/${goal}`}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  // ────── renderReviewGuide ──────
+  const renderReviewGuide = () => {
+    if (weakQuestionCount === 0 && reviewDueCount === 0) return null;
+    return (
+      <View style={[
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 },
+        { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16 },
+      ]}>
+        <View style={[
+          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+        ]}>
+          <Text style={[
+            { fontSize: 13, fontWeight: '600', color: colors.text },
+            { fontSize: 13, fontWeight: '600', color: colors.text },
+          ]}>
+            {locale === 'ja' ? '復習が必要な問題' : 'Review Needed'}
+          </Text>
+          <Text style={[
+            { fontSize: 12, color: colors.primary },
+            { fontSize: 12, color: colors.primary },
+          ]}>
+            {weakQuestionCount + reviewDueCount} {locale === 'ja' ? '問' : 'q'}
+          </Text>
+        </View>
+        <Text style={[
+          { fontSize: 12, color: colors.textSecondary },
+          { fontSize: 12, color: colors.textSecondary },
+        ]}>
+          {locale === 'ja' ? '学習を始めると復習が表示されます' : 'Start learning to see reviews'}
+        </Text>
+      </View>
+    );
+  };
+
   // デイリークエストカード
   const renderDailyQuests = () => {
     if (dailyQuests.length === 0) return null;
@@ -1535,18 +1605,9 @@ const HomeScreen = React.memo(() => {
           ) : (
             /* モバイル／タブレット／デスクトップ：1カラムレイアウト（PCの視覚順序に統一） */
             <View style={mainContentStyle[screenType]}>
+              {renderTodayGoal()}
+              {renderReviewGuide()}
               {renderTransferSelector()}
-              {totalQuestions === 0 ? renderEmptyStats() : renderStatsCard()}
-              {renderReviewCard()}
-              {renderWeakCard()}
-              {renderDailyQuests()}
-              <TerminalLog
-                ref={terminalLogRef}
-                statusLine={statusText}
-                initialLines={[...TERMINAL_LOG_HEAD, memoryCoreText]}
-              />
-              {renderTodayQuestion()}
-              {renderAchievementBadges()}
             </View>
           )}
 

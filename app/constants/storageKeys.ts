@@ -80,6 +80,9 @@ export const STORAGE_KEYS = {
   // スクリーンタイム
   WEEKLY_SCREEN_TIME: 'weekly_screen_time_minutes',
   CUSTOM_TIMERS: 'CUSTOM_TIMERS',
+  ANIMATION_LEVEL: 'animation_level',
+  ACTIVE_TIMER_MINUTES: 'active_timer_minutes',
+  ACTIVE_TIMER_LABEL: 'active_timer_label',
 
   // タグ管理
   TAG_MASTER_LIST: 'tag_master_list',
@@ -97,7 +100,23 @@ export const STORAGE_KEYS = {
 
   // マイグレーション
   DB_VERSION: 'db_version',
-} as const;
+
+ // クイズ関連
+ QUIZ_MODE: 'quiz_mode',
+ QUIZ_RESULTS: 'quiz_results',
+ QUIZ_HISTORY: 'quiz_history',
+
+ // カレンダー関連
+ CALENDAR_EVENTS: 'calendar_events',
+
+ // ユーザー認証・プロファイル関連
+ USERNAME: 'user_username',
+ USER_BIO: 'user_bio',
+ JOIN_DATE: 'join_date',
+ LAST_LOGIN_DATE: 'lastLoginDate',
+
+ // ユーザー進捗
+ USER_BOOKS: 'user_books',
 
 /**
  * ストレージ操作のヘルパー関数

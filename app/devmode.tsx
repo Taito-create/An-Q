@@ -9,6 +9,7 @@ import { loadStats, saveStats, saveProgress, DEFAULT_STATS, MISSIONS } from './m
 import { useRooms } from './context/RoomsContext';
 import { useQuestionsContext } from './context/QuestionsContext';
 import { attachDevBotToRoom } from './utils/devBot';
+import LevelUpOverlay from './components/LevelUpOverlay';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, CheckCircle, Music, Pencil, Lock, BarChart3, Trash2, ClipboardList, Wrench, Bot, Calendar } from 'lucide-react';
@@ -34,6 +35,8 @@ export default function DevModeScreen() {
   const [botMode, setBotMode] = useState(false);
   const [creatingLimitSec, setCreatingLimitSec] = useState<number>(60);
   const [starting, setStarting] = useState(false);
+  // レベルアップ演出プレビュー（表示状態のみ。XP・保存処理は一切呼ばない）
+  const [levelUpPreviewVisible, setLevelUpPreviewVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -215,6 +218,7 @@ export default function DevModeScreen() {
     { label: '本を1000冊付与', icon: BookOpen, action: () => giveBooks(1000), color: colors.primary },
     { label: '全ミッション達成', icon: CheckCircle, action: completeAllMissions, color: colors.success },
     { label: 'カスタムBGM解放', icon: Music, action: unlockCustomBGM, color: colors.success },
+    { label: 'レベルアップ演出をプレビュー', icon: CheckCircle, action: () => { SoundManager.play('decide'); setLevelUpPreviewVisible(true); }, color: colors.success },
     { label: '問題スロット999', icon: Pencil, action: maxQuestionSlots, color: colors.success },
     { label: '全機能解放（最大値）', icon: Lock, action: unlockAll, color: '#9C27B0' },
     { label: '現在の統計を表示', icon: BarChart3, action: showStats, color: colors.warning },
@@ -224,6 +228,12 @@ export default function DevModeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LevelUpOverlay
+        visible={levelUpPreviewVisible}
+        fromLevel={4}
+        toLevel={5}
+        onDone={() => setLevelUpPreviewVisible(false)}
+      />
       <View style={[styles.header, { backgroundColor: '#1A1A1A', borderBottomColor: '#333', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
         <View>
           <Text style={styles.headerTitle}><Wrench size={20} color="#00FF41" style={{ marginRight: 8 }} />Developer Mode</Text>

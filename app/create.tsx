@@ -25,6 +25,7 @@ import { awardQuestionCreation, incrementXP, uploadImageToCloudinary } from '../
 // Tag functions now come from useQuestionsContext (Firestore-synced)
 import Tesseract from 'tesseract.js';
 import { Trash2, Tag as TagIcon, Camera, Loader2, PenSquare } from 'lucide-react';
+import VoiceInputButton from './VoiceInputButton';
 import './create.css';
 
 export default function CreateQuestionScreen() {
@@ -894,16 +895,19 @@ export default function CreateQuestionScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: br }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t.question}</Text>
-          {!showCropUI && (
-            <PressableButton
-              style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8 }]}
-              onPress={() => handleOcrExtract({ type: 'question' })}
-              disabled={ocrLoading}
-              title={locale === 'ja' ? '写真や画像で入力' : 'Scan image'}
-            >
-              <Camera size={20} color={onPrimary} />
-            </PressableButton>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <VoiceInputButton locale={locale} colors={colors} onPrimary={onPrimary} br={br} value={question} onTranscript={setQuestion} multiline />
+            {!showCropUI && (
+              <PressableButton
+                style={[styles.ocrIconButton, { backgroundColor: colors.primary, borderRadius: 8, marginLeft: 6 }]}
+                onPress={() => handleOcrExtract({ type: 'question' })}
+                disabled={ocrLoading}
+                title={locale === 'ja' ? '写真や画像で入力' : 'Scan image'}
+              >
+                <Camera size={20} color={onPrimary} />
+              </PressableButton>
+            )}
+          </View>
         </View>
         <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top', backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]} value={question} onChangeText={setQuestion} placeholder={locale === 'ja' ? '問題を入力' : 'Enter the question'} placeholderTextColor={colors.textSecondary} multiline />
 
@@ -1056,6 +1060,11 @@ export default function CreateQuestionScreen() {
                       placeholder={locale === 'ja' ? '正解を入力' : 'Enter the correct answer'}
                       placeholderTextColor={colors.textSecondary}
                     />
+                    <VoiceInputButton locale={locale} colors={colors} onPrimary={onPrimary} br={br} value={answer} onTranscript={(text) => {
+                      const newGroups = answerGroups.map(g => [...g]);
+                      newGroups[groupIndex][answerIndex] = text;
+                      setAnswerGroups(newGroups);
+                    }} />
                     {group.length > 1 && answerIndex > 0 && (
                       <PressableButton
                         style={{
@@ -1136,18 +1145,24 @@ export default function CreateQuestionScreen() {
         {answerType === 'multiple' && (
           <View>
             {multipleChoice.options.map((option, index) => (
-              <TextInput
-                key={index}
-                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br }]}
-                value={option}
-                onChangeText={(text) => {
+              <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1, backgroundColor: colors.background, borderColor: colors.border, color: colors.text, borderRadius: br, marginBottom: 0 }]}
+                  value={option}
+                  onChangeText={(text) => {
+                    const newOptions = [...multipleChoice.options];
+                    newOptions[index] = text;
+                    setMultipleChoice({...multipleChoice, options: newOptions});
+                  }}
+                  placeholder={`${t.options} ${index + 1}`}
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <VoiceInputButton locale={locale} colors={colors} onPrimary={onPrimary} br={br} value={option} onTranscript={(text) => {
                   const newOptions = [...multipleChoice.options];
                   newOptions[index] = text;
-                  setMultipleChoice({...multipleChoice, options: newOptions});
-                }}
-                placeholder={`${t.options} ${index + 1}`}
-                placeholderTextColor={colors.textSecondary}
-              />
+                  setMultipleChoice({ ...multipleChoice, options: newOptions });
+                }} />
+              </View>
             ))}
             <View style={styles.correctAnswerContainer}>
               <Text style={[styles.correctAnswerLabel, { color: colors.text }]}>

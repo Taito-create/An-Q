@@ -4,6 +4,7 @@ import {
   Animated, Platform,
 } from 'react-native';
 import { useNavigate, useParams } from 'react-router-dom';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from './theme';
 import { useRoom, useRooms } from './context/RoomsContext';
 import { useAuth } from './auth/AuthContext';
@@ -12,6 +13,8 @@ import OpponentCard from './components/OpponentCard';
 import { convertToBattleAnswer } from './utils/questionToBattle';
 import { awardQuizCompletion, recordBattleResult } from '../src/utils/userProgress';
 import PressableButton from './components/PressableButton';
+import LevelUpOverlay from './components/LevelUpOverlay';
+import type { AnimationLevel } from './animations';
 import BackButton from './components/BackButton';
 import TypedText from './components/TypedText';
 import { useScramble } from './hooks/useScramble';
@@ -620,6 +623,11 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [rewardText, setRewardText] = useState<string | null>(null);
   const [statsText, setStatsText] = useState<string | null>(null);
+  // レベルアップ演出（報酬確定由来・roomId単位で1回限り）
+  const [levelUp, setLevelUp] = useState<{ fromLevel: number; toLevel: number } | null>(null);
+  const [levelUpVisible, setLevelUpVisible] = useState(false);
+  const levelUpForRef = useRef<string | null>(null);
+  const [pendingRematchId, setPendingRematchId] = useState<string | null>(null);
   const isHost = room.hostId === user?.uid;
   const opponentUid = getOpponentUid(room, user?.uid);
   const outcome = decideOutcome(room, isHost);
@@ -656,13 +664,16 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 両者同意で新ルームへ自動遷移
+  // 両者同意で新ルームへ自動遷移（レベルアップ演出中は終了・スキップ後に遷移）
   useEffect(() => {
-    if (room.rematchRoomId) {
-      SoundManager.play('decide');
-      navigate(`/battle/${room.rematchRoomId}`);
+    if (!room.rematchRoomId) return;
+    if (levelUpVisible) {
+      setPendingRematchId(room.rematchRoomId);
+      return;
     }
-  }, [room.rematchRoomId, navigate]);
+    SoundManager.play('decide');
+    navigate(`/battle/${room.rematchRoomId}`);
+  }, [room.rematchRoomId, levelUpVisible, navigate]);
 
   // 報酬付与 (マウント時1度だけ・sessionStorageで重複防止)
   useEffect(() => {
@@ -702,6 +713,19 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
           ? ' (×0.5 時間切れ)'
           : ' (×1.5 ボーナス)';
         setRewardText(`報酬: +${bonusCoins}コイン / +${bonusXP}XP${multiplierLabel}${levelText}`);
+        // レベルアップ演出は報酬確定後に1回だけ出す（演出なし設定では出さない）
+        // 再レンダリングでの重複防止に roomId 単位で記録する
+        if (result.leveledUp > 0 && levelUpForRef.current !== roomId) {
+          levelUpForRef.current = roomId;
+          const toLevel = result.document.level;
+          setLevelUp({ fromLevel: toLevel - result.leveledUp, toLevel });
+          try {
+            const savedAnim = (await AsyncStorage.getItem('animation_level')) as AnimationLevel | null;
+            if (savedAnim !== 'none') setLevelUpVisible(true);
+          } catch {
+            setLevelUpVisible(true);
+          }
+        }
       } catch (e) {
         console.warn('battle reward failed:', e);
       }
@@ -747,8 +771,27 @@ function FinishedView({ room, roomId }: { room: BattleRoom; roomId: string }) {
   const myWant = isHost ? (room.hostRematch ?? false) : (room.guestRematch ?? false);
   const peerWant = isHost ? (room.guestRematch ?? false) : (room.hostRematch ?? false);
 
+  const handleLevelUpDone = () => {
+    setLevelUpVisible(false);
+    // 演出終了・スキップ後に再戦先へ遷移（既存の自動遷移をここで完了させる）
+    if (pendingRematchId) {
+      const nextId = pendingRematchId;
+      setPendingRematchId(null);
+      SoundManager.play('decide');
+      navigate(`/battle/${nextId}`);
+    }
+  };
+
   return (
     <View style={styles.phaseBox}>
+      {levelUp && (
+        <LevelUpOverlay
+          visible={levelUpVisible}
+          fromLevel={levelUp.fromLevel}
+          toLevel={levelUp.toLevel}
+          onDone={handleLevelUpDone}
+        />
+      )}
       <Text style={[styles.resultHeadline, { color: headlineColor }]}>{scrambledHeadline}</Text>
       {(() => {
         const peerTimedOut = isHost ? (room.guestTimedOut ?? false) : (room.hostTimedOut ?? false);

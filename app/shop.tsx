@@ -44,7 +44,7 @@ export default function ShopScreen() {
     if (item.currency === 'coins') {
       if (coins < item.price) {
         Alert.alert(
-          locale === 'ja' ? 'コイン不足' : 'Insufficient Coins',
+          t.insufficientCoins,
           locale === 'ja' ? `このアイテムには${item.price}コイン必要です` : `This item costs ${item.price} coins`
         );
         SoundManager.play('wrong' as any);
@@ -57,7 +57,7 @@ export default function ShopScreen() {
       const currentBooks = stats?.totalBooks ?? 0;
       if (currentBooks < item.price) {
         Alert.alert(
-          locale === 'ja' ? '本不足' : 'Insufficient Books',
+          t.insufficientBooks,
           locale === 'ja' ? `このアイテムには${item.price}冊の本が必要です` : `This item costs ${item.price} books`
         );
         SoundManager.play('wrong' as any);
@@ -77,7 +77,7 @@ export default function ShopScreen() {
       const total = parseInt(boosted, 10) + bonus;
       await AsyncStorage.setItem('user_coins', total.toString());
       setCoins(total);
-      bonusMessage = locale === 'ja' ? `（コイン+${bonus}）` : `(coins +${bonus})`;
+      bonusMessage = locale === 'ja' ? t.coinBonus.replace('{bonus}', bonus.toString()) : `(coins +${bonus})`;
     }
     if (item.id === 's4') {
       const updatedStats = await loadStats();

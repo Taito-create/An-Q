@@ -81,11 +81,11 @@ function RootLayoutInner() {
         const oldKey1 = await AsyncStorage.getItem('timerSetting');
         const oldKey2 = await AsyncStorage.getItem('CURRENT_TIMER_SETTING');
         
-        if (oldKey1 && !await AsyncStorage.getItem('APP_TIMER_SETTING')) {
-          await AsyncStorage.setItem('APP_TIMER_SETTING', oldKey1);
+        if (oldKey1 && !await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING)) {
+          await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, oldKey1);
         }
-        if (oldKey2 && !await AsyncStorage.getItem('APP_TIMER_SETTING')) {
-          await AsyncStorage.setItem('APP_TIMER_SETTING', oldKey2);
+        if (oldKey2 && !await AsyncStorage.getItem(STORAGE_KEYS.APP_TIMER_SETTING)) {
+          await AsyncStorage.setItem(STORAGE_KEYS.APP_TIMER_SETTING, oldKey2);
         }
         
         // Remove old keys

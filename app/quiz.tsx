@@ -755,7 +755,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       const minutes = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
       setPreTimerMinutes(minutes);
 
-      const customRaw = await AsyncStorage.getItem('CUSTOM_TIMERS');
+      const customRaw = await AsyncStorage.getItem(STORAGE_KEYS.CUSTOM_TIMERS);
       const customTimers = customRaw ? JSON.parse(customRaw) : [];
       const presets: { label: string; value: number | null }[] = [
         { label: locale === 'ja' ? 'なし' : 'No limit', value: null },
@@ -1250,6 +1250,7 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
   // クイズ終了
   // ──────────────────────────────────────────────
   const finishQuizWithResults = async (finalResults: QuizResult[]) => {
+    let rewardResultForOverlay: { leveledUp: number; document: { level: number } } | null = null;
     setIsTimerActive(false);
     // クイズ終了時に手動読み上げを停止する
     stopSpeech();
@@ -1371,6 +1372,12 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
             bonusCoins: totalCoinReward - baseCoins,
           })
         : null;
+      if (rewardResult) {
+        rewardResultForOverlay = {
+          leveledUp: rewardResult.leveledUp,
+          document: { level: rewardResult.document.level },
+        };
+      }
 
       const levelUpMessage = rewardResult && rewardResult.leveledUp > 0
         ? locale === 'ja'
@@ -1426,7 +1433,8 @@ const [voicevoxSpeaker, setVoicevoxSpeaker] = useState<number>(3);
       state: {
         total: totalQuestions,
         score: finalScore,
-        results: finalResults
+        results: finalResults,
+        rewardResult: rewardResultForOverlay,
       }
     });
   };
